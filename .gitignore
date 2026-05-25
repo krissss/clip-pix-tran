@@ -1,5 +1,6 @@
 # macOS
 .DS_Store
+.idea
 
 # Xcode
 DerivedData/
@@ -9,6 +10,7 @@ build/
 *.xcuserstate
 *.moved-aside
 *.xcscmblueprint
+.idea/
 
 # Swift Package Manager
 .build/
@@ -30,6 +32,7 @@ fastlane/test_output/
 *.dSYM.zip
 *.dSYM
 *.mobileprovision
+Config/Signing.local.xcconfig
 
 # Logs
 *.log
