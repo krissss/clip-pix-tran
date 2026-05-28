@@ -150,6 +150,8 @@ private struct ShortcutsSettingsSection: View {
         VStack(spacing: 0) {
             shortcutRow(title: "打开 Clip", name: .showClip)
             SettingsRowDivider()
+            shortcutRow(title: "剪贴板快速面板", name: .showClipboardQuickPanel)
+            SettingsRowDivider()
             shortcutRow(title: "区域截图", name: .captureSelectedRegion)
             SettingsRowDivider()
             shortcutRow(title: "翻译剪贴板文本", name: .translateClipboardText)

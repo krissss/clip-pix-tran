@@ -3,6 +3,8 @@ import Foundation
 protocol ClipboardService {
     var changeCount: Int { get }
 
+    func readItem() -> ClipboardItem?
+    func writeItem(_ item: ClipboardItem) throws
     func readPlainText() -> String?
     func writePlainText(_ text: String) throws
 }

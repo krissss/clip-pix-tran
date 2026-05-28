@@ -35,17 +35,62 @@ struct Application: App {
         translationService: HybridTranslationService(),
         pasteboard: SystemClipboardService()
     )
+    @State private var shortcutController: AppShortcutController
+
+    init() {
+        let clipboardMonitor = ClipboardMonitor(
+            pasteboard: SystemClipboardService(),
+            history: ClipboardHistoryStore(
+                persistence: FileClipboardHistoryPersistence(),
+                persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.clipboard
+            )
+        )
+        let screenshotController = ScreenshotController(
+            history: ScreenshotHistoryStore(
+                persistence: FileScreenshotHistoryPersistence(),
+                persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.screenshot
+            ),
+            screenshotService: SystemScreenshotService(),
+            pasteboard: SystemScreenshotPasteboardService(),
+            fileSaver: SystemScreenshotFileSaver()
+        )
+        let translationController = TranslationController(
+            history: TranslationHistoryStore(
+                persistence: FileTranslationHistoryPersistence(),
+                persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.translation
+            ),
+            translationService: HybridTranslationService(),
+            pasteboard: SystemClipboardService()
+        )
+
+        self._clipboardMonitor = State(initialValue: clipboardMonitor)
+        self._screenshotController = State(initialValue: screenshotController)
+        self._translationController = State(initialValue: translationController)
+        self._shortcutController = State(
+            initialValue: AppShortcutController(
+                clipboardMonitor: clipboardMonitor,
+                screenshotController: screenshotController,
+                translationController: translationController
+            )
+        )
+    }
 
     var body: some Scene {
         WindowGroup("ClipPixTran", id: "main") {
             ContentView(
                 clipboardMonitor: clipboardMonitor,
                 screenshotController: screenshotController,
-                translationController: translationController
+                translationController: translationController,
+                shortcutController: shortcutController
             )
                 .frame(minWidth: 760, minHeight: 520)
+                .onAppear {
+                    clipboardMonitor.start()
+                    shortcutController.start()
+                }
         }
         .defaultLaunchBehavior(.presented)
+        .defaultSize(width: 1040, height: 680)
 
         Settings {
             AppSettingsView(
@@ -71,13 +116,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func bringMainWindowForward() {
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
-            return
-        }
-
         DispatchQueue.main.async {
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
+            AppWindowPresenter.bringMainWindowForward()
         }
     }
 }

@@ -70,17 +70,29 @@ final class ClipboardHistoryStore {
             return
         }
 
-        if let existingIndex = items.firstIndex(where: { $0.text == text }) {
-            var existingItem = items.remove(at: existingIndex)
-            existingItem.lastCopiedAt = date
+        record(ClipboardItem(text: text, createdAt: date, lastCopiedAt: date), at: date)
+    }
+
+    func record(_ item: ClipboardItem, at date: Date = Date()) {
+        guard shouldRecord(item) else {
+            return
+        }
+
+        if let existingIndex = items.firstIndex(where: { $0.contentMatches(item) }) {
+            let existingItem = items.remove(at: existingIndex)
             items.insert(existingItem, at: 0)
-        } else {
-            let item = ClipboardItem(
-                text: text,
-                createdAt: date,
+            items[0] = existingItem.mergingMetadata(
+                from: item,
                 lastCopiedAt: date
             )
-            items.insert(item, at: 0)
+        } else {
+            items.insert(
+                item.replacingDates(
+                    createdAt: date,
+                    lastCopiedAt: date
+                ),
+                at: 0
+            )
         }
 
         sortItems()
@@ -95,7 +107,7 @@ final class ClipboardHistoryStore {
         }
 
         return items.filter {
-            $0.text.localizedCaseInsensitiveContains(normalizedQuery)
+            $0.searchableText.localizedCaseInsensitiveContains(normalizedQuery)
         }
     }
 
@@ -145,6 +157,17 @@ final class ClipboardHistoryStore {
             }
 
             return first.lastCopiedAt > second.lastCopiedAt
+        }
+    }
+
+    private func shouldRecord(_ item: ClipboardItem) -> Bool {
+        switch item.kind {
+        case .text:
+            return !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .image:
+            return item.imageData != nil || !item.filePaths.isEmpty
+        case .file:
+            return !item.filePaths.isEmpty
         }
     }
 

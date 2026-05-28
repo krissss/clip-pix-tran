@@ -91,7 +91,10 @@ struct ScreenshotControllerTests {
             await controller.captureSelectedRegion()
         }
 
-        try await Task.sleep(nanoseconds: 80_000_000)
+        try await waitUntil {
+            controller.isCapturing == false
+                && controller.lastCaptureError == .timedOut
+        }
 
         #expect(controller.isCapturing == false)
         #expect(controller.lastErrorMessage == ScreenshotCaptureError.timedOut.localizedDescription)
@@ -258,6 +261,23 @@ struct ScreenshotControllerTests {
 
         controller.clearHistory()
         #expect(history.items.isEmpty)
+    }
+}
+
+@MainActor
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    pollIntervalNanoseconds: UInt64 = 10_000_000,
+    condition: () -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + .nanoseconds(Int64(timeoutNanoseconds))
+
+    while ContinuousClock.now < deadline {
+        if condition() {
+            return
+        }
+
+        try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
     }
 }
 

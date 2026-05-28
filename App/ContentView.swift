@@ -6,14 +6,15 @@
 //
 
 import SwiftUI
-import KeyboardShortcuts
 
 struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     @Bindable var clipboardMonitor: ClipboardMonitor
     @Bindable var screenshotController: ScreenshotController
     @Bindable var translationController: TranslationController
+    let shortcutController: AppShortcutController
     @State private var selectedSection: AppSection = .clip
 
     var body: some View {
@@ -45,20 +46,20 @@ struct ContentView: View {
         } detail: {
             sectionView(for: selectedSection)
         }
+        .background(MainWindowRegistrationView())
         .onAppear {
-            clipboardMonitor.start()
-        }
-        .onDisappear {
-            clipboardMonitor.stop()
-        }
-        .task {
-            await observeShowClipShortcut()
-        }
-        .task {
-            await observeCaptureSelectedRegionShortcut()
-        }
-        .task {
-            await observeTranslateClipboardShortcut()
+            shortcutController.selectSection = { section in
+                selectedSection = section
+            }
+            shortcutController.openSection = { section in
+                selectedSection = section
+                if !AppWindowPresenter.bringMainWindowForward() {
+                    openWindow(id: "main")
+                    DispatchQueue.main.async {
+                        AppWindowPresenter.bringMainWindowForward()
+                    }
+                }
+            }
         }
     }
 
@@ -82,38 +83,6 @@ struct ContentView: View {
         selectedSection = .tran
     }
 
-    private func observeShowClipShortcut() async {
-        for await event in KeyboardShortcuts.events(for: .showClip) where event == .keyUp {
-            selectedSection = .clip
-            bringMainWindowForward()
-        }
-    }
-
-    private func observeCaptureSelectedRegionShortcut() async {
-        for await event in KeyboardShortcuts.events(for: .captureSelectedRegion) where event == .keyUp {
-            selectedSection = .pix
-            bringMainWindowForward()
-            await screenshotController.captureSelectedRegion()
-        }
-    }
-
-    private func observeTranslateClipboardShortcut() async {
-        for await event in KeyboardShortcuts.events(for: .translateClipboardText) where event == .keyUp {
-            guard let text = SystemClipboardService().readPlainText() else {
-                continue
-            }
-
-            translationController.prefillSourceText(text)
-            selectedSection = .tran
-            bringMainWindowForward()
-            await translationController.translate()
-        }
-    }
-
-    private func bringMainWindowForward() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
-    }
 }
 
 #Preview {
@@ -132,6 +101,23 @@ struct ContentView: View {
             history: .preview,
             translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
+        ),
+        shortcutController: AppShortcutController(
+            clipboardMonitor: ClipboardMonitor(
+                pasteboard: PreviewClipboardService(),
+                history: ClipboardHistoryStore.preview
+            ),
+            screenshotController: ScreenshotController(
+                history: .preview,
+                screenshotService: PreviewScreenshotService(),
+                pasteboard: PreviewScreenshotPasteboardService(),
+                fileSaver: PreviewScreenshotFileSaver()
+            ),
+            translationController: TranslationController(
+                history: .preview,
+                translationService: FallbackTranslationService(),
+                pasteboard: PreviewClipboardService()
+            )
         )
     )
 }

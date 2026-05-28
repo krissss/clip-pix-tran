@@ -307,6 +307,19 @@ private final class CapturingClipboardService: ClipboardService {
         self.error = error
     }
 
+    func readItem() -> ClipboardItem? {
+        text.map { ClipboardItem(text: $0) }
+    }
+
+    func writeItem(_ item: ClipboardItem) throws {
+        if let error {
+            throw error
+        }
+
+        text = item.text
+        changeCount += 1
+    }
+
     func readPlainText() -> String? {
         text
     }

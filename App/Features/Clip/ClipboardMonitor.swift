@@ -59,16 +59,27 @@ final class ClipboardMonitor {
 
         observedChangeCount = currentChangeCount
 
-        if let text = pasteboard.readPlainText() {
-            history.record(text)
+        if let item = pasteboard.readItem() {
+            history.record(item)
         }
     }
 
     func copyToPasteboard(_ item: ClipboardItem) {
         do {
+            try pasteboard.writeItem(item)
+            observedChangeCount = pasteboard.changeCount
+            history.record(item)
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func copyPlainTextToPasteboard(_ item: ClipboardItem) {
+        do {
             try pasteboard.writePlainText(item.text)
             observedChangeCount = pasteboard.changeCount
-            history.record(item.text)
+            history.record(item)
             lastErrorMessage = nil
         } catch {
             lastErrorMessage = error.localizedDescription

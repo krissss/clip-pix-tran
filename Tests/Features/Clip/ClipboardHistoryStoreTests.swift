@@ -44,6 +44,56 @@ struct ClipboardHistoryStoreTests {
         #expect(store.items.first?.text == "same")
     }
 
+    @Test func repeatedTextKeepsLatestPayloads() throws {
+        let store = ClipboardHistoryStore()
+        let richTextPayload = ClipboardPayload(
+            type: "public.html",
+            data: try #require("<b>same</b>".data(using: .utf8))
+        )
+
+        store.record("same")
+        store.record(ClipboardItem(text: "same", payloads: [richTextPayload]))
+
+        let item = try #require(store.items.first)
+        #expect(store.items.count == 1)
+        #expect(item.text == "same")
+        #expect(item.payloads == [richTextPayload])
+    }
+
+    @Test func recordsImageItems() throws {
+        let store = ClipboardHistoryStore()
+        let imageData = Data([0x89, 0x50, 0x4E, 0x47])
+
+        store.record(ClipboardItem(imageData: imageData))
+
+        let item = try #require(store.items.first)
+        #expect(item.kind == .image)
+        #expect(item.imageData == imageData)
+    }
+
+    @Test func recordsFileItems() throws {
+        let store = ClipboardHistoryStore()
+
+        store.record(ClipboardItem(filePaths: ["/tmp/report.pdf", "/tmp/photo.png"]))
+
+        let item = try #require(store.items.first)
+        #expect(item.kind == .file)
+        #expect(item.filePaths == ["/tmp/report.pdf", "/tmp/photo.png"])
+    }
+
+    @Test func deduplicatesRepeatedFiles() {
+        let store = ClipboardHistoryStore()
+        let firstDate = Date(timeIntervalSince1970: 10)
+        let secondDate = Date(timeIntervalSince1970: 20)
+        let item = ClipboardItem(filePaths: ["/tmp/report.pdf"])
+
+        store.record(item, at: firstDate)
+        store.record(item, at: secondDate)
+
+        #expect(store.items.count == 1)
+        #expect(store.items.first?.lastCopiedAt == secondDate)
+    }
+
     @Test func movesRepeatedTextToTop() {
         let store = ClipboardHistoryStore()
         let firstDate = Date(timeIntervalSince1970: 10)
@@ -81,6 +131,17 @@ struct ClipboardHistoryStoreTests {
 
         #expect(filteredItems.map(\.text) == ["daily note", "Design note"])
         #expect(store.items.map(\.text) == ["daily note", "Release checklist", "Design note"])
+    }
+
+    @Test func filtersFileItemsByFilename() {
+        let store = ClipboardHistoryStore()
+
+        store.record("plain text")
+        store.record(ClipboardItem(filePaths: ["/tmp/design-brief.pdf"]))
+
+        let filteredItems = store.filteredItems(matching: "brief")
+
+        #expect(filteredItems.map(\.kind) == [.file])
     }
 
     @Test func emptySearchReturnsAllItems() {
@@ -242,6 +303,46 @@ struct ClipboardHistoryStoreTests {
 
         #expect(!FileManager.default.fileExists(atPath: fileURL.path))
         #expect(store.items.map(\.text) == ["temporary"])
+    }
+
+    @Test func persistsImageAndFileItems() async throws {
+        let fileURL = temporaryFileURL()
+        let persistence = FileClipboardHistoryPersistence(fileURL: fileURL)
+        let store = ClipboardHistoryStore(persistence: persistence)
+        let imageData = Data([0x89, 0x50, 0x4E, 0x47])
+
+        store.record(ClipboardItem(imageData: imageData))
+        store.record(ClipboardItem(filePaths: ["/tmp/report.pdf"]))
+        await store.waitForPendingPersistence()
+
+        let reloadedStore = ClipboardHistoryStore(
+            persistence: FileClipboardHistoryPersistence(fileURL: fileURL)
+        )
+
+        #expect(reloadedStore.items.map(\.kind) == [.file, .image])
+        #expect(reloadedStore.items.first?.filePaths == ["/tmp/report.pdf"])
+        #expect(reloadedStore.items.last?.imageData == imageData)
+    }
+
+    @Test func persistsRichTextPayloads() async throws {
+        let fileURL = temporaryFileURL()
+        let persistence = FileClipboardHistoryPersistence(fileURL: fileURL)
+        let store = ClipboardHistoryStore(persistence: persistence)
+        let payload = ClipboardPayload(
+            type: "public.rtf",
+            data: try #require("{\\rtf1 rich}".data(using: .utf8))
+        )
+
+        store.record(ClipboardItem(text: "rich", payloads: [payload]))
+        await store.waitForPendingPersistence()
+
+        let reloadedStore = ClipboardHistoryStore(
+            persistence: FileClipboardHistoryPersistence(fileURL: fileURL)
+        )
+
+        let item = try #require(reloadedStore.items.first)
+        #expect(item.text == "rich")
+        #expect(item.payloads == [payload])
     }
 
     @Test func updatesLimitAndTrimsNormalItems() {
