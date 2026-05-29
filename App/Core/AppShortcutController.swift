@@ -6,21 +6,27 @@ final class AppShortcutController {
     private let clipboardMonitor: ClipboardMonitor
     private let screenshotController: ScreenshotController
     private let translationController: TranslationController
+    private let textSelectionService: TextSelectionService
     private let clipboardQuickPanelPresenter = ClipboardQuickPanelPresenter()
+    private let translationQuickPanelPresenter = TranslationQuickPanelPresenter()
     private var tasks: [Task<Void, Never>] = []
-    var selectSection: ((AppSection) -> Void)?
     var openSection: ((AppSection) -> Void)?
 
     init(
         clipboardMonitor: ClipboardMonitor,
         screenshotController: ScreenshotController,
-        translationController: TranslationController
+        translationController: TranslationController,
+        textSelectionService: TextSelectionService? = nil
     ) {
         self.clipboardMonitor = clipboardMonitor
         self.screenshotController = screenshotController
         self.translationController = translationController
+        self.textSelectionService = textSelectionService ?? SystemTextSelectionService()
         clipboardQuickPanelPresenter.openFullClipboardAction = { [weak self] in
             self?.openSection?(.clip)
+        }
+        translationQuickPanelPresenter.openFullTranslationAction = { [weak self] in
+            self?.openSection?(.tran)
         }
     }
 
@@ -33,6 +39,7 @@ final class AppShortcutController {
             Task { await observeShowClipShortcut() },
             Task { await observeClipboardQuickPanelShortcut() },
             Task { await observeCaptureSelectedRegionShortcut() },
+            Task { await observeTranslateSelectedTextShortcut() },
             Task { await observeTranslateClipboardShortcut() }
         ]
     }
@@ -58,6 +65,32 @@ final class AppShortcutController {
         for await event in KeyboardShortcuts.events(for: .captureSelectedRegion) where event == .keyUp {
             openSection?(.pix)
             await screenshotController.captureSelectedRegion()
+        }
+    }
+
+    private func observeTranslateSelectedTextShortcut() async {
+        for await event in KeyboardShortcuts.events(for: .translateSelectedText) where event == .keyUp {
+            translationController.prefillSourceText("")
+
+            guard let text = await textSelectionService.selectedText() else {
+                translationQuickPanelPresenter.show(
+                    controller: translationController,
+                    sourceText: nil,
+                    errorMessage: TextSelectionError.noSelection.localizedDescription
+                )
+                continue
+            }
+
+            translationController.prefillSourceText(text)
+            translationQuickPanelPresenter.show(
+                controller: translationController,
+                sourceText: text
+            )
+            await translationController.translate()
+            translationQuickPanelPresenter.show(
+                controller: translationController,
+                sourceText: text
+            )
         }
     }
 

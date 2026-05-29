@@ -184,11 +184,14 @@ private enum LocalTranslationDictionary {
 
 enum TranslationProviderError: LocalizedError, Equatable {
     case unavailable
+    case noEnabledProviders
 
     var errorDescription: String? {
         switch self {
         case .unavailable:
             "当前翻译服务不可用。请稍后重试，或检查系统翻译语言包。"
+        case .noEnabledProviders:
+            "请至少启用一个翻译 provider。"
         }
     }
 }

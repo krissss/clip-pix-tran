@@ -38,6 +38,10 @@ struct TranslationLanguageTests {
         #expect(TranslationLanguage.name(for: "es") == "es")
     }
 
+    @Test func nameForSourceOnlyLanguageReturnsDisplayName() {
+        #expect(TranslationLanguage.name(for: "zh-Hant") == "繁体中文")
+    }
+
     @Test func supportCheckDistinguishesKnownAndUnknownCodes() {
         #expect(TranslationLanguage.isSupported("ja"))
         #expect(!TranslationLanguage.isSupported("es"))

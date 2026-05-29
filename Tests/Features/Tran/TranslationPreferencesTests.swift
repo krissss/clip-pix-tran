@@ -41,6 +41,43 @@ struct TranslationPreferencesTests {
         #expect(preferences.defaultTargetLanguageCode == "ja")
     }
 
+    @Test func defaultsToAutomaticSourceLanguage() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+    }
+
+    @Test func persistsDefaultSourceLanguage() {
+        let defaults = makeDefaults()
+        var preferences = TranslationPreferences(defaults: defaults)
+
+        preferences.updateDefaultSourceLanguage("en")
+        preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.defaultSourceLanguageCode == "en")
+    }
+
+    @Test func clearingDefaultSourceLanguageRestoresAutomaticDetection() {
+        let defaults = makeDefaults()
+        var preferences = TranslationPreferences(defaults: defaults)
+        preferences.updateDefaultSourceLanguage("ja")
+
+        preferences.updateDefaultSourceLanguage(nil)
+        preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+    }
+
+    @Test func ignoresUnsupportedDefaultSourceLanguage() {
+        let defaults = makeDefaults()
+        defaults.set("unknown", forKey: "tran.defaultSourceLanguageCode")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+        #expect(defaults.string(forKey: "tran.defaultSourceLanguageCode") == nil)
+    }
+
     @Test func ignoresLegacyStoredLanguageWithoutExplicitSelectionMarker() {
         let defaults = makeDefaults()
         defaults.set("ja", forKey: "tran.defaultTargetLanguageCode")
@@ -79,6 +116,32 @@ struct TranslationPreferencesTests {
 
         #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
         #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultTargetLanguage") == false)
+    }
+
+    @Test func defaultsToAllBuiltInProvidersEnabled() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+
+        #expect(preferences.enabledProviderIDs == TranslationProviderDescriptor.builtIn.map(\.id))
+    }
+
+    @Test func persistsEnabledProviders() {
+        let defaults = makeDefaults()
+        var preferences = TranslationPreferences(defaults: defaults)
+
+        preferences.updateEnabledProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
+        preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.enabledProviderIDs == [TranslationProviderDescriptor.systemTranslation.id])
+    }
+
+    @Test func keepsAtLeastOneProviderEnabled() {
+        let defaults = makeDefaults()
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        preferences.updateEnabledProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
+        preferences.updateEnabledProvider(TranslationProviderDescriptor.systemTranslation.id, isEnabled: false)
+
+        #expect(preferences.enabledProviderIDs == [TranslationProviderDescriptor.systemTranslation.id])
     }
 }
 

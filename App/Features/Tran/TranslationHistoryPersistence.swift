@@ -1,6 +1,6 @@
 import Foundation
 
-struct TranslationHistorySnapshot: Codable, Equatable {
+struct TranslationHistorySnapshot: Codable, Equatable, Sendable {
     var items: [TranslationHistoryItem]
     var maximumItems: Int
     var persistsHistory: Bool

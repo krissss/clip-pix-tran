@@ -66,42 +66,80 @@ final class TranslationHistoryStore {
 
     func record(
         request: TranslationRequest,
-        result: TranslationResult,
+        providerResult: TranslationProviderResult,
         at date: Date = Date()
     ) {
         let sourceText = request.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let translatedText = result.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let translatedText = providerResult.result.translatedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sourceText.isEmpty, !translatedText.isEmpty else {
             return
         }
 
-        if let existingIndex = items.firstIndex(where: {
-            $0.sourceText == sourceText && $0.targetLanguageCode == result.targetLanguageCode
+        var nextItems = items
+        if let existingIndex = nextItems.firstIndex(where: {
+            $0.sourceText == sourceText
+                && $0.targetLanguageCode == providerResult.result.targetLanguageCode
+                && $0.providerID == providerResult.provider.id
         }) {
-            items.remove(at: existingIndex)
+            nextItems.remove(at: existingIndex)
         }
 
-        items.insert(
+        nextItems.insert(
             TranslationHistoryItem(
                 sourceText: sourceText,
                 translatedText: translatedText,
-                sourceLanguageCode: result.sourceLanguageCode,
-                targetLanguageCode: result.targetLanguageCode,
+                sourceLanguageCode: request.sourceLanguageCode,
+                detectedSourceLanguageCode: providerResult.result.sourceLanguageCode,
+                targetLanguageCode: providerResult.result.targetLanguageCode,
+                providerID: providerResult.provider.id,
+                providerName: providerResult.provider.name,
                 createdAt: date
             ),
             at: 0
         )
+        items = nextItems
         trimToLimit()
         persistIfNeeded()
     }
 
+    func record(
+        request: TranslationRequest,
+        result: TranslationResult,
+        at date: Date = Date()
+    ) {
+        record(
+            request: request,
+            providerResult: TranslationProviderResult(
+                provider: .systemTranslation,
+                result: result
+            ),
+            at: date
+        )
+    }
+
+    func filteredItems(matching searchText: String) -> [TranslationHistoryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return items
+        }
+
+        return items.filter { item in
+            item.sourceText.localizedCaseInsensitiveContains(query)
+                || item.translatedText.localizedCaseInsensitiveContains(query)
+                || item.providerName.localizedCaseInsensitiveContains(query)
+                || TranslationLanguage.name(for: item.targetLanguageCode)
+                    .localizedCaseInsensitiveContains(query)
+        }
+    }
+
     func delete(_ item: TranslationHistoryItem) {
-        items.removeAll { $0.id == item.id }
+        items = items.filter { $0.id != item.id }
         persistIfNeeded()
     }
 
     func clear() {
-        items.removeAll()
+        items = []
         persistIfNeeded()
     }
 
@@ -111,7 +149,7 @@ final class TranslationHistoryStore {
 
     private func trimToLimit() {
         if items.count > maximumItems {
-            items.removeSubrange(maximumItems...)
+            items = Array(items.prefix(maximumItems))
         }
     }
 

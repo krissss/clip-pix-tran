@@ -154,6 +154,8 @@ private struct ShortcutsSettingsSection: View {
             SettingsRowDivider()
             shortcutRow(title: "区域截图", name: .captureSelectedRegion)
             SettingsRowDivider()
+            shortcutRow(title: "翻译选中文本", name: .translateSelectedText)
+            SettingsRowDivider()
             shortcutRow(title: "翻译剪贴板文本", name: .translateClipboardText)
         }
         .settingsRowGroup()
@@ -266,6 +268,22 @@ private struct TranSettingsSection: View {
 
         VStack(spacing: 0) {
             HStack {
+                Text("默认原文语言")
+                Spacer()
+                Picker("", selection: sourceLanguageSelection) {
+                    Text(TranslationLanguage.automaticSourceName)
+                        .tag(TranslationLanguage.automaticSourceCode)
+                    Divider()
+                    ForEach(TranslationLanguage.supportedSources) { language in
+                        Text(language.name).tag(language.code)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 190)
+            }
+            .settingsRow()
+            SettingsRowDivider()
+            HStack {
                 Text("默认目标语言")
                 Spacer()
                 Picker("", selection: targetLanguageSelection) {
@@ -277,6 +295,15 @@ private struct TranSettingsSection: View {
                 .frame(width: 190)
             }
             .settingsRow()
+            SettingsRowDivider()
+            VStack(spacing: 0) {
+                ForEach(TranslationProviderDescriptor.builtIn) { provider in
+                    providerToggleRow(provider)
+                    if provider.id != TranslationProviderDescriptor.builtIn.last?.id {
+                        SettingsRowDivider()
+                    }
+                }
+            }
             SettingsRowDivider()
             toggleRow("重启后保留翻译历史", isOn: $persistsHistory) { newValue in
                 controller.history.updatePersistsHistory(newValue)
@@ -301,6 +328,43 @@ private struct TranSettingsSection: View {
             controller.targetLanguageCode
         } set: { newValue in
             controller.selectTargetLanguage(newValue)
+        }
+    }
+
+    private var sourceLanguageSelection: Binding<String> {
+        Binding {
+            controller.sourceLanguageCode ?? TranslationLanguage.automaticSourceCode
+        } set: { newValue in
+            controller.selectSourceLanguage(
+                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue
+            )
+        }
+    }
+
+    private func providerToggleRow(_ provider: TranslationProviderDescriptor) -> some View {
+        Toggle(isOn: providerEnabledBinding(provider.id)) {
+            HStack(spacing: 8) {
+                Image(systemName: provider.systemImage)
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.name)
+
+                    Text(provider.isLocal ? "本地 provider" : "云端 provider")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .toggleStyle(.switch)
+        .settingsRow()
+    }
+
+    private func providerEnabledBinding(_ providerID: String) -> Binding<Bool> {
+        Binding {
+            controller.preferences.enabledProviderIDs.contains(providerID)
+        } set: { newValue in
+            controller.setProvider(providerID, isEnabled: newValue)
         }
     }
 }

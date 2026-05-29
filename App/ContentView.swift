@@ -15,7 +15,7 @@ struct ContentView: View {
     @Bindable var screenshotController: ScreenshotController
     @Bindable var translationController: TranslationController
     let shortcutController: AppShortcutController
-    @State private var selectedSection: AppSection = .clip
+    @Binding var selectedSection: AppSection
 
     var body: some View {
         NavigationSplitView {
@@ -48,9 +48,6 @@ struct ContentView: View {
         }
         .background(MainWindowRegistrationView())
         .onAppear {
-            shortcutController.selectSection = { section in
-                selectedSection = section
-            }
             shortcutController.openSection = { section in
                 selectedSection = section
                 if !AppWindowPresenter.bringMainWindowForward() {
@@ -118,6 +115,7 @@ struct ContentView: View {
                 translationService: FallbackTranslationService(),
                 pasteboard: PreviewClipboardService()
             )
-        )
+        ),
+        selectedSection: .constant(.clip)
     )
 }

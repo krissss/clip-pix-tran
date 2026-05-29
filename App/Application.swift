@@ -11,31 +11,11 @@ import SwiftUI
 struct Application: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate
 
-    @State private var clipboardMonitor = ClipboardMonitor(
-        pasteboard: SystemClipboardService(),
-        history: ClipboardHistoryStore(
-            persistence: FileClipboardHistoryPersistence(),
-            persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.clipboard
-        )
-    )
-    @State private var screenshotController = ScreenshotController(
-        history: ScreenshotHistoryStore(
-            persistence: FileScreenshotHistoryPersistence(),
-            persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.screenshot
-        ),
-        screenshotService: SystemScreenshotService(),
-        pasteboard: SystemScreenshotPasteboardService(),
-        fileSaver: SystemScreenshotFileSaver()
-    )
-    @State private var translationController = TranslationController(
-        history: TranslationHistoryStore(
-            persistence: FileTranslationHistoryPersistence(),
-            persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.translation
-        ),
-        translationService: HybridTranslationService(),
-        pasteboard: SystemClipboardService()
-    )
+    @State private var clipboardMonitor: ClipboardMonitor
+    @State private var screenshotController: ScreenshotController
+    @State private var translationController: TranslationController
     @State private var shortcutController: AppShortcutController
+    @State private var selectedSection: AppSection = .clip
 
     init() {
         let clipboardMonitor = ClipboardMonitor(
@@ -59,7 +39,16 @@ struct Application: App {
                 persistence: FileTranslationHistoryPersistence(),
                 persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.translation
             ),
-            translationService: HybridTranslationService(),
+            providers: [
+                TranslationProvider(
+                    descriptor: .systemTranslation,
+                    service: HybridTranslationService()
+                ),
+                TranslationProvider(
+                    descriptor: .localDictionary,
+                    service: FallbackTranslationService()
+                )
+            ],
             pasteboard: SystemClipboardService()
         )
 
@@ -81,7 +70,8 @@ struct Application: App {
                 clipboardMonitor: clipboardMonitor,
                 screenshotController: screenshotController,
                 translationController: translationController,
-                shortcutController: shortcutController
+                shortcutController: shortcutController,
+                selectedSection: $selectedSection
             )
                 .frame(minWidth: 760, minHeight: 520)
                 .onAppear {

@@ -18,8 +18,35 @@ struct TranslationControllerTests {
 
         #expect(controller.translatedText == "你好")
         #expect(controller.history.items.map(\.sourceText) == ["hello"])
+        #expect(controller.history.items.first?.detectedSourceLanguageCode == "en")
+        #expect(controller.history.items.first?.providerID == TranslationProviderDescriptor.systemTranslation.id)
         #expect(controller.history.items.first?.targetLanguageCode == "zh-Hans")
         #expect(controller.lastErrorMessage == nil)
+    }
+
+    @Test func translateUsesSelectedSourceLanguage() async throws {
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "Hallo",
+                sourceLanguageCode: "de",
+                targetLanguageCode: "en"
+            )
+        )
+        let controller = TranslationController(
+            translationService: service,
+            pasteboard: CapturingClipboardService()
+        )
+        controller.sourceText = "hallo"
+        controller.selectSourceLanguage("de")
+        controller.selectTargetLanguage("en")
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceLanguageCode == "de")
+        #expect(request.targetLanguageCode == "en")
+        #expect(controller.history.items.first?.sourceLanguageCode == "de")
+        #expect(controller.history.items.first?.detectedSourceLanguageCode == "de")
     }
 
     @Test func emptySourceShowsValidationError() async {
@@ -193,6 +220,104 @@ struct TranslationControllerTests {
         #expect(preferences.defaultTargetLanguageCode == "de")
     }
 
+    @Test func selectingTargetLanguageClearsExistingResults() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+        controller.translatedText = "你好"
+
+        controller.selectTargetLanguage("ja")
+
+        #expect(controller.targetLanguageCode == "ja")
+        #expect(controller.translatedText.isEmpty)
+        #expect(controller.activeProviderStates.allSatisfy { state in
+            if case .idle = state.status {
+                return state.result == nil
+            }
+
+            return false
+        })
+    }
+
+    @Test func selectingSourceLanguageUpdatesPreferences() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+
+        controller.selectSourceLanguage("ja")
+
+        #expect(controller.sourceLanguageCode == "ja")
+        #expect(preferences.defaultSourceLanguageCode == "ja")
+    }
+
+    @Test func selectingSourceLanguageClearsExistingResults() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+        controller.translatedText = "你好"
+
+        controller.selectSourceLanguage("en")
+
+        #expect(controller.sourceLanguageCode == "en")
+        #expect(controller.translatedText.isEmpty)
+    }
+
+    @Test func selectingAutomaticSourceLanguageUpdatesPreferences() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+        controller.selectSourceLanguage("ja")
+
+        controller.selectSourceLanguage(nil)
+
+        #expect(controller.sourceLanguageCode == nil)
+        #expect(preferences.defaultSourceLanguageCode == nil)
+    }
+
     @Test func selectingUnsupportedTargetLanguageDoesNotChangePreferences() {
         let preferences = TranslationPreferences(defaults: makeDefaults())
         let controller = TranslationController(
@@ -242,6 +367,7 @@ struct TranslationControllerTests {
         controller.useHistoryItem(item)
 
         #expect(controller.targetLanguageCode == "ja")
+        #expect(controller.sourceLanguageCode == nil)
         #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
     }
 
@@ -273,6 +399,200 @@ struct TranslationControllerTests {
         #expect(service.requestCount == 1)
         #expect(controller.translatedText == "你好")
     }
+
+    @Test func translatesWithEnabledProvidersAndRecordsEachProvider() async {
+        let providers = [
+            TranslationProvider(
+                descriptor: .systemTranslation,
+                service: FakeTranslationService(
+                    result: .success(
+                        TranslationResult(
+                            translatedText: "你好",
+                            sourceLanguageCode: "en",
+                            targetLanguageCode: "zh-Hans"
+                        )
+                    )
+                )
+            ),
+            TranslationProvider(
+                descriptor: .localDictionary,
+                service: FakeTranslationService(
+                    result: .success(
+                        TranslationResult(
+                            translatedText: "您好",
+                            sourceLanguageCode: "en",
+                            targetLanguageCode: "zh-Hans"
+                        )
+                    )
+                )
+            )
+        ]
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            providers: providers,
+            pasteboard: CapturingClipboardService()
+        )
+        controller.sourceText = "hello"
+
+        await controller.translate()
+
+        #expect(controller.activeProviderStates.count == 2)
+        #expect(controller.history.items.map(\.providerID) == [
+            TranslationProviderDescriptor.localDictionary.id,
+            TranslationProviderDescriptor.systemTranslation.id
+        ])
+    }
+
+    @Test func providerFailureDoesNotBlockOtherProviders() async {
+        let providers = [
+            TranslationProvider(
+                descriptor: .systemTranslation,
+                service: FakeTranslationService(result: .failure(FakeTranslationError.failed))
+            ),
+            TranslationProvider(
+                descriptor: .localDictionary,
+                service: FakeTranslationService(
+                    result: .success(
+                        TranslationResult(
+                            translatedText: "你好",
+                            sourceLanguageCode: "en",
+                            targetLanguageCode: "zh-Hans"
+                        )
+                    )
+                )
+            )
+        ]
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            providers: providers,
+            pasteboard: CapturingClipboardService()
+        )
+        controller.sourceText = "hello"
+
+        await controller.translate()
+
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.translatedText == "你好")
+        #expect(controller.history.items.count == 1)
+    }
+
+    @Test func reenabledProviderReturnsToIdleState() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            providers: [
+                TranslationProvider(
+                    descriptor: .systemTranslation,
+                    service: FakeTranslationService(
+                        result: .success(
+                            TranslationResult(
+                                translatedText: "unused",
+                                sourceLanguageCode: nil,
+                                targetLanguageCode: "zh-Hans"
+                            )
+                        )
+                    )
+                ),
+                TranslationProvider(
+                    descriptor: .localDictionary,
+                    service: FakeTranslationService(
+                        result: .success(
+                            TranslationResult(
+                                translatedText: "unused",
+                                sourceLanguageCode: nil,
+                                targetLanguageCode: "zh-Hans"
+                            )
+                        )
+                    )
+                )
+            ],
+            pasteboard: CapturingClipboardService()
+        )
+
+        controller.setProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
+        controller.setProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: true)
+
+        let localDictionaryState = controller.activeProviderStates.first {
+            $0.provider.id == TranslationProviderDescriptor.localDictionary.id
+        }
+        #expect(localDictionaryState != nil)
+        if case .idle(let message) = localDictionaryState?.status {
+            #expect(message == "输入文本后点击翻译，结果会显示在这里。")
+        } else {
+            Issue.record("Expected re-enabled provider to be idle.")
+        }
+    }
+
+    @Test func historyItemFromDisabledProviderStaysVisible() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        preferences.updateEnabledProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
+        let controller = TranslationController(
+            preferences: preferences,
+            providers: [
+                TranslationProvider(
+                    descriptor: .systemTranslation,
+                    service: FakeTranslationService(
+                        result: .success(
+                            TranslationResult(
+                                translatedText: "unused",
+                                sourceLanguageCode: nil,
+                                targetLanguageCode: "zh-Hans"
+                            )
+                        )
+                    )
+                ),
+                TranslationProvider(
+                    descriptor: .localDictionary,
+                    service: FakeTranslationService(
+                        result: .success(
+                            TranslationResult(
+                                translatedText: "unused",
+                                sourceLanguageCode: nil,
+                                targetLanguageCode: "zh-Hans"
+                            )
+                        )
+                    )
+                )
+            ],
+            pasteboard: CapturingClipboardService()
+        )
+        let item = TranslationHistoryItem(
+            sourceText: "hello",
+            translatedText: "您好",
+            targetLanguageCode: "zh-Hans",
+            providerID: TranslationProviderDescriptor.localDictionary.id,
+            providerName: TranslationProviderDescriptor.localDictionary.name
+        )
+
+        controller.useHistoryItem(item)
+
+        #expect(controller.translatedText == "您好")
+        #expect(controller.activeProviderStates.contains {
+            $0.provider.id == TranslationProviderDescriptor.localDictionary.id
+                && $0.translatedText == "您好"
+        })
+    }
+
+    @Test func copiesSourceToPasteboard() {
+        let pasteboard = CapturingClipboardService()
+        let controller = TranslationController(
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: pasteboard
+        )
+        controller.sourceText = "hello"
+
+        controller.copySourceToPasteboard()
+
+        #expect(pasteboard.text == "hello")
+    }
 }
 
 private func makeDefaults() -> UserDefaults {
@@ -287,6 +607,20 @@ private struct FakeTranslationService: TranslationService {
 
     func translate(_ request: TranslationRequest) async throws -> TranslationResult {
         try result.get()
+    }
+}
+
+private final class CapturingTranslationService: TranslationService {
+    let result: TranslationResult
+    private(set) var requests: [TranslationRequest] = []
+
+    init(result: TranslationResult) {
+        self.result = result
+    }
+
+    func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+        requests.append(request)
+        return result
     }
 }
 

@@ -69,6 +69,59 @@ struct TranslationHistoryStoreTests {
         #expect(store.items.first?.translatedText == "您好")
     }
 
+    @Test func keepsSameTextResultsFromDifferentProviders() {
+        let store = TranslationHistoryStore()
+        let request = TranslationRequest(
+            sourceText: "hello",
+            targetLanguageCode: "zh-Hans",
+            sourceLanguageCode: "en"
+        )
+
+        store.record(
+            request: request,
+            providerResult: TranslationProviderResult(
+                provider: .systemTranslation,
+                result: TranslationResult(
+                    translatedText: "你好",
+                    sourceLanguageCode: "en",
+                    targetLanguageCode: "zh-Hans"
+                )
+            )
+        )
+        store.record(
+            request: request,
+            providerResult: TranslationProviderResult(
+                provider: .localDictionary,
+                result: TranslationResult(
+                    translatedText: "您好",
+                    sourceLanguageCode: "en",
+                    targetLanguageCode: "zh-Hans"
+                )
+            )
+        )
+
+        #expect(store.items.count == 2)
+        #expect(store.items.map(\.providerID) == [
+            TranslationProviderDescriptor.localDictionary.id,
+            TranslationProviderDescriptor.systemTranslation.id
+        ])
+    }
+
+    @Test func filtersHistoryByProviderAndTranslatedText() {
+        let store = TranslationHistoryStore()
+        store.record(
+            request: TranslationRequest(sourceText: "hello", targetLanguageCode: "zh-Hans", sourceLanguageCode: "en"),
+            providerResult: TranslationProviderResult(
+                provider: .localDictionary,
+                result: TranslationResult(translatedText: "你好", sourceLanguageCode: "en", targetLanguageCode: "zh-Hans")
+            )
+        )
+
+        #expect(store.filteredItems(matching: "dictionary").count == 1)
+        #expect(store.filteredItems(matching: "你好").count == 1)
+        #expect(store.filteredItems(matching: "missing").isEmpty)
+    }
+
     @Test func trimsToLimit() {
         let store = TranslationHistoryStore(limit: 2)
 

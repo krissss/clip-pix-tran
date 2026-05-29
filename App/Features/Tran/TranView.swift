@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TranView: View {
     @Bindable var controller: TranslationController
+    @State private var historySearchText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,98 +17,205 @@ struct TranView: View {
     }
 
     private var editor: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("文本翻译")
-                    .font(.title3.weight(.semibold))
-
-                Spacer()
-
-                Picker("目标语言", selection: targetLanguageSelection) {
-                    ForEach(TranslationLanguage.supported) { language in
-                        Text(language.name).tag(language.code)
-                    }
-                }
-                .frame(width: 150)
-
-                Button {
-                    Task {
-                        await controller.translate()
-                    }
-                } label: {
-                    if controller.isTranslating {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Label("翻译", systemImage: "arrow.right.circle")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(controller.isTranslating)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            toolbar
 
             HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("原文")
-                            .font(.headline)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(height: 28)
+                sourcePane
+                    .frame(minWidth: 280, maxWidth: .infinity)
 
-                    ShortcutTextEditor(text: $controller.sourceText) {
-                        Task {
-                            await controller.translate()
-                        }
-                    }
-                        .frame(minHeight: 180)
-                        .background(.quaternary.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .frame(maxWidth: .infinity)
+                Divider()
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("译文")
-                            .font(.headline)
-
-                        Spacer()
-
-                        Button(action: controller.copyResultToPasteboard) {
-                            Label("复制", systemImage: "doc.on.doc")
-                        }
-                        .help("复制译文")
-                        .controlSize(.small)
-                        .disabled(controller.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    .frame(height: 28)
-
-                    TextEditor(text: $controller.translatedText)
-                        .font(.body)
-                        .frame(minHeight: 180)
-                        .scrollContentBackground(.hidden)
-                        .background(.quaternary.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .frame(maxWidth: .infinity)
+                resultPane
+                    .frame(minWidth: 300, maxWidth: .infinity)
             }
-
-            if let errorMessage = controller.lastErrorMessage {
-                Text(errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
+            .frame(minHeight: 260)
         }
         .padding()
     }
 
+    private var toolbar: some View {
+        HStack(spacing: 12) {
+            Text("文本翻译")
+                .font(.title3.weight(.semibold))
+
+            Spacer()
+
+            languageBar
+
+            Button {
+                Task {
+                    await controller.translate()
+                }
+            } label: {
+                if controller.isTranslating {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Label("翻译", systemImage: "arrow.right.circle")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(controller.isTranslating)
+        }
+    }
+
+    private var sourcePane: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            paneHeader(
+                title: "原文",
+                systemImage: "text.alignleft",
+                accessory: sourceLanguageName
+            )
+
+            ShortcutTextEditor(text: $controller.sourceText) {
+                translate()
+            }
+            .frame(maxWidth: .infinity, minHeight: 220)
+            .background(.quaternary.opacity(0.35))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var resultPane: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            paneHeader(
+                title: "翻译结果",
+                systemImage: "rectangle.stack",
+                accessory: "\(visibleProviders.count) 个服务"
+            )
+
+            providerDeck
+        }
+    }
+
+    private func paneHeader(
+        title: String,
+        systemImage: String,
+        accessory: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+
+            Spacer()
+
+            Text(accessory)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(height: 26)
+    }
+
+    private var languageBar: some View {
+        HStack(spacing: 10) {
+            Picker("原文语言", selection: sourceLanguageSelection) {
+                Text(TranslationLanguage.automaticSourceName)
+                    .tag(TranslationLanguage.automaticSourceCode)
+                Divider()
+                ForEach(TranslationLanguage.supportedSources) { language in
+                    Text(language.name).tag(language.code)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
+
+            Button(action: swapLanguages) {
+                Image(systemName: "arrow.left.arrow.right")
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canSwapLanguages)
+            .help("交换语言")
+
+            Picker("目标语言", selection: targetLanguageSelection) {
+                ForEach(TranslationLanguage.supported) { language in
+                    Text(language.name).tag(language.code)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .disabled(controller.isTranslating)
+    }
+
+    private var providerDeck: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                providerCards
+            }
+            .padding(.vertical, 1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 300)
+        .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private var providerCards: some View {
+        ForEach(visibleProviders) { provider in
+            TranslationProviderCard(
+                provider: provider.provider,
+                status: provider.status,
+                translatedText: provider.translatedText,
+                detectedSourceLanguageCode: provider.detectedSourceLanguageCode,
+                canCopy: hasTranslatedText(for: provider),
+                onCopy: {
+                    controller.copyResultToPasteboard(providerID: provider.provider.id)
+                },
+                onRetry: translate,
+                contentMinHeight: 150
+            )
+        }
+    }
+
+    private var visibleProviders: [TranslationProviderState] {
+        controller.activeProviderStates
+    }
+
+    private var sourceLanguageName: String {
+        guard let sourceLanguageCode = controller.sourceLanguageCode else {
+            return TranslationLanguage.automaticSourceName
+        }
+
+        return TranslationLanguage.name(for: sourceLanguageCode)
+    }
+
+    private func translate() {
+        Task {
+            await controller.translate()
+        }
+    }
+
+    private var canSwapLanguages: Bool {
+        guard let sourceLanguageCode = controller.sourceLanguageCode else {
+            return false
+        }
+
+        return TranslationLanguage.isSupported(sourceLanguageCode)
+            && TranslationLanguage.isSupportedSource(controller.targetLanguageCode)
+    }
+
+    private func swapLanguages() {
+        guard canSwapLanguages, let sourceLanguageCode = controller.sourceLanguageCode else {
+            return
+        }
+
+        let targetLanguageCode = controller.targetLanguageCode
+        controller.selectSourceLanguage(targetLanguageCode)
+        controller.selectTargetLanguage(sourceLanguageCode)
+    }
+
     @ViewBuilder
     private var history: some View {
+        let visibleItems = controller.history.filteredItems(matching: historySearchText)
         if controller.history.items.isEmpty {
             ContentUnavailableView(
                 "还没有翻译记录",
                 systemImage: "text.bubble",
-                description: Text("输入文本并点击翻译后，结果会出现在这里。")
+                description: Text("输入文本并点击翻译后，成功的 provider 结果会出现在这里。")
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -123,7 +231,12 @@ struct TranView: View {
                             .padding(.vertical, 10)
                     }
 
-                    ForEach(controller.history.items) { item in
+                    if visibleItems.isEmpty {
+                        ContentUnavailableView.search(text: historySearchText)
+                            .padding(.vertical, 36)
+                    }
+
+                    ForEach(visibleItems) { item in
                         TranslationHistoryRow(
                             item: item,
                             onUse: {
@@ -139,12 +252,17 @@ struct TranView: View {
             }
             .background(Color(nsColor: .textBackgroundColor))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .searchable(
+                text: $historySearchText,
+                placement: .toolbar,
+                prompt: "搜索翻译历史"
+            )
         }
     }
 
     private var historyActions: some View {
         HStack {
-            Label("\(controller.history.items.count) 条记录", systemImage: "clock")
+            Label(historyCountText, systemImage: "clock")
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -160,12 +278,36 @@ struct TranView: View {
         .padding(.vertical, 10)
     }
 
+    private var historyCountText: String {
+        let totalCount = controller.history.items.count
+        let visibleCount = controller.history.filteredItems(matching: historySearchText).count
+        if historySearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "\(totalCount) 条记录"
+        }
+
+        return "\(visibleCount)/\(totalCount) 条记录"
+    }
+
     private var targetLanguageSelection: Binding<String> {
         Binding {
             controller.targetLanguageCode
         } set: { newValue in
             controller.selectTargetLanguage(newValue)
         }
+    }
+
+    private var sourceLanguageSelection: Binding<String> {
+        Binding {
+            controller.sourceLanguageCode ?? TranslationLanguage.automaticSourceCode
+        } set: { newValue in
+            controller.selectSourceLanguage(
+                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue
+            )
+        }
+    }
+
+    private func hasTranslatedText(for provider: TranslationProviderState) -> Bool {
+        !provider.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
@@ -265,14 +407,25 @@ private struct TranslationHistoryRow: View {
     let onDelete: () -> Void
 
     private var languageText: String {
-        TranslationLanguage.name(for: item.targetLanguageCode)
+        let targetLanguage = TranslationLanguage.name(for: item.targetLanguageCode)
+        let sourceLanguage = item.detectedSourceLanguageCode
+            .map { TranslationLanguage.name(for: $0) }
+            ?? item.sourceLanguageCode.map { TranslationLanguage.name(for: $0) }
+            ?? TranslationLanguage.automaticSourceName
+        return "\(sourceLanguage) → \(targetLanguage)"
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(languageText)
-                    .font(.headline)
+                HStack(spacing: 8) {
+                    Text(item.providerName)
+                        .font(.headline)
+
+                    Text(languageText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Text(item.sourceText)
                     .font(.subheadline)
