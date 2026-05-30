@@ -49,8 +49,115 @@ struct TranslationControllerTests {
         #expect(controller.history.items.first?.detectedSourceLanguageCode == "de")
     }
 
+    @Test func autoDetectsSourceLanguageBeforeTranslation() async throws {
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "你好",
+                sourceLanguageCode: "en",
+                targetLanguageCode: "zh-Hans"
+            )
+        )
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            translationService: service,
+            pasteboard: CapturingClipboardService(),
+            languageDetector: StubTranslationLanguageDetector(languageCode: "en")
+        )
+        controller.sourceText = "hello"
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceLanguageCode == "en")
+        #expect(request.targetLanguageCode == "zh-Hans")
+        #expect(controller.effectiveSourceLanguageCode == "en")
+    }
+
+    @Test func fixedSourceLanguageSkipsAutoDetection() async throws {
+        let detector = CapturingTranslationLanguageDetector(languageCode: "zh-Hans")
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "Hallo",
+                sourceLanguageCode: "de",
+                targetLanguageCode: "en"
+            )
+        )
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            translationService: service,
+            pasteboard: CapturingClipboardService(),
+            languageDetector: detector
+        )
+        controller.sourceText = "hallo"
+        controller.selectSourceLanguage("de", persistsDefault: false)
+        controller.selectTargetLanguage("en", persistsDefault: false)
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceLanguageCode == "de")
+        #expect(request.targetLanguageCode == "en")
+        #expect(detector.detectedTexts.isEmpty)
+    }
+
+    @Test func unreliableAutoDetectionKeepsConfiguredTargetLanguage() async throws {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        preferences.updateDefaultTargetLanguage("ja")
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "translated",
+                sourceLanguageCode: nil,
+                targetLanguageCode: "ja"
+            )
+        )
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: service,
+            pasteboard: CapturingClipboardService(),
+            languageDetector: StubTranslationLanguageDetector(languageCode: nil)
+        )
+        controller.sourceText = "???"
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceLanguageCode == nil)
+        #expect(request.targetLanguageCode == "ja")
+        #expect(controller.targetLanguageCode == "ja")
+        #expect(preferences.defaultTargetLanguageCode == "ja")
+    }
+
+    @Test func autoDetectionFlipsTargetWhenDetectedSourceMatchesTarget() async throws {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "Hello",
+                sourceLanguageCode: "zh-Hans",
+                targetLanguageCode: "en"
+            )
+        )
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: service,
+            pasteboard: CapturingClipboardService(),
+            languageDetector: StubTranslationLanguageDetector(languageCode: "zh-Hans")
+        )
+        controller.sourceText = "你好"
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceLanguageCode == "zh-Hans")
+        #expect(request.targetLanguageCode == "en")
+        #expect(controller.targetLanguageCode == "zh-Hans")
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
+        #expect(controller.effectiveSourceLanguageCode == "zh-Hans")
+        #expect(controller.history.items.first?.targetLanguageCode == "en")
+    }
+
     @Test func emptySourceShowsValidationError() async {
         let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
             translationService: FakeTranslationService(
                 result: .success(
                     TranslationResult(
@@ -199,6 +306,35 @@ struct TranslationControllerTests {
         #expect(controller.lastErrorMessage == nil)
     }
 
+    @Test func editingSourceTextClearsPreviousResultAndUsesEditedText() async throws {
+        let service = CapturingTranslationService(
+            result: TranslationResult(
+                translatedText: "新的译文",
+                sourceLanguageCode: "en",
+                targetLanguageCode: "zh-Hans"
+            )
+        )
+        let controller = TranslationController(
+            translationService: service,
+            pasteboard: CapturingClipboardService()
+        )
+        controller.sourceText = "old"
+        controller.translatedText = "旧译文"
+        controller.lastErrorMessage = "旧错误"
+
+        controller.editSourceText("new")
+
+        #expect(controller.sourceText == "new")
+        #expect(controller.translatedText.isEmpty)
+        #expect(controller.lastErrorMessage == nil)
+
+        await controller.translate()
+
+        let request = try #require(service.requests.first)
+        #expect(request.sourceText == "new")
+        #expect(controller.translatedText == "新的译文")
+    }
+
     @Test func selectingTargetLanguageUpdatesPreferences() {
         let preferences = TranslationPreferences(defaults: makeDefaults())
         let controller = TranslationController(
@@ -218,6 +354,52 @@ struct TranslationControllerTests {
         controller.selectTargetLanguage("de")
 
         #expect(preferences.defaultTargetLanguageCode == "de")
+    }
+
+    @Test func selectingMatchingTargetLanguageFlipsWhenSourceIsFixed() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+        controller.selectSourceLanguage("en", persistsDefault: false)
+
+        controller.selectTargetLanguage("en", persistsDefault: false)
+
+        #expect(controller.sourceLanguageCode == "en")
+        #expect(controller.targetLanguageCode == "zh-Hans")
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
+    }
+
+    @Test func selectingSessionTargetLanguageDoesNotUpdatePreferences() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+
+        controller.selectTargetLanguage("de", persistsDefault: false)
+
+        #expect(controller.targetLanguageCode == "de")
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
     }
 
     @Test func selectingTargetLanguageClearsExistingResults() {
@@ -270,6 +452,51 @@ struct TranslationControllerTests {
 
         #expect(controller.sourceLanguageCode == "ja")
         #expect(preferences.defaultSourceLanguageCode == "ja")
+    }
+
+    @Test func selectingSessionSourceLanguageDoesNotUpdatePreferences() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+
+        controller.selectSourceLanguage("de", persistsDefault: false)
+
+        #expect(controller.sourceLanguageCode == "de")
+        #expect(preferences.defaultSourceLanguageCode == nil)
+    }
+
+    @Test func selectingMatchingSourceLanguageFlipsTargetLanguage() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService()
+        )
+
+        controller.selectSourceLanguage("zh-Hans", persistsDefault: false)
+
+        #expect(controller.sourceLanguageCode == "zh-Hans")
+        #expect(controller.targetLanguageCode == "en")
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
     }
 
     @Test func selectingSourceLanguageClearsExistingResults() {
@@ -593,6 +820,107 @@ struct TranslationControllerTests {
 
         #expect(pasteboard.text == "hello")
     }
+
+    @Test func speaksSourceTextUsingSelectedSourceLanguage() {
+        let speechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.sourceText = " hello "
+        controller.selectSourceLanguage("en")
+
+        controller.speakSourceText()
+
+        #expect(controller.speakingTarget == .source)
+        #expect(speechService.requests == [
+            TranslationSpeechRequest(text: "hello", languageCode: "en")
+        ])
+    }
+
+    @Test func speaksProviderTranslationUsingResultTargetLanguage() {
+        let speechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            preferences: TranslationPreferences(defaults: makeDefaults()),
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.translatedText = " 你好 "
+
+        controller.speakResult(providerID: TranslationProviderDescriptor.systemTranslation.id)
+
+        #expect(controller.isSpeakingResult(providerID: TranslationProviderDescriptor.systemTranslation.id))
+        #expect(speechService.requests == [
+            TranslationSpeechRequest(text: "你好", languageCode: "zh-Hans")
+        ])
+    }
+
+    @Test func speakingSameSourceAgainStopsPlayback() {
+        let speechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.sourceText = "hello"
+
+        controller.speakSourceText()
+        controller.speakSourceText()
+
+        #expect(controller.speakingTarget == nil)
+        #expect(speechService.stopCount == 1)
+    }
+
+    @Test func naturalSpeechFinishClearsPlaybackState() {
+        let speechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.sourceText = "hello"
+
+        controller.speakSourceText()
+        speechService.finishLatest()
+
+        #expect(controller.speakingTarget == nil)
+    }
+
 }
 
 private func makeDefaults() -> UserDefaults {
@@ -665,6 +993,63 @@ private final class CapturingClipboardService: ClipboardService {
 
         self.text = text
         changeCount += 1
+    }
+}
+
+private final class CapturingTranslationSpeechService: TranslationSpeechService {
+    private(set) var requests: [TranslationSpeechRequest] = []
+    private var finishHandlers: [() -> Void] = []
+    private(set) var stopCount = 0
+
+    func speak(_ request: TranslationSpeechRequest, onFinish: @escaping () -> Void) {
+        requests.append(request)
+        finishHandlers.append(onFinish)
+    }
+
+    func stop() {
+        stopCount += 1
+    }
+
+    func finishLatest() {
+        finishHandlers.last?()
+    }
+}
+
+private struct StubTranslationLanguageDetector: TranslationLanguageDetecting {
+    let languageCode: String?
+
+    func detect(
+        _ text: String,
+        threshold: Double,
+        preferredSourceHints: [String: Double]?
+    ) -> TranslationLanguageDetectionResult {
+        TranslationLanguageDetectionResult(
+            languageCode: languageCode,
+            confidence: languageCode == nil ? 0 : 1,
+            isReliable: languageCode != nil
+        )
+    }
+}
+
+private final class CapturingTranslationLanguageDetector: TranslationLanguageDetecting {
+    let languageCode: String?
+    private(set) var detectedTexts: [String] = []
+
+    init(languageCode: String?) {
+        self.languageCode = languageCode
+    }
+
+    func detect(
+        _ text: String,
+        threshold: Double,
+        preferredSourceHints: [String: Double]?
+    ) -> TranslationLanguageDetectionResult {
+        detectedTexts.append(text)
+        return TranslationLanguageDetectionResult(
+            languageCode: languageCode,
+            confidence: languageCode == nil ? 0 : 1,
+            isReliable: languageCode != nil
+        )
     }
 }
 

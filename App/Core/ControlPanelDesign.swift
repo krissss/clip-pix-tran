@@ -24,17 +24,17 @@ enum ControlPanelDesign {
         enum QuickPanel {
             static let clipboardWidth: CGFloat = 420
             static let clipboardHeight: CGFloat = 430
-            static let translationWidth: CGFloat = 480
+            static let translationWidth: CGFloat = 500
             static let translationHeight: CGFloat = 424
             static let cornerRadius: CGFloat = 12
             static let headerHorizontalPadding: CGFloat = 14
             static let headerVerticalPadding: CGFloat = 10
-            static let contentPadding: CGFloat = 12
-            static let sectionSpacing: CGFloat = 10
-            static let groupPadding: CGFloat = 10
-            static let languagePickerWidth: CGFloat = 176
-            static let sourceMinHeight: CGFloat = 54
-            static let providerMinHeight: CGFloat = 58
+            static let contentPadding: CGFloat = 10
+            static let sectionSpacing: CGFloat = 6
+            static let groupPadding: CGFloat = 8
+            static let languagePickerWidth: CGFloat = 150
+            static let sourceMinHeight: CGFloat = 46
+            static let providerMinHeight: CGFloat = 38
         }
 
         enum Settings {

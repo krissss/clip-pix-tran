@@ -16,7 +16,7 @@ struct FallbackTranslationService: TranslationService {
 
         return TranslationResult(
             translatedText: translatedText,
-            sourceLanguageCode: request.sourceLanguageCode ?? "en",
+            sourceLanguageCode: request.sourceLanguageCode,
             targetLanguageCode: request.targetLanguageCode
         )
     }

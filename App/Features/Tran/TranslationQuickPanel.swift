@@ -227,15 +227,44 @@ private struct TranslationQuickPanelView: View {
     let onClose: () -> Void
 
     private var visibleErrorMessage: String? {
-        errorMessage ?? controller.lastErrorMessage
+        if !controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return controller.lastErrorMessage
+        }
+
+        return errorMessage ?? controller.lastErrorMessage
     }
 
     private var isReadingSelection: Bool {
-        sourceText == nil && visibleErrorMessage == nil && !controller.isTranslating
+        sourceText == nil
+            && controller.sourceText.isEmpty
+            && visibleErrorMessage == nil
+            && !controller.isTranslating
+    }
+
+    private var canEditSource: Bool {
+        !isReadingSelection && !controller.isTranslating
     }
 
     private var canSelectTargetLanguage: Bool {
-        sourceText != nil && !controller.isTranslating
+        canTranslateSource
+    }
+
+    private var canTranslateSource: Bool {
+        !isReadingSelection
+            && !controller.isTranslating
+            && !controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canSpeakSource: Bool {
+        !controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var sourceTextBinding: Binding<String> {
+        Binding {
+            controller.sourceText
+        } set: { newValue in
+            controller.editSourceText(newValue)
+        }
     }
 
     private var visibleProviders: [TranslationProviderState] {
@@ -247,12 +276,8 @@ private struct TranslationQuickPanelView: View {
     }
 
     private var sourcePreviewText: String {
-        if let sourceText, !sourceText.isEmpty {
-            return sourceText
-        }
-
         if visibleErrorMessage != nil {
-            return "未读取到选中文本"
+            return "输入原文"
         }
 
         return "正在读取选中文本..."
@@ -294,7 +319,7 @@ private struct TranslationQuickPanelView: View {
                 Image(systemName: "doc.on.clipboard")
             }
             .buttonStyle(ControlPanelIconButtonStyle())
-            .disabled(sourceText == nil)
+            .disabled(controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .help("复制原文")
 
             Button(action: onTogglePinned) {
@@ -330,75 +355,119 @@ private struct TranslationQuickPanelView: View {
     }
 
     private var languageBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ControlPanelCompactSectionHeader(title: "语言", systemImage: "globe")
+        HStack(spacing: 8) {
+            Label("语言", systemImage: "globe")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .labelStyle(.titleAndIcon)
+                .frame(width: 56, alignment: .leading)
 
-            HStack(spacing: 8) {
-                Picker("原文语言", selection: sourceLanguageSelection) {
-                    Text(TranslationLanguage.automaticSourceName)
-                        .tag(TranslationLanguage.automaticSourceCode)
-                    Divider()
-                    ForEach(TranslationLanguage.supportedSources) { language in
-                        Text(language.name).tag(language.code)
-                    }
+            Picker("原文语言", selection: sourceLanguageSelection) {
+                Text(TranslationLanguage.automaticSourceName)
+                    .tag(TranslationLanguage.automaticSourceCode)
+                Divider()
+                ForEach(TranslationLanguage.supportedSources) { language in
+                    Text(language.name).tag(language.code)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
-                .help("切换原文语言")
-
-                Button(action: swapLanguages) {
-                    Image(systemName: "arrow.left.arrow.right")
-                        .font(.caption)
-                }
-                .buttonStyle(ControlPanelIconButtonStyle())
-                .disabled(!canSwapLanguages)
-                .help("交换语言")
-
-                Picker("目标语言", selection: targetLanguageSelection) {
-                    ForEach(TranslationLanguage.supported) { language in
-                        Text(language.name).tag(language.code)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
-                .help("切换目标语言")
             }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
+            .help("切换原文语言")
+
+            Button(action: swapLanguages) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.caption)
+            }
+            .buttonStyle(ControlPanelIconButtonStyle())
+            .disabled(!canSwapLanguages)
+            .help("交换语言")
+
+            Picker("目标语言", selection: targetLanguageSelection) {
+                ForEach(TranslationLanguage.supported) { language in
+                    Text(language.name).tag(language.code)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
+            .help("切换目标语言")
         }
+        .padding(.horizontal, ControlPanelDesign.Layout.QuickPanel.groupPadding)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(!canSelectTargetLanguage)
-        .controlPanelQuickPanelGroup()
+        .controlPanelRoundedSurface(
+            background: ControlPanelDesign.embeddedPanelBackground,
+            cornerRadius: ControlPanelDesign.cardRadius
+        )
     }
 
     private var sourceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ControlPanelCompactSectionHeader(title: "原文", systemImage: "text.alignleft") {
-                if let sourceText {
-                    Text("\(sourceText.count) 字")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                Image(systemName: "text.alignleft")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text("原文")
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer(minLength: 8)
+
+                if !controller.sourceText.isEmpty {
+                    Text("\(controller.sourceText.count) 字")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                TranslationSpeechButton(
+                    isSpeaking: controller.speakingTarget == .source,
+                    canSpeak: canSpeakSource,
+                    idleHelp: "朗读原文",
+                    action: controller.speakSourceText
+                )
+
+                Button(action: translateCurrentSelection) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(ControlPanelIconButtonStyle())
+                .disabled(!canTranslateSource)
+                .help("用当前原文重新翻译")
+            }
+            .frame(height: 22)
+
+            ZStack(alignment: .topLeading) {
+                TranslationQuickPanelSourceEditor(
+                    text: sourceTextBinding,
+                    isEditable: canEditSource
+                )
+                .padding(1)
+
+                if controller.sourceText.isEmpty {
+                    Text(sourcePreviewText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 13)
+                        .allowsHitTesting(false)
                 }
             }
-
-            Text(sourcePreviewText)
-                .font(.callout)
-                .foregroundStyle(sourceText == nil ? .secondary : .primary)
-                .textSelection(.enabled)
-                .lineLimit(4)
                 .frame(
                     maxWidth: .infinity,
                     minHeight: ControlPanelDesign.Layout.QuickPanel.sourceMinHeight,
+                    maxHeight: ControlPanelDesign.Layout.QuickPanel.sourceMinHeight,
                     alignment: .topLeading
                 )
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
                 .controlPanelTextSurface(cornerRadius: ControlPanelDesign.compactRadius)
         }
         .controlPanelQuickPanelGroup()
     }
 
     private var resultsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             ControlPanelCompactSectionHeader(title: "翻译结果", systemImage: "rectangle.stack") {
                 Text("\(visibleProviders.count) 个服务")
             }
@@ -411,7 +480,7 @@ private struct TranslationQuickPanelView: View {
                 .frame(maxWidth: .infinity, minHeight: 112)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 6) {
                         providerCards
                     }
                     .padding(.vertical, 1)
@@ -432,11 +501,17 @@ private struct TranslationQuickPanelView: View {
                 translatedText: providerTranslatedText(for: provider),
                 detectedSourceLanguageCode: provider.detectedSourceLanguageCode,
                 canCopy: providerCanCopy(for: provider),
+                canSpeak: providerCanCopy(for: provider),
+                isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
                 onCopy: {
                     onCopyProviderTranslation(provider.provider.id)
                 },
+                onSpeak: {
+                    controller.speakResult(providerID: provider.provider.id)
+                },
                 onRetry: translateCurrentSelection,
-                contentMinHeight: ControlPanelDesign.Layout.QuickPanel.providerMinHeight
+                contentMinHeight: ControlPanelDesign.Layout.QuickPanel.providerMinHeight,
+                isCompact: true
             )
         }
     }
@@ -483,7 +558,7 @@ private struct TranslationQuickPanelView: View {
                 return
             }
 
-            controller.selectTargetLanguage(newValue)
+            controller.selectTargetLanguage(newValue, persistsDefault: false)
             translateCurrentSelection()
         }
     }
@@ -497,13 +572,13 @@ private struct TranslationQuickPanelView: View {
                 return
             }
 
-            controller.selectSourceLanguage(selectedCode)
+            controller.selectSourceLanguage(selectedCode, persistsDefault: false)
             translateCurrentSelection()
         }
     }
 
     private func translateCurrentSelection() {
-        guard sourceText != nil else {
+        guard canTranslateSource else {
             return
         }
 
@@ -513,7 +588,7 @@ private struct TranslationQuickPanelView: View {
     }
 
     private var canSwapLanguages: Bool {
-        guard let sourceLanguageCode = controller.sourceLanguageCode else {
+        guard let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
             return false
         }
 
@@ -522,26 +597,104 @@ private struct TranslationQuickPanelView: View {
     }
 
     private func swapLanguages() {
-        guard canSwapLanguages, let sourceLanguageCode = controller.sourceLanguageCode else {
+        guard canSwapLanguages, let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
             return
         }
 
         let targetLanguageCode = controller.targetLanguageCode
-        controller.selectSourceLanguage(targetLanguageCode)
-        controller.selectTargetLanguage(sourceLanguageCode)
+        controller.selectSourceLanguage(targetLanguageCode, persistsDefault: false)
+        controller.selectTargetLanguage(sourceLanguageCode, persistsDefault: false)
         translateCurrentSelection()
     }
 
     private func handleKeyDown(_ event: NSEvent) -> Bool {
+        let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isTextEditorActive = event.window?.firstResponder is NSTextView
+
         switch event.keyCode {
         case 53:
             onClose()
             return true
-        case 8 where event.modifierFlags.contains(.command):
+        case 36, 76:
+            guard modifierFlags.contains(.command) else {
+                return false
+            }
+
+            translateCurrentSelection()
+            return true
+        case 8 where modifierFlags.contains(.command) && !isTextEditorActive:
             onCopyBestTranslation()
             return true
         default:
             return false
+        }
+    }
+}
+
+private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
+    @Binding var text: String
+    let isEditable: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+
+        let textView = NSTextView()
+        textView.delegate = context.coordinator
+        textView.string = text
+        textView.font = .systemFont(ofSize: NSFont.systemFontSize)
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.isEditable = isEditable
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: .greatestFiniteMagnitude
+        )
+
+        scrollView.documentView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.text = $text
+
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return
+        }
+
+        textView.isEditable = isEditable
+
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else {
+                return
+            }
+
+            text.wrappedValue = textView.string
         }
     }
 }

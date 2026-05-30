@@ -2,6 +2,42 @@ import Testing
 @testable import ClipPixTran
 
 struct TranslationLanguageTests {
+    @Test func detectsShortEnglishWordsBeforeStatisticalRecognition() {
+        let detector = NaturalLanguageTranslationLanguageDetector()
+
+        #expect(
+            detector.detect("translate", threshold: 0.3, preferredSourceHints: nil).languageCode == "en"
+        )
+        #expect(
+            detector.detect("Cover", threshold: 0.3, preferredSourceHints: nil).languageCode == "en"
+        )
+    }
+
+    @Test func shortEnglishFallbackDoesNotOverrideCommonGermanOrFrenchWords() {
+        let detector = NaturalLanguageTranslationLanguageDetector()
+
+        #expect(
+            detector.detect("danke", threshold: 0.3, preferredSourceHints: nil).languageCode != "en"
+        )
+        #expect(
+            detector.detect("merci", threshold: 0.3, preferredSourceHints: nil).languageCode != "en"
+        )
+    }
+
+    @Test func deterministicDetectionHandlesCJKAndKanaScripts() {
+        let detector = NaturalLanguageTranslationLanguageDetector()
+
+        #expect(
+            detector.detect("你好", threshold: 0.3, preferredSourceHints: nil).languageCode == "zh-Hans"
+        )
+        #expect(
+            detector.detect("こんにちは", threshold: 0.3, preferredSourceHints: nil).languageCode == "ja"
+        )
+        #expect(
+            detector.detect("안녕하세요", threshold: 0.3, preferredSourceHints: nil).languageCode == "ko"
+        )
+    }
+
     @Test func matchesRegionSpecificPreferredLanguage() {
         #expect(
             TranslationLanguage.bestTargetCode(

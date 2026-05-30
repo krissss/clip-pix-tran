@@ -118,6 +118,37 @@ struct TranslationServiceTests {
         #expect(result.targetLanguageCode == "zh-Hans")
     }
 
+    @Test func systemPrefersDeterministicEnglishForShortWords() async throws {
+        var attemptedSourceCodes: [String] = []
+        let service = SystemTranslationService(
+            availabilityStatus: { source, target in
+                attemptedSourceCodes.append(source.languageCode?.identifier ?? "")
+                return source.languageCode?.identifier == "en"
+                    && target?.languageCode?.identifier == "zh"
+                    ? .installed
+                    : .unsupported
+            },
+            installedTranslator: { source, _, sourceText, targetLanguageCode in
+                TranslationResult(
+                    translatedText: "\(sourceText)-translated",
+                    sourceLanguageCode: source.languageCode?.identifier,
+                    targetLanguageCode: targetLanguageCode
+                )
+            }
+        )
+
+        let result = try await service.translate(
+            TranslationRequest(
+                sourceText: "translate",
+                targetLanguageCode: "zh-Hans",
+                sourceLanguageCode: nil
+            )
+        )
+
+        #expect(attemptedSourceCodes.first == "en")
+        #expect(result.sourceLanguageCode == "en")
+    }
+
     @Test func systemRejectsSupportedButUninstalledLanguagePair() async {
         let service = SystemTranslationService(
             availabilityStatus: { _, _ in .supported },

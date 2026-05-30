@@ -55,6 +55,7 @@ struct TranslationPreferencesTests {
         preferences = TranslationPreferences(defaults: defaults)
 
         #expect(preferences.defaultSourceLanguageCode == "en")
+        #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultSourceLanguage"))
     }
 
     @Test func clearingDefaultSourceLanguageRestoresAutomaticDetection() {
@@ -66,6 +67,27 @@ struct TranslationPreferencesTests {
         preferences = TranslationPreferences(defaults: defaults)
 
         #expect(preferences.defaultSourceLanguageCode == nil)
+    }
+
+    @Test func ignoresLegacyStoredSourceLanguageWithoutExplicitSelectionMarker() {
+        let defaults = makeDefaults()
+        defaults.set("de", forKey: "tran.defaultSourceLanguageCode")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+        #expect(defaults.string(forKey: "tran.defaultSourceLanguageCode") == nil)
+        #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultSourceLanguage") == false)
+    }
+
+    @Test func respectsExplicitStoredSourceLanguage() {
+        let defaults = makeDefaults()
+        defaults.set("de", forKey: "tran.defaultSourceLanguageCode")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultSourceLanguage")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.defaultSourceLanguageCode == "de")
     }
 
     @Test func ignoresUnsupportedDefaultSourceLanguage() {
@@ -103,6 +125,24 @@ struct TranslationPreferencesTests {
         )
 
         #expect(preferences.defaultTargetLanguageCode == "ja")
+    }
+
+    @Test func legacyStoredSourceLanguageClearsAccidentalTargetLanguagePair() {
+        let defaults = makeDefaults()
+        defaults.set("de", forKey: "tran.defaultSourceLanguageCode")
+        defaults.set("en", forKey: "tran.defaultTargetLanguageCode")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultTargetLanguage")
+
+        let preferences = TranslationPreferences(
+            defaults: defaults,
+            preferredLanguages: ["zh-Hans-CN"]
+        )
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
+        #expect(defaults.string(forKey: "tran.defaultSourceLanguageCode") == nil)
+        #expect(defaults.string(forKey: "tran.defaultTargetLanguageCode") == "zh-Hans")
+        #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultTargetLanguage") == false)
     }
 
     @Test func ignoresUnsupportedStoredLanguage() {

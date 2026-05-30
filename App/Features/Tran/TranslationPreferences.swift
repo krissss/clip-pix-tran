@@ -4,6 +4,7 @@ import Foundation
 final class TranslationPreferences {
     private let defaults: UserDefaults
     private let defaultSourceLanguageKey = "tran.defaultSourceLanguageCode"
+    private let hasUserSelectedDefaultSourceLanguageKey = "tran.hasUserSelectedDefaultSourceLanguage"
     private let defaultTargetLanguageKey = "tran.defaultTargetLanguageCode"
     private let hasUserSelectedDefaultTargetLanguageKey = "tran.hasUserSelectedDefaultTargetLanguage"
     private let enabledProviderIDsKey = "tran.enabledProviderIDs"
@@ -19,17 +20,24 @@ final class TranslationPreferences {
         self.defaults = defaults
 
         let storedSourceCode = defaults.string(forKey: defaultSourceLanguageKey)
-        if let storedSourceCode,
+        let hasUserSelectedDefaultSourceLanguage = defaults.bool(
+            forKey: hasUserSelectedDefaultSourceLanguageKey
+        )
+        let hasLegacyUnmarkedSourceLanguage = storedSourceCode != nil
+            && !hasUserSelectedDefaultSourceLanguage
+        if hasUserSelectedDefaultSourceLanguage,
+           let storedSourceCode,
            TranslationLanguage.isSupportedSource(storedSourceCode) {
             self.defaultSourceLanguageCode = storedSourceCode
         } else {
             self.defaultSourceLanguageCode = nil
             defaults.removeObject(forKey: defaultSourceLanguageKey)
+            defaults.set(false, forKey: hasUserSelectedDefaultSourceLanguageKey)
         }
 
         let hasUserSelectedDefaultTargetLanguage = defaults.bool(
             forKey: hasUserSelectedDefaultTargetLanguageKey
-        )
+        ) && !hasLegacyUnmarkedSourceLanguage
         let storedCode = defaults.string(forKey: defaultTargetLanguageKey)
         if hasUserSelectedDefaultTargetLanguage,
            let storedCode,
@@ -60,6 +68,7 @@ final class TranslationPreferences {
         guard let code else {
             defaultSourceLanguageCode = nil
             defaults.removeObject(forKey: defaultSourceLanguageKey)
+            defaults.set(false, forKey: hasUserSelectedDefaultSourceLanguageKey)
             return
         }
 
@@ -69,6 +78,7 @@ final class TranslationPreferences {
 
         defaultSourceLanguageCode = code
         defaults.set(code, forKey: defaultSourceLanguageKey)
+        defaults.set(true, forKey: hasUserSelectedDefaultSourceLanguageKey)
     }
 
     func updateDefaultTargetLanguage(_ code: String) {

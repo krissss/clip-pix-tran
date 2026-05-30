@@ -68,11 +68,7 @@ struct TranView: View {
 
     private var sourcePane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            paneHeader(
-                title: "原文",
-                systemImage: "text.alignleft",
-                accessory: sourceLanguageName
-            )
+            sourcePaneHeader
 
             ShortcutTextEditor(text: $controller.sourceText) {
                 translate()
@@ -82,6 +78,27 @@ struct TranView: View {
             .controlPanelTextSurface()
         }
         .controlPanelDetailSection()
+    }
+
+    private var sourcePaneHeader: some View {
+        HStack(spacing: 8) {
+            Label("原文", systemImage: "text.alignleft")
+                .font(.headline)
+
+            Spacer()
+
+            Text(sourceLanguageName)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            TranslationSpeechButton(
+                isSpeaking: controller.speakingTarget == .source,
+                canSpeak: canSpeakSourceText,
+                idleHelp: "朗读原文",
+                action: controller.speakSourceText
+            )
+        }
+        .frame(height: 26)
     }
 
     private var resultPane: some View {
@@ -171,8 +188,13 @@ struct TranView: View {
                 translatedText: provider.translatedText,
                 detectedSourceLanguageCode: provider.detectedSourceLanguageCode,
                 canCopy: hasTranslatedText(for: provider),
+                canSpeak: hasTranslatedText(for: provider),
+                isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
                 onCopy: {
                     controller.copyResultToPasteboard(providerID: provider.provider.id)
+                },
+                onSpeak: {
+                    controller.speakResult(providerID: provider.provider.id)
                 },
                 onRetry: translate,
                 contentMinHeight: 150
@@ -185,8 +207,14 @@ struct TranView: View {
     }
 
     private var sourceLanguageName: String {
-        guard let sourceLanguageCode = controller.sourceLanguageCode else {
-            return TranslationLanguage.automaticSourceName
+        guard let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
+            return controller.sourceLanguageCode == nil
+                ? TranslationLanguage.automaticSourceName
+                : TranslationLanguage.name(for: controller.sourceLanguageCode ?? "")
+        }
+
+        if controller.sourceLanguageCode == nil {
+            return "\(TranslationLanguage.automaticSourceName)：\(TranslationLanguage.name(for: sourceLanguageCode))"
         }
 
         return TranslationLanguage.name(for: sourceLanguageCode)
@@ -198,8 +226,12 @@ struct TranView: View {
         }
     }
 
+    private var canSpeakSourceText: Bool {
+        !controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var canSwapLanguages: Bool {
-        guard let sourceLanguageCode = controller.sourceLanguageCode else {
+        guard let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
             return false
         }
 
@@ -208,13 +240,13 @@ struct TranView: View {
     }
 
     private func swapLanguages() {
-        guard canSwapLanguages, let sourceLanguageCode = controller.sourceLanguageCode else {
+        guard canSwapLanguages, let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
             return
         }
 
         let targetLanguageCode = controller.targetLanguageCode
-        controller.selectSourceLanguage(targetLanguageCode)
-        controller.selectTargetLanguage(sourceLanguageCode)
+        controller.selectSourceLanguage(targetLanguageCode, persistsDefault: false)
+        controller.selectTargetLanguage(sourceLanguageCode, persistsDefault: false)
     }
 
     @ViewBuilder
@@ -308,7 +340,7 @@ struct TranView: View {
         Binding {
             controller.targetLanguageCode
         } set: { newValue in
-            controller.selectTargetLanguage(newValue)
+            controller.selectTargetLanguage(newValue, persistsDefault: false)
         }
     }
 
@@ -317,7 +349,8 @@ struct TranView: View {
             controller.sourceLanguageCode ?? TranslationLanguage.automaticSourceCode
         } set: { newValue in
             controller.selectSourceLanguage(
-                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue
+                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue,
+                persistsDefault: false
             )
         }
     }

@@ -8,18 +8,23 @@ final class TranslationController {
 
     private let providers: [TranslationProvider]
     private let pasteboard: ClipboardService
+    private let speechService: TranslationSpeechService
+    private let languageDetector: TranslationLanguageDetecting
     private var historyProviderID: String?
+    private var sessionDetectedSourceLanguageCode: String?
 
     var sourceText = ""
     private(set) var providerStates: [TranslationProviderState]
     private(set) var sourceLanguageCode: String?
     private(set) var targetLanguageCode: String
     var isTranslating = false
+    private(set) var speakingTarget: TranslationSpeechTarget?
     var lastErrorMessage: String?
 
     private static let defaultIdleMessage = "输入文本后点击翻译，结果会显示在这里。"
     private static let historyIdleMessage = "载入历史记录后，可点击翻译刷新其它 provider。"
     private static let disabledProviderMessage = "此 provider 已在设置中关闭。"
+    private static let languageDetectionThreshold = 0.3
 
     var enabledProviders: [TranslationProvider] {
         let providerIDs = Set(providers.map(\.id))
@@ -71,6 +76,10 @@ final class TranslationController {
         primarySuccessfulState?.translatedText
     }
 
+    var effectiveSourceLanguageCode: String? {
+        sourceLanguageCode ?? detectedSourceLanguageCode
+    }
+
     private var primarySuccessfulState: TranslationProviderState? {
         activeProviderStates.first { state in
             if case .success = state.status {
@@ -86,7 +95,9 @@ final class TranslationController {
         preferences: TranslationPreferences? = nil,
         translationService: TranslationService? = nil,
         providers: [TranslationProvider]? = nil,
-        pasteboard: ClipboardService
+        pasteboard: ClipboardService,
+        speechService: TranslationSpeechService? = nil,
+        languageDetector: TranslationLanguageDetecting? = nil
     ) {
         self.history = history ?? TranslationHistoryStore()
         self.preferences = preferences ?? TranslationPreferences()
@@ -103,6 +114,8 @@ final class TranslationController {
             self.providers = TranslationProvider.builtIn()
         }
         self.pasteboard = pasteboard
+        self.speechService = speechService ?? SystemTranslationSpeechService()
+        self.languageDetector = languageDetector ?? NaturalLanguageTranslationLanguageDetector()
         self.sourceLanguageCode = self.preferences.defaultSourceLanguageCode
         self.targetLanguageCode = self.preferences.defaultTargetLanguageCode
         self.providerStates = self.providers.map { provider in
@@ -114,14 +127,16 @@ final class TranslationController {
         }
     }
 
-    func selectSourceLanguage(_ code: String?) {
+    func selectSourceLanguage(_ code: String?, persistsDefault: Bool = true) {
         guard let code else {
             guard sourceLanguageCode != nil else {
                 return
             }
 
             sourceLanguageCode = nil
-            preferences.updateDefaultSourceLanguage(nil)
+            if persistsDefault {
+                preferences.updateDefaultSourceLanguage(nil)
+            }
             resetProviderResults()
             return
         }
@@ -135,11 +150,14 @@ final class TranslationController {
         }
 
         sourceLanguageCode = code
-        preferences.updateDefaultSourceLanguage(code)
+        autoAdjustTargetLanguage(forSourceLanguage: code)
+        if persistsDefault {
+            preferences.updateDefaultSourceLanguage(code)
+        }
         resetProviderResults()
     }
 
-    func selectTargetLanguage(_ code: String) {
+    func selectTargetLanguage(_ code: String, persistsDefault: Bool = true) {
         guard TranslationLanguage.isSupported(code) else {
             return
         }
@@ -149,7 +167,10 @@ final class TranslationController {
         }
 
         targetLanguageCode = code
-        preferences.updateDefaultTargetLanguage(code)
+        autoAdjustTargetLanguageForCurrentSource()
+        if persistsDefault {
+            preferences.updateDefaultTargetLanguage(code)
+        }
         resetProviderResults()
     }
 
@@ -185,10 +206,13 @@ final class TranslationController {
         setActiveProviderStates(status: .loading("正在翻译..."), result: nil)
         defer { isTranslating = false }
 
+        let languageResolution = resolveLanguages(for: trimmedText)
+        sessionDetectedSourceLanguageCode = languageResolution.detectedSourceLanguageCode
+
         let request = TranslationRequest(
             sourceText: trimmedText,
-            targetLanguageCode: targetLanguageCode,
-            sourceLanguageCode: sourceLanguageCode
+            targetLanguageCode: languageResolution.targetLanguageCode,
+            sourceLanguageCode: languageResolution.sourceLanguageCode
         )
 
         var successfulResults: [TranslationProviderResult] = []
@@ -230,6 +254,17 @@ final class TranslationController {
     }
 
     func prefillSourceText(_ text: String) {
+        stopSpeech()
+        sourceText = text
+        resetProviderResults()
+    }
+
+    func editSourceText(_ text: String) {
+        guard text != sourceText else {
+            return
+        }
+
+        stopSpeech()
         sourceText = text
         resetProviderResults()
     }
@@ -277,6 +312,53 @@ final class TranslationController {
         } catch {
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    func speakSourceText() {
+        let trimmedText = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            return
+        }
+
+        speak(
+            target: .source,
+            TranslationSpeechRequest(
+                text: trimmedText,
+                languageCode: sourceLanguageCode ?? detectedSourceLanguageCode
+            )
+        )
+    }
+
+    func speakResult(providerID: String) {
+        guard let state = providerStates.first(where: { $0.provider.id == providerID }) else {
+            return
+        }
+
+        let trimmedText = state.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            return
+        }
+
+        speak(
+            target: .result(providerID: providerID),
+            TranslationSpeechRequest(
+                text: trimmedText,
+                languageCode: state.result?.targetLanguageCode ?? targetLanguageCode
+            )
+        )
+    }
+
+    func stopSpeech() {
+        guard speakingTarget != nil else {
+            return
+        }
+
+        speakingTarget = nil
+        speechService.stop()
+    }
+
+    func isSpeakingResult(providerID: String) -> Bool {
+        speakingTarget == .result(providerID: providerID)
     }
 
     func useHistoryItem(_ item: TranslationHistoryItem) {
@@ -358,6 +440,7 @@ final class TranslationController {
 
     private func resetProviderResults() {
         historyProviderID = nil
+        sessionDetectedSourceLanguageCode = nil
         providerStates = providerStates.map { state in
             TranslationProviderState(
                 provider: state.provider,
@@ -366,6 +449,121 @@ final class TranslationController {
             )
         }
         lastErrorMessage = nil
+    }
+
+    private var detectedSourceLanguageCode: String? {
+        sessionDetectedSourceLanguageCode
+            ?? activeProviderStates.compactMap(\.detectedSourceLanguageCode).first
+    }
+
+    private func resolveLanguages(for text: String) -> LanguageResolution {
+        if let sourceLanguageCode {
+            return LanguageResolution(
+                sourceLanguageCode: sourceLanguageCode,
+                detectedSourceLanguageCode: sourceLanguageCode,
+                targetLanguageCode: resolvedTargetLanguage(forDetectedSource: sourceLanguageCode)
+            )
+        }
+
+        let detectedLanguageCode = languageDetector.detect(
+            text,
+            threshold: Self.languageDetectionThreshold,
+            preferredSourceHints: languageDetectionHints()
+        ).languageCode
+
+        return LanguageResolution(
+            sourceLanguageCode: detectedLanguageCode,
+            detectedSourceLanguageCode: detectedLanguageCode,
+            targetLanguageCode: resolvedTargetLanguage(forDetectedSource: detectedLanguageCode)
+        )
+    }
+
+    private func resolvedTargetLanguage(forDetectedSource detectedSourceLanguageCode: String?) -> String {
+        guard let detectedSourceLanguageCode else {
+            return targetLanguageCode
+        }
+
+        if TranslationLanguage.isChinese(detectedSourceLanguageCode),
+           TranslationLanguage.isChinese(targetLanguageCode) {
+            return "en"
+        }
+
+        if detectedSourceLanguageCode == targetLanguageCode {
+            return TranslationLanguage.isChinese(detectedSourceLanguageCode) ? "en" : "zh-Hans"
+        }
+
+        return targetLanguageCode
+    }
+
+    private func languageDetectionHints() -> [String: Double]? {
+        var hints: [String: Double] = [:]
+        switch targetLanguageCode {
+        case let code where code.hasPrefix("zh"):
+            hints["en", default: 0] += 0.2
+            hints["ja", default: 0] += 0.1
+            hints["ko", default: 0] += 0.05
+        case "en":
+            hints["zh-Hans", default: 0] += 0.2
+            hints["ja", default: 0] += 0.1
+            hints["ko", default: 0] += 0.05
+            hints["fr", default: 0] += 0.05
+            hints["de", default: 0] += 0.05
+        case "ja":
+            hints["en", default: 0] += 0.2
+            hints["zh-Hans", default: 0] += 0.1
+        case "ko":
+            hints["en", default: 0] += 0.2
+            hints["zh-Hans", default: 0] += 0.1
+            hints["ja", default: 0] += 0.05
+        case "fr", "de":
+            hints["en", default: 0] += 0.2
+            hints["fr", default: 0] += 0.05
+            hints["de", default: 0] += 0.05
+        default:
+            break
+        }
+
+        hints.removeValue(forKey: targetLanguageCode)
+        return hints.isEmpty ? nil : hints
+    }
+
+    private func autoAdjustTargetLanguageForCurrentSource() {
+        guard let sourceLanguageCode else {
+            return
+        }
+
+        autoAdjustTargetLanguage(forSourceLanguage: sourceLanguageCode)
+    }
+
+    private func autoAdjustTargetLanguage(forSourceLanguage sourceLanguageCode: String) {
+        let resolvedTargetLanguage = resolvedTargetLanguage(forDetectedSource: sourceLanguageCode)
+        guard resolvedTargetLanguage != targetLanguageCode else {
+            return
+        }
+
+        targetLanguageCode = resolvedTargetLanguage
+    }
+
+    private func speak(
+        target: TranslationSpeechTarget,
+        _ request: TranslationSpeechRequest
+    ) {
+        if speakingTarget == target {
+            stopSpeech()
+            return
+        }
+
+        if speakingTarget != nil {
+            stopSpeech()
+        }
+        speakingTarget = target
+        speechService.speak(request) { [weak self] in
+            guard self?.speakingTarget == target else {
+                return
+            }
+
+            self?.speakingTarget = nil
+        }
     }
 
     private func upsertProviderState(
@@ -389,6 +587,12 @@ final class TranslationController {
             )
         }
     }
+}
+
+private struct LanguageResolution {
+    let sourceLanguageCode: String?
+    let detectedSourceLanguageCode: String?
+    let targetLanguageCode: String
 }
 
 enum TranslationValidationError: LocalizedError, Equatable {

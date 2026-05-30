@@ -45,6 +45,10 @@ extension TranslationLanguage {
         supportedSources.contains { $0.code == code }
     }
 
+    static func isChinese(_ code: String) -> Bool {
+        code.hasPrefix("zh")
+    }
+
     static func bestTargetCode(forPreferredLanguages preferredLanguages: [String]) -> String {
         for preferredLanguage in preferredLanguages {
             if let supportedCode = supportedCode(matching: preferredLanguage) {

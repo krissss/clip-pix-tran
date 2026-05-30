@@ -309,7 +309,7 @@ private struct TranSettingsSection: View {
 
     private var targetLanguageSelection: Binding<String> {
         Binding {
-            controller.targetLanguageCode
+            controller.preferences.defaultTargetLanguageCode
         } set: { newValue in
             controller.selectTargetLanguage(newValue)
         }
@@ -317,7 +317,7 @@ private struct TranSettingsSection: View {
 
     private var sourceLanguageSelection: Binding<String> {
         Binding {
-            controller.sourceLanguageCode ?? TranslationLanguage.automaticSourceCode
+            controller.preferences.defaultSourceLanguageCode ?? TranslationLanguage.automaticSourceCode
         } set: { newValue in
             controller.selectSourceLanguage(
                 newValue == TranslationLanguage.automaticSourceCode ? nil : newValue

@@ -101,11 +101,15 @@ struct SystemTranslationService: TranslationService {
     }
 
     private func sourceLanguageCandidates(for sourceText: String) -> [Locale.Language] {
+        let deterministicLanguageCode = NaturalLanguageTranslationLanguageDetector()
+            .detect(sourceText, threshold: 0.3, preferredSourceHints: nil)
+            .languageCode
+
         let recognizer = NLLanguageRecognizer()
         recognizer.languageConstraints = Self.detectableLanguages
         recognizer.processString(sourceText)
 
-        let languageCodes = recognizer
+        var languageCodes = recognizer
             .languageHypotheses(withMaximum: Self.detectableLanguages.count)
             .filter { $0.value >= Self.minimumLanguageConfidence }
             .sorted { first, second in
@@ -114,6 +118,9 @@ struct SystemTranslationService: TranslationService {
             .compactMap { language, _ in
                 Self.languageCode(for: language)
             }
+        if let deterministicLanguageCode {
+            languageCodes.insert(deterministicLanguageCode, at: 0)
+        }
 
         var seenLanguageCodes = Set<String>()
         return languageCodes.compactMap { languageCode in
