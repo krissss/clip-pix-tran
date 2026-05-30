@@ -21,19 +21,19 @@ struct ClipView: View {
     }
 
     var body: some View {
-        HSplitView {
-            sidebar
-                .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
+        GeometryReader { proxy in
+            let sidebarWidth = ControlPanelDesign.Layout.historySidebarWidth(for: proxy.size.width)
 
-            detail
-                .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: ControlPanelDesign.Layout.splitSpacing) {
+                sidebar
+                    .frame(width: sidebarWidth)
+
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .navigationTitle("Clip")
-        .searchable(
-            text: $searchText,
-            placement: .toolbar,
-            prompt: "搜索剪贴板历史"
-        )
+        .background(ControlPanelBackground())
         .onAppear(perform: selectFirstVisibleItemIfNeeded)
         .onChange(of: visibleItems.map(\.id)) { _, _ in
             selectFirstVisibleItemIfNeeded()
@@ -44,45 +44,43 @@ struct ClipView: View {
         VStack(spacing: 0) {
             sidebarHeader
 
-            Divider()
+            ControlPanelSearchField(text: $searchText, prompt: "搜索剪贴板历史")
+                .padding(.horizontal, ControlPanelDesign.Layout.searchHorizontalPadding)
+                .padding(.bottom, 10)
 
             sidebarContent
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .controlPanelSidebarSurface()
     }
 
     private var sidebarHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("剪贴板历史")
-                    .font(.title3.weight(.semibold))
-
-                Text("\(visibleItems.count) 条记录")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
+        ControlPanelSidebarHeader(
+            title: "剪贴板历史",
+            systemImage: "doc.on.clipboard",
+            tint: ControlPanelDesign.tint(for: .clip)
+        ) {
             Text("\(monitor.history.items.count)/\(monitor.history.limit)")
-                .font(.callout.monospacedDigit())
+                .font(.callout.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, ControlPanelDesign.Layout.headerHorizontalPadding)
+        .padding(.vertical, ControlPanelDesign.Layout.headerVerticalPadding)
     }
 
     @ViewBuilder
     private var sidebarContent: some View {
         if monitor.history.items.isEmpty {
-            ContentUnavailableView(
-                "暂无剪贴板记录",
+            ControlPanelEmptyState(
+                title: "暂无剪贴板记录",
                 systemImage: "doc.on.clipboard",
-                description: Text("复制文本、图片或文件后，它会自动加入历史。")
+                tint: ControlPanelDesign.tint(for: .clip)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if visibleItems.isEmpty {
-            ContentUnavailableView.search(text: searchText)
+            ControlPanelNoResultsState(
+                title: "没有匹配记录",
+                systemImage: "doc.text.magnifyingglass"
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             List(selection: $selectedItemID) {
@@ -93,6 +91,10 @@ struct ClipView: View {
                 ForEach(visibleItems) { item in
                     ClipboardItemRow(item: item)
                         .tag(item.id)
+                        .controlPanelListRow(
+                            isSelected: item.id == selectedItemID,
+                            tint: ControlPanelDesign.tint(for: .clip)
+                        )
                         .contextMenu {
                             contextMenu(for: item)
                         }
@@ -101,7 +103,8 @@ struct ClipView: View {
                         }
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -113,13 +116,16 @@ struct ClipView: View {
             Spacer()
 
             Button(role: .destructive, action: monitor.clearHistory) {
-                Label("清空全部", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(monitor.history.items.isEmpty)
             .help("清空剪贴板历史")
         }
         .font(.callout)
         .padding(.vertical, 4)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private var detail: some View {
@@ -150,14 +156,15 @@ struct ClipView: View {
                     }
                 )
             } else {
-                ContentUnavailableView(
-                    "选择一条记录",
+                ControlPanelEmptyState(
+                    title: "选择一条记录",
                     systemImage: "sidebar.right",
-                    description: Text("左侧选择剪贴板记录后，可以在这里查看预览和操作。")
+                    tint: ControlPanelDesign.tint(for: .clip)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .controlPanelContentSurface()
         .overlay(alignment: .top) {
             statusMessages
         }
@@ -265,13 +272,7 @@ private struct ClipboardStatusBanner: View {
     let message: String
 
     var body: some View {
-        Label(message, systemImage: "exclamationmark.triangle")
-            .font(.callout)
-            .foregroundStyle(.red)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+        ControlPanelStatusBanner(message: message)
     }
 }
 
@@ -282,10 +283,10 @@ private struct ClipboardItemRow: View {
         HStack(alignment: .top, spacing: 12) {
             itemPreview
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(item.displayTitle)
-                        .font(.body)
+                        .font(.callout.weight(.medium))
                         .lineLimit(2)
                         .foregroundStyle(.primary)
 
@@ -308,8 +309,6 @@ private struct ClipboardItemRow: View {
 
             Spacer(minLength: 0)
         }
-        .contentShape(Rectangle())
-        .padding(.vertical, 6)
     }
 
     private var summaryText: String {
@@ -350,15 +349,20 @@ private struct ClipboardItemRow: View {
         if item.kind == .image, let imageData = item.imageData {
             ImageThumbnailView(
                 data: imageData,
-                size: CGSize(width: 44, height: 44)
+                size: CGSize(
+                    width: ControlPanelDesign.Layout.historyRowThumbnailSize,
+                    height: ControlPanelDesign.Layout.historyRowThumbnailSize
+                )
             )
         } else {
             Image(systemName: item.kind.systemImage)
                 .font(.title3)
                 .foregroundStyle(.secondary)
-                .frame(width: 44, height: 44)
-                .background(.quinary)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(
+                    width: ControlPanelDesign.Layout.historyRowThumbnailSize,
+                    height: ControlPanelDesign.Layout.historyRowThumbnailSize
+                )
+                .controlPanelQuietSurface()
         }
     }
 }
@@ -389,18 +393,16 @@ private struct ClipboardItemDetailPane: View {
         VStack(spacing: 0) {
             actionBar
 
-            Divider()
-
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 2) {
                     previewSection
                     metadataSection
                 }
-                .padding(20)
+                .padding(ControlPanelDesign.Layout.detailContentPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .controlPanelContentSurface()
     }
 
     private var actionBar: some View {
@@ -408,51 +410,56 @@ private struct ClipboardItemDetailPane: View {
             Button(action: copyAction) {
                 Label("复制", systemImage: "doc.on.doc")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .clip), prominence: .primary))
             .help("复制回剪贴板")
 
             if canCopyPlainText {
                 Button(action: copyPlainTextAction) {
-                    Label("纯文本", systemImage: "text.alignleft")
+                    Image(systemName: "text.alignleft")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("复制为纯文本")
             }
 
             Button(action: togglePinnedAction) {
-                Label(item.isPinned ? "取消收藏" : "收藏", systemImage: item.isPinned ? "pin.slash" : "pin")
+                Image(systemName: item.isPinned ? "pin.slash" : "pin")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: item.isPinned ? .selected : .normal, tint: ControlPanelDesign.tint(for: .clip)))
             .help(item.isPinned ? "取消收藏" : "收藏")
 
             if item.isText {
                 Button(action: translateAction) {
-                    Label("翻译", systemImage: "text.bubble")
+                    Image(systemName: "text.bubble")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("发送到 Tran")
             }
 
             if canPreview {
                 Button(action: systemPreviewAction) {
-                    Label("预览", systemImage: "eye")
+                    Image(systemName: "eye")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("用系统预览.app打开图片")
             }
 
             if canRevealInFinder {
                 Button(action: revealInFinderAction) {
-                    Label("访达", systemImage: "folder")
+                    Image(systemName: "folder")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("在访达中显示")
             }
 
             Spacer()
 
             Button(role: .destructive, action: deleteAction) {
-                Label("删除", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .help("删除记录")
         }
-        .labelStyle(.titleAndIcon)
-        .padding(20)
+        .controlPanelActionBar()
     }
 
     @ViewBuilder
@@ -469,8 +476,7 @@ private struct ClipboardItemDetailPane: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("详情")
-                .font(.headline)
+            ControlPanelSectionLabel(title: "详情", systemImage: "info.circle")
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
                 ClipboardMetadataRow(title: "类型", value: item.kind.displayName)
@@ -487,6 +493,7 @@ private struct ClipboardItemDetailPane: View {
                 }
             }
         }
+        .controlPanelDetailSection()
     }
 }
 
@@ -496,8 +503,10 @@ private struct ClipboardTextPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(item.payloads.isEmpty ? "文本预览" : "带格式文本")
-                    .font(.headline)
+                ControlPanelSectionLabel(
+                    title: item.payloads.isEmpty ? "文本预览" : "带格式文本",
+                    systemImage: "text.alignleft"
+                )
 
                 Spacer()
 
@@ -513,13 +522,9 @@ private struct ClipboardTextPreview: View {
                 richTextData: item.richTextPreviewData
             )
             .frame(minHeight: 240, maxHeight: 420)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(.quaternary)
-            }
+            .controlPanelTextSurface()
         }
+        .controlPanelDetailSection()
     }
 }
 
@@ -528,24 +533,18 @@ private struct ClipboardImagePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("图片预览")
-                .font(.headline)
+            ControlPanelSectionLabel(title: "图片预览", systemImage: "photo")
 
             if let imageData = item.imageData {
                 ImageThumbnailView(
                     data: imageData,
                     size: CGSize(width: 320, height: 200),
-                    cornerRadius: 8,
+                    cornerRadius: ControlPanelDesign.cardRadius,
                     maxPixelSize: 720
                 )
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(18)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.quaternary)
-                }
+                .padding(ControlPanelDesign.Layout.detailContentPadding)
+                .controlPanelTextSurface()
             } else {
                 ContentUnavailableView("无法预览图片", systemImage: "photo")
                     .frame(minHeight: 220)
@@ -555,6 +554,7 @@ private struct ClipboardImagePreview: View {
                 ClipboardPathList(paths: item.filePaths)
             }
         }
+        .controlPanelDetailSection()
     }
 }
 
@@ -563,11 +563,11 @@ private struct ClipboardFilePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("文件")
-                .font(.headline)
+            ControlPanelSectionLabel(title: "文件", systemImage: "doc")
 
             ClipboardPathList(paths: item.filePaths)
         }
+        .controlPanelDetailSection()
     }
 }
 
@@ -601,13 +601,12 @@ private struct ClipboardPathList: View {
                     } label: {
                         Image(systemName: "folder")
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(ControlPanelIconButtonStyle())
                     .help("在访达中显示")
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .controlPanelTextSurface()
             }
         }
     }

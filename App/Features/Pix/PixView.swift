@@ -21,19 +21,19 @@ struct PixView: View {
     }
 
     var body: some View {
-        HSplitView {
-            sidebar
-                .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
+        GeometryReader { proxy in
+            let sidebarWidth = ControlPanelDesign.Layout.historySidebarWidth(for: proxy.size.width)
 
-            detail
-                .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: ControlPanelDesign.Layout.splitSpacing) {
+                sidebar
+                    .frame(width: sidebarWidth)
+
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .navigationTitle("Pix")
-        .searchable(
-            text: $searchText,
-            placement: .toolbar,
-            prompt: "搜索截图历史"
-        )
+        .background(ControlPanelBackground())
         .onAppear(perform: selectFirstVisibleItemIfNeeded)
         .onChange(of: visibleItems.map(\.id)) { _, _ in
             selectFirstVisibleItemIfNeeded()
@@ -44,29 +44,24 @@ struct PixView: View {
         VStack(spacing: 0) {
             sidebarHeader
 
-            Divider()
+            ControlPanelSearchField(text: $searchText, prompt: "搜索截图历史")
+                .padding(.horizontal, ControlPanelDesign.Layout.searchHorizontalPadding)
+                .padding(.bottom, 10)
 
             sidebarContent
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .controlPanelSidebarSurface()
     }
 
     private var sidebarHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("截图历史")
-                        .font(.title3.weight(.semibold))
-
-                    Text("\(visibleItems.count) 张截图")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
+            ControlPanelSidebarHeader(
+                title: "截图历史",
+                systemImage: "camera.viewfinder",
+                tint: ControlPanelDesign.tint(for: .pix)
+            ) {
                 Text("\(controller.history.items.count)/\(controller.history.limit)")
-                    .font(.callout.monospacedDigit())
+                    .font(.callout.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
@@ -77,22 +72,25 @@ struct PixView: View {
                 stopCaptureAction: controller.stopCapture
             )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(minHeight: 104)
+        .padding(.horizontal, ControlPanelDesign.Layout.headerHorizontalPadding)
+        .padding(.vertical, 10)
+        .frame(minHeight: 96)
     }
 
     @ViewBuilder
     private var sidebarContent: some View {
         if controller.history.items.isEmpty {
-            ContentUnavailableView(
-                "暂无截图",
+            ControlPanelEmptyState(
+                title: "暂无截图",
                 systemImage: "camera.viewfinder",
-                description: Text("点击选区截图或主屏幕截图后，它会自动加入历史。")
+                tint: ControlPanelDesign.tint(for: .pix)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if visibleItems.isEmpty {
-            ContentUnavailableView.search(text: searchText)
+            ControlPanelNoResultsState(
+                title: "没有匹配截图",
+                systemImage: "photo.badge.magnifyingglass"
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             List(selection: $selectedItemID) {
@@ -103,6 +101,10 @@ struct PixView: View {
                 ForEach(visibleItems) { item in
                     ScreenshotItemRow(item: item)
                         .tag(item.id)
+                        .controlPanelListRow(
+                            isSelected: item.id == selectedItemID,
+                            tint: ControlPanelDesign.tint(for: .pix)
+                        )
                         .contextMenu {
                             contextMenu(for: item)
                         }
@@ -111,7 +113,8 @@ struct PixView: View {
                         }
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -123,13 +126,16 @@ struct PixView: View {
             Spacer()
 
             Button(role: .destructive, action: clearHistory) {
-                Label("清空全部", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(controller.history.items.isEmpty)
             .help("清空截图历史")
         }
         .font(.callout)
         .padding(.vertical, 4)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private var detail: some View {
@@ -156,6 +162,7 @@ struct PixView: View {
                 )
             }
         }
+        .controlPanelContentSurface()
         .overlay(alignment: .top) {
             statusMessages
         }
@@ -248,23 +255,17 @@ private struct ScreenshotStatusBanner: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Label(message, systemImage: "exclamationmark.triangle")
-                .font(.callout)
-                .foregroundStyle(.red)
-
-            if showsSettingsButton {
-                Button {
-                    openScreenRecordingSettings()
-                } label: {
-                    Label("打开系统设置", systemImage: "gearshape")
+            ControlPanelStatusBanner(message: message) {
+                if showsSettingsButton {
+                    Button {
+                        openScreenRecordingSettings()
+                    } label: {
+                        Label("打开系统设置", systemImage: "gearshape")
+                    }
+                    .controlSize(.small)
                 }
-                .controlSize(.small)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -275,12 +276,12 @@ private struct ScreenshotItemRow: View {
         HStack(alignment: .top, spacing: 12) {
             ImageThumbnailView(
                 data: item.data,
-                size: CGSize(width: 56, height: 44)
+                size: CGSize(width: 48, height: ControlPanelDesign.Layout.historyRowThumbnailSize)
             )
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(item.createdAt.absoluteDisplayString)
-                    .font(.body)
+                    .font(.callout.weight(.medium))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
 
@@ -295,8 +296,6 @@ private struct ScreenshotItemRow: View {
 
             Spacer(minLength: 0)
         }
-        .contentShape(Rectangle())
-        .padding(.vertical, 6)
     }
 }
 
@@ -311,18 +310,16 @@ private struct ScreenshotItemDetailPane: View {
         VStack(spacing: 0) {
             actionBar
 
-            Divider()
-
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 2) {
                     previewSection
                     metadataSection
                 }
-                .padding(20)
+                .padding(ControlPanelDesign.Layout.detailContentPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .controlPanelContentSurface()
     }
 
     private var actionBar: some View {
@@ -330,54 +327,49 @@ private struct ScreenshotItemDetailPane: View {
             Button(action: copyAction) {
                 Label("复制", systemImage: "doc.on.doc")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
             .help("复制截图")
 
             Button(action: saveAction) {
-                Label("保存", systemImage: "square.and.arrow.down")
+                Image(systemName: "square.and.arrow.down")
             }
+            .buttonStyle(ControlPanelIconButtonStyle())
             .help("保存截图")
 
             Button(action: previewAction) {
-                Label("预览", systemImage: "eye")
+                Image(systemName: "eye")
             }
+            .buttonStyle(ControlPanelIconButtonStyle())
             .help("用系统预览.app打开截图")
 
             Spacer()
 
             Button(role: .destructive, action: deleteAction) {
-                Label("删除", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .help("删除截图")
         }
-        .labelStyle(.titleAndIcon)
-        .padding(.horizontal, 20)
-        .frame(height: 70)
+        .controlPanelActionBar()
     }
 
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("图片预览")
-                    .font(.headline)
+                ControlPanelSectionLabel(title: "图片预览", systemImage: "photo")
             }
 
             ScreenshotFittedPreviewImage(data: item.data)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(18)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(.quaternary)
-            }
+            .padding(ControlPanelDesign.Layout.detailContentPadding)
+            .controlPanelTextSurface()
         }
+        .controlPanelDetailSection()
     }
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("详情")
-                .font(.headline)
+            ControlPanelSectionLabel(title: "详情", systemImage: "info.circle")
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
                 ScreenshotMetadataRow(title: "类型", value: "PNG 图片")
@@ -386,6 +378,7 @@ private struct ScreenshotItemDetailPane: View {
                 ScreenshotMetadataRow(title: "数据", value: "\(item.data.count) bytes")
             }
         }
+        .controlPanelDetailSection()
     }
 }
 
@@ -396,7 +389,7 @@ private struct ScreenshotFittedPreviewImage: View {
     @State private var didLoadThumbnail = false
 
     private let previewHeight: CGFloat = 320
-    private let cornerRadius: CGFloat = 6
+    private let cornerRadius: CGFloat = ControlPanelDesign.compactRadius
 
     private var nsImage: NSImage? {
         guard let thumbnailData else {
@@ -426,10 +419,6 @@ private struct ScreenshotFittedPreviewImage: View {
                         .scaledToFit()
                         .frame(width: displaySize.width, height: displaySize.height)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: cornerRadius)
-                                .stroke(.quaternary)
-                        }
                 } else {
                     placeholder
                 }
@@ -502,20 +491,25 @@ private struct PixCaptureControls: View {
                 Button(action: stopCaptureAction) {
                     Label("停止截图", systemImage: "xmark.circle")
                 }
+                .buttonStyle(ControlPanelButtonStyle(prominence: .destructive))
                 .help("结束当前框选")
             } else {
                 Button(action: captureSelectedRegionAction) {
                     Label("选区截图", systemImage: "selection.pin.in.out")
                 }
+                .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
                 .help("拖拽选择屏幕区域")
 
                 Button(action: captureMainDisplayAction) {
-                    Label("全屏截图", systemImage: "display")
+                    Image(systemName: "display")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("捕获主屏幕画面")
             }
         }
-        .labelStyle(.titleAndIcon)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlPanelRoundedSurface(background: ControlPanelDesign.embeddedPanelBackground)
     }
 }
 
@@ -524,18 +518,15 @@ private struct ScreenshotEmptyDetailPane: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 42, weight: .regular))
-                .foregroundStyle(.secondary)
+            ControlPanelIconTile(
+                systemImage: "camera.viewfinder",
+                tint: ControlPanelDesign.tint(for: .pix),
+                size: 52
+            )
 
             VStack(spacing: 6) {
                 Text("还没有截图")
                     .font(.title3.weight(.semibold))
-
-                Text("开始一次截图后，历史会出现在左侧，右侧会显示预览和操作。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
 
             if needsScreenRecordingPermission {
@@ -548,7 +539,7 @@ private struct ScreenshotEmptyDetailPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(32)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .controlPanelContentSurface()
     }
 }
 

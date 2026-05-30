@@ -9,26 +9,28 @@ struct AppSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(selectedPane.title)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-                .padding(.bottom, 2)
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("设置")
+                        .font(.headline)
+                }
 
-            SettingsPaneToolbar(selectedPane: $selectedPane)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 16)
+                Spacer()
 
-            Divider()
+                SettingsPaneToolbar(selectedPane: $selectedPane)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
 
             SettingsContentPanel {
                 selectedPaneView
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
         }
-        .frame(width: 620)
-        .frame(minHeight: 420)
-        .background(.regularMaterial)
+        .frame(width: ControlPanelDesign.Layout.Settings.windowWidth)
+        .frame(height: ControlPanelDesign.Layout.Settings.windowHeight)
+        .background(ControlPanelBackground())
     }
 
     @ViewBuilder
@@ -86,40 +88,44 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
             "info.circle"
         }
     }
+
 }
 
 private struct SettingsPaneToolbar: View {
     @Binding var selectedPane: SettingsPane
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 3) {
             ForEach(SettingsPane.allCases) { pane in
                 Button {
                     selectedPane = pane
                 } label: {
-                    VStack(spacing: 5) {
+                    HStack(spacing: 6) {
                         Image(systemName: pane.systemImage)
-                            .font(.system(size: 20, weight: .regular))
+                            .font(.system(size: 13, weight: .semibold))
                             .symbolRenderingMode(.hierarchical)
-                            .frame(width: 28, height: 24)
+                            .frame(width: 16, height: 16)
 
                         Text(pane.title)
                             .font(.caption)
                     }
                     .foregroundStyle(selectedPane == pane ? Color.accentColor : Color.secondary)
-                    .frame(width: 74, height: 54)
-                    .background {
-                        if selectedPane == pane {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.accentColor.opacity(0.1))
-                        }
-                    }
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .frame(width: 74, height: 30)
+                    .controlPanelRoundedSurface(
+                        background: ControlPanelDesign.selectedFill(
+                            tint: Color.accentColor,
+                            isSelected: selectedPane == pane,
+                            opacity: 0.11
+                        ),
+                        cornerRadius: ControlPanelDesign.compactRadius
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .help(pane.title)
             }
         }
+        .controlPanelSegmentedSurface()
     }
 }
 
@@ -127,48 +133,39 @@ private struct SettingsContentPanel<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            content
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(minHeight: ControlPanelDesign.Layout.Settings.contentMinHeight, alignment: .topLeading)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
         }
+        .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(22)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor).opacity(0.64))
-        }
     }
 }
 
 private struct ShortcutsSettingsSection: View {
     var body: some View {
-        SettingsSectionHeader(
-            icon: "keyboard",
-            title: "快捷键",
-            subtitle: "配置常用操作的全局快捷键。"
-        )
-
-        VStack(spacing: 0) {
-            shortcutRow(title: "打开 Clip", name: .showClip)
-            SettingsRowDivider()
-            shortcutRow(title: "剪贴板快速面板", name: .showClipboardQuickPanel)
-            SettingsRowDivider()
-            shortcutRow(title: "区域截图", name: .captureSelectedRegion)
-            SettingsRowDivider()
-            shortcutRow(title: "翻译选中文本", name: .translateSelectedText)
-            SettingsRowDivider()
-            shortcutRow(title: "翻译剪贴板文本", name: .translateClipboardText)
+        SettingsGroup(title: "全局快捷键") {
+            VStack(spacing: 0) {
+                shortcutRow(title: "打开 Clip", name: .showClip)
+                shortcutRow(title: "剪贴板快速面板", name: .showClipboardQuickPanel)
+                shortcutRow(title: "区域截图", name: .captureSelectedRegion)
+                shortcutRow(title: "翻译选中文本", name: .translateSelectedText)
+                shortcutRow(title: "翻译剪贴板文本", name: .translateClipboardText)
+            }
+            .settingsRowGroup()
         }
-        .settingsRowGroup()
     }
 
     private func shortcutRow(title: String, name: KeyboardShortcuts.Name) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
+        SettingsFormRow(title: title) {
             KeyboardShortcuts.Recorder("", name: name)
                 .labelsHidden()
         }
-        .settingsRow()
     }
 }
 
@@ -184,27 +181,22 @@ private struct ClipSettingsSection: View {
     }
 
     var body: some View {
-        SettingsSectionHeader(
-            icon: "doc.on.clipboard",
-            title: "Clip",
-            subtitle: "管理剪贴板历史的保存方式和容量。"
-        )
-
-        VStack(spacing: 0) {
-            toggleRow("重启后保留剪贴板历史", isOn: $persistsHistory) { newValue in
-                history.updatePersistsHistory(newValue)
+        SettingsGroup(title: "历史") {
+            VStack(spacing: 0) {
+                toggleRow("重启后保留剪贴板历史", isOn: $persistsHistory) { newValue in
+                    history.updatePersistsHistory(newValue)
+                }
+                historyLimitRow(
+                    title: "普通历史上限",
+                    value: $maximumNormalItems,
+                    range: 10...200,
+                    step: 10
+                ) { newValue in
+                    history.updateLimit(Int(newValue))
+                }
             }
-            SettingsRowDivider()
-            historyLimitRow(
-                title: "普通历史上限",
-                value: $maximumNormalItems,
-                range: 10...200,
-                step: 10
-            ) { newValue in
-                history.updateLimit(Int(newValue))
-            }
+            .settingsRowGroup()
         }
-        .settingsRowGroup()
 
         SettingsFootnote("关闭保留历史后，已保存的剪贴板历史文件会被删除。")
     }
@@ -222,27 +214,22 @@ private struct PixSettingsSection: View {
     }
 
     var body: some View {
-        SettingsSectionHeader(
-            icon: "camera.viewfinder",
-            title: "Pix",
-            subtitle: "管理截图历史的保存方式和容量。"
-        )
-
-        VStack(spacing: 0) {
-            toggleRow("重启后保留截图历史", isOn: $persistsHistory) { newValue in
-                history.updatePersistsHistory(newValue)
+        SettingsGroup(title: "历史") {
+            VStack(spacing: 0) {
+                toggleRow("重启后保留截图历史", isOn: $persistsHistory) { newValue in
+                    history.updatePersistsHistory(newValue)
+                }
+                historyLimitRow(
+                    title: "截图历史上限",
+                    value: $maximumItems,
+                    range: 5...50,
+                    step: 5
+                ) { newValue in
+                    history.updateLimit(Int(newValue))
+                }
             }
-            SettingsRowDivider()
-            historyLimitRow(
-                title: "截图历史上限",
-                value: $maximumItems,
-                range: 5...50,
-                step: 5
-            ) { newValue in
-                history.updateLimit(Int(newValue))
-            }
+            .settingsRowGroup()
         }
-        .settingsRowGroup()
 
         SettingsFootnote("截图可能包含敏感信息；开启保留历史后，会把最近截图保存到本机应用支持目录。")
     }
@@ -260,67 +247,64 @@ private struct TranSettingsSection: View {
     }
 
     var body: some View {
-        SettingsSectionHeader(
-            icon: "character.book.closed",
-            title: "Tran",
-            subtitle: "配置翻译默认语言和历史记录。"
-        )
+        VStack(alignment: .leading, spacing: 14) {
+            SettingsGroup(title: "默认语言") {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: "默认原文语言") {
+                        Picker("", selection: sourceLanguageSelection) {
+                            Text(TranslationLanguage.automaticSourceName)
+                                .tag(TranslationLanguage.automaticSourceCode)
+                            Divider()
+                            ForEach(TranslationLanguage.supportedSources) { language in
+                                Text(language.name).tag(language.code)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                    }
+                    SettingsFormRow(title: "默认目标语言") {
+                        Picker("", selection: targetLanguageSelection) {
+                            ForEach(TranslationLanguage.supported) { language in
+                                Text(language.name).tag(language.code)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .settingsRowGroup()
+            }
 
-        VStack(spacing: 0) {
-            HStack {
-                Text("默认原文语言")
-                Spacer()
-                Picker("", selection: sourceLanguageSelection) {
-                    Text(TranslationLanguage.automaticSourceName)
-                        .tag(TranslationLanguage.automaticSourceCode)
-                    Divider()
-                    ForEach(TranslationLanguage.supportedSources) { language in
-                        Text(language.name).tag(language.code)
+            SettingsGroup(title: "翻译服务") {
+                VStack(spacing: 0) {
+                    ForEach(TranslationProviderDescriptor.builtIn) { provider in
+                        providerToggleRow(provider)
                     }
                 }
-                .labelsHidden()
-                .frame(width: 190)
+                .settingsRowGroup()
             }
-            .settingsRow()
-            SettingsRowDivider()
-            HStack {
-                Text("默认目标语言")
-                Spacer()
-                Picker("", selection: targetLanguageSelection) {
-                    ForEach(TranslationLanguage.supported) { language in
-                        Text(language.name).tag(language.code)
+
+            SettingsGroup(title: "历史") {
+                VStack(spacing: 0) {
+                    toggleRow("重启后保留翻译历史", isOn: $persistsHistory) { newValue in
+                        controller.history.updatePersistsHistory(newValue)
+                    }
+                    historyLimitRow(
+                        title: "翻译历史上限",
+                        value: $maximumItems,
+                        range: 10...200,
+                        step: 10
+                    ) { newValue in
+                        controller.history.updateLimit(Int(newValue))
                     }
                 }
-                .labelsHidden()
-                .frame(width: 190)
-            }
-            .settingsRow()
-            SettingsRowDivider()
-            VStack(spacing: 0) {
-                ForEach(TranslationProviderDescriptor.builtIn) { provider in
-                    providerToggleRow(provider)
-                    if provider.id != TranslationProviderDescriptor.builtIn.last?.id {
-                        SettingsRowDivider()
-                    }
-                }
-            }
-            SettingsRowDivider()
-            toggleRow("重启后保留翻译历史", isOn: $persistsHistory) { newValue in
-                controller.history.updatePersistsHistory(newValue)
-            }
-            SettingsRowDivider()
-            historyLimitRow(
-                title: "翻译历史上限",
-                value: $maximumItems,
-                range: 10...200,
-                step: 10
-            ) { newValue in
-                controller.history.updateLimit(Int(newValue))
+                .settingsRowGroup()
             }
         }
-        .settingsRowGroup()
 
-        SettingsFootnote("未手动选择时，默认目标语言会跟随系统首选语言；开启保留历史后，翻译记录会保存到本机应用支持目录。")
+        SettingsFootnote("目标语言默认跟随系统；翻译历史会保存到本机。")
     }
 
     private var targetLanguageSelection: Binding<String> {
@@ -342,22 +326,15 @@ private struct TranSettingsSection: View {
     }
 
     private func providerToggleRow(_ provider: TranslationProviderDescriptor) -> some View {
-        Toggle(isOn: providerEnabledBinding(provider.id)) {
-            HStack(spacing: 8) {
-                Image(systemName: provider.systemImage)
-                    .foregroundStyle(.secondary)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.name)
-
-                    Text(provider.isLocal ? "本地 provider" : "云端 provider")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+        SettingsFormRow {
+            Label(provider.name, systemImage: provider.systemImage)
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(.primary)
+        } control: {
+            Toggle("", isOn: providerEnabledBinding(provider.id))
+                .labelsHidden()
+                .toggleStyle(.switch)
         }
-        .toggleStyle(.switch)
-        .settingsRow()
     }
 
     private func providerEnabledBinding(_ providerID: String) -> Binding<Bool> {
@@ -369,52 +346,71 @@ private struct TranSettingsSection: View {
     }
 }
 
+private struct SettingsGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+
+            content
+        }
+    }
+}
+
 private struct AboutSettingsSection: View {
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "sparkles.rectangle.stack")
-                .font(.system(size: 42, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 70, height: 70)
-                .background {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.12))
-                }
+            ControlPanelIconTile(
+                systemImage: "sparkles.rectangle.stack",
+                tint: Color.accentColor,
+                size: 58
+            )
 
             Text("ClipPixTran")
                 .font(.title3.weight(.semibold))
-
-            Text("剪贴板、截图与翻译的轻量工具集。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
     }
 }
 
-private struct SettingsSectionHeader: View {
-    var icon: String
-    var title: String
-    var subtitle: String
+private struct SettingsFormRow<Control: View>: View {
+    let titleContent: AnyView
+    @ViewBuilder var control: Control
+
+    init(title: String, @ViewBuilder control: () -> Control) {
+        self.titleContent = AnyView(Text(title))
+        self.control = control()
+    }
+
+    init<Title: View>(
+        @ViewBuilder title: () -> Title,
+        @ViewBuilder control: () -> Control
+    ) {
+        self.titleContent = AnyView(title())
+        self.control = control()
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 34, height: 34)
+        HStack(alignment: .center, spacing: 18) {
+            titleContent
+                .font(.callout)
+                .lineLimit(2)
+                .frame(width: ControlPanelDesign.Layout.Settings.labelWidth, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            Spacer(minLength: 16)
+
+            control
+                .controlSize(.regular)
+                .frame(width: ControlPanelDesign.Layout.Settings.controlWidth, alignment: .trailing)
         }
+        .frame(minHeight: ControlPanelDesign.Layout.Settings.rowHeight)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -426,35 +422,22 @@ private struct SettingsFootnote: View {
     }
 
     var body: some View {
-        Text(text)
-            .font(.footnote)
+        Label(text, systemImage: "info.circle")
+            .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-private struct SettingsRowDivider: View {
-    var body: some View {
-        Divider()
-            .padding(.leading, 16)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .controlPanelRoundedSurface(
+                background: ControlPanelDesign.quietFill,
+                cornerRadius: ControlPanelDesign.compactRadius
+            )
     }
 }
 
 private extension View {
     func settingsRowGroup() -> some View {
-        background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.72))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        }
-    }
-
-    func settingsRow() -> some View {
-        frame(minHeight: 46)
-            .padding(.horizontal, 16)
+        controlPanelSettingsRowGroup()
     }
 }
 
@@ -463,12 +446,14 @@ private func toggleRow(
     isOn: Binding<Bool>,
     onChange: @escaping (Bool) -> Void
 ) -> some View {
-    Toggle(title, isOn: isOn)
-        .toggleStyle(.switch)
-        .settingsRow()
-        .onChange(of: isOn.wrappedValue) { _, newValue in
-            onChange(newValue)
-        }
+    SettingsFormRow(title: title) {
+        Toggle("", isOn: isOn)
+            .labelsHidden()
+            .toggleStyle(.switch)
+    }
+    .onChange(of: isOn.wrappedValue) { _, newValue in
+        onChange(newValue)
+    }
 }
 
 private func historyLimitRow(
@@ -478,22 +463,20 @@ private func historyLimitRow(
     step: Double,
     onChange: @escaping (Double) -> Void
 ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-        HStack {
-            Text(title)
-            Spacer()
-            Text("\(Int(value.wrappedValue))")
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-        }
+    SettingsFormRow(title: title) {
+        HStack(spacing: 10) {
+            Slider(value: value, in: range, step: step)
+                .frame(width: ControlPanelDesign.Layout.Settings.sliderWidth)
+                .onChange(of: value.wrappedValue) { _, newValue in
+                    onChange(newValue)
+                }
 
-        Slider(value: value, in: range, step: step)
-            .onChange(of: value.wrappedValue) { _, newValue in
-                onChange(newValue)
-            }
+            Text("\(Int(value.wrappedValue))")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: ControlPanelDesign.Layout.Settings.valueWidth, alignment: .trailing)
+        }
     }
-    .padding(.vertical, 10)
-    .settingsRow()
 }
 
 #Preview {

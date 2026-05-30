@@ -81,7 +81,12 @@ final class ClipboardQuickPanelPresenter {
 
     private func makePanel() -> KeyboardHandlingPanel {
         let panel = KeyboardHandlingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 430),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: ControlPanelDesign.Layout.QuickPanel.clipboardWidth,
+                height: ControlPanelDesign.Layout.QuickPanel.clipboardHeight
+            ),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -266,34 +271,28 @@ private struct ClipboardQuickPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "doc.on.clipboard")
-                    .foregroundStyle(.secondary)
-
-                TextField("搜索剪贴板历史", text: $searchText)
-                    .textFieldStyle(.plain)
+            HStack(spacing: 8) {
+                ControlPanelSearchField(text: $searchText, prompt: "搜索剪贴板历史")
                     .focused($searchFieldFocused)
 
                 Button(action: onOpenFullClipboard) {
                     Image(systemName: "sidebar.left")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("打开完整剪贴板")
 
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("关闭")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-
-            Divider()
+            .padding(.horizontal, ControlPanelDesign.Layout.QuickPanel.headerHorizontalPadding)
+            .padding(.vertical, ControlPanelDesign.Layout.QuickPanel.headerVerticalPadding)
 
             if visibleItems.isEmpty {
-                ContentUnavailableView(
-                    "没有匹配记录",
+                ControlPanelNoResultsState(
+                    title: "没有匹配记录",
                     systemImage: "doc.text.magnifyingglass"
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -304,18 +303,16 @@ private struct ClipboardQuickPanelView: View {
                             ForEach(visibleItems) { item in
                                 ClipboardQuickPanelRow(
                                     item: item,
-                                    isSelected: item.id == selectedVisibleItemID
+                                    isSelected: item.id == selectedVisibleItemID,
+                                    tint: ControlPanelDesign.tint(for: .clip)
                                 ) {
                                     onSelect(item)
                                 }
                                 .id(item.id)
-
-                                if item.id != visibleItems.last?.id {
-                                    Divider()
-                                        .padding(.leading, 66)
-                                }
                             }
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
                     }
                     .onChange(of: selectedVisibleItemID) { _, selectedID in
                         if let selectedID {
@@ -327,17 +324,15 @@ private struct ClipboardQuickPanelView: View {
                 }
             }
 
-            Divider()
+            ControlPanelHairline(.horizontal)
 
             shortcutHints
         }
-        .frame(width: 420, height: 430)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.quaternary)
-        }
+        .frame(
+            width: ControlPanelDesign.Layout.QuickPanel.clipboardWidth,
+            height: ControlPanelDesign.Layout.QuickPanel.clipboardHeight
+        )
+        .controlPanelPanelChrome(cornerRadius: ControlPanelDesign.Layout.QuickPanel.cornerRadius)
         .background(KeyboardEventBridge { event in
             handleKeyDown(event)
         })
@@ -434,8 +429,7 @@ private struct ShortcutHint: View {
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(.quinary)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .controlPanelQuietSurface(cornerRadius: 4)
 
             Text(title)
         }
@@ -445,6 +439,7 @@ private struct ShortcutHint: View {
 private struct ClipboardQuickPanelRow: View {
     let item: ClipboardItem
     let isSelected: Bool
+    let tint: Color
     let action: () -> Void
 
     var body: some View {
@@ -454,7 +449,7 @@ private struct ClipboardQuickPanelRow: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.displayTitle)
-                        .font(.body)
+                        .font(.callout.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
 
@@ -470,19 +465,9 @@ private struct ClipboardQuickPanelRow: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.accentColor.opacity(0.16))
-                }
-            }
+            .controlPanelHistoryRow(isSelected: isSelected, tint: tint)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
     }
 
     @ViewBuilder
@@ -490,15 +475,20 @@ private struct ClipboardQuickPanelRow: View {
         if item.kind == .image, let imageData = item.imageData {
             ImageThumbnailView(
                 data: imageData,
-                size: CGSize(width: 42, height: 42)
+                size: CGSize(
+                    width: ControlPanelDesign.Layout.compactPreviewSize,
+                    height: ControlPanelDesign.Layout.compactPreviewSize
+                )
             )
         } else {
             Image(systemName: item.kind.systemImage)
                 .font(.title3)
                 .foregroundStyle(.secondary)
-                .frame(width: 42, height: 42)
-                .background(.quinary)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(
+                    width: ControlPanelDesign.Layout.compactPreviewSize,
+                    height: ControlPanelDesign.Layout.compactPreviewSize
+                )
+                .controlPanelQuietSurface()
         }
     }
 }

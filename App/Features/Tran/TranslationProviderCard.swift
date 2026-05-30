@@ -14,26 +14,19 @@ struct TranslationProviderCard: View {
         VStack(spacing: 0) {
             header
 
-            Divider()
-
             bodyContent
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(.quaternary)
-        }
+        .controlPanelRoundedSurface(
+            background: ControlPanelDesign.historyRowBackground,
+            cornerRadius: ControlPanelDesign.compactRadius
+        )
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "chevron.down")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-
             Image(systemName: provider.systemImage)
                 .foregroundStyle(.secondary)
+                .frame(width: 18)
 
             Text(provider.name)
                 .font(.subheadline.weight(.semibold))
@@ -43,30 +36,40 @@ struct TranslationProviderCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .controlPanelRoundedSurface(
+                        background: ControlPanelDesign.quietFill,
+                        cornerRadius: ControlPanelDesign.compactRadius
+                    )
             }
 
             Spacer()
 
             statusIndicator
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
     @ViewBuilder
     private var statusIndicator: some View {
         switch status {
         case .idle:
-            Image(systemName: "circle")
+            Image(systemName: "circle.dotted")
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         case .loading:
             ProgressView()
                 .controlSize(.small)
         case .success:
             Image(systemName: "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.red)
         }
     }
@@ -78,8 +81,9 @@ struct TranslationProviderCard: View {
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .center)
-                .padding(10)
+                .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
         case .loading(let message):
             HStack(spacing: 8) {
                 ProgressView()
@@ -89,8 +93,9 @@ struct TranslationProviderCard: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .center)
-            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         case .success:
             VStack(alignment: .leading, spacing: 8) {
                 if let detectedSourceLanguageCode {
@@ -102,42 +107,40 @@ struct TranslationProviderCard: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Text(translatedText)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
-
-                HStack {
-                    Spacer()
+                HStack(alignment: .top, spacing: 10) {
+                    Text(translatedText)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
 
                     Button(action: onCopy) {
-                        Label("复制", systemImage: "doc.on.doc")
+                        Image(systemName: "doc.on.doc")
                     }
-                    .controlSize(.small)
+                    .buttonStyle(ControlPanelIconButtonStyle())
                     .disabled(!canCopy)
                     .help("复制译文")
                 }
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
-
-                HStack {
-                    Spacer()
+                HStack(alignment: .top, spacing: 10) {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
 
                     Button(action: onRetry) {
-                        Label("重试", systemImage: "arrow.clockwise")
+                        Image(systemName: "arrow.clockwise")
                     }
-                    .controlSize(.small)
+                    .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
                     .help("重新翻译")
                 }
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
     }
 }

@@ -8,40 +8,45 @@ struct TranView: View {
         VStack(spacing: 0) {
             editor
 
-            Divider()
-                .padding(.horizontal, 16)
-
             history
         }
         .navigationTitle("Tran")
+        .background(ControlPanelBackground())
     }
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            toolbar
+            translateToolbar
 
             HStack(alignment: .top, spacing: 14) {
                 sourcePane
                     .frame(minWidth: 280, maxWidth: .infinity)
 
-                Divider()
+                ControlPanelHairline(.vertical)
+                    .padding(.vertical, 14)
 
                 resultPane
                     .frame(minWidth: 300, maxWidth: .infinity)
             }
             .frame(minHeight: 260)
         }
-        .padding()
+        .padding(ControlPanelDesign.Layout.pagePadding)
+        .overlay(alignment: .bottom) {
+            ControlPanelHairline(.horizontal)
+        }
     }
 
-    private var toolbar: some View {
+    private var translateToolbar: some View {
         HStack(spacing: 12) {
-            Text("文本翻译")
-                .font(.title3.weight(.semibold))
-
-            Spacer()
+            ControlPanelSidebarHeader(
+                title: "文本翻译",
+                systemImage: "text.bubble",
+                tint: ControlPanelDesign.tint(for: .tran)
+            )
 
             languageBar
+
+            Spacer()
 
             Button {
                 Task {
@@ -55,9 +60,10 @@ struct TranView: View {
                     Label("翻译", systemImage: "arrow.right.circle")
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .tran), prominence: .primary))
             .disabled(controller.isTranslating)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var sourcePane: some View {
@@ -72,9 +78,10 @@ struct TranView: View {
                 translate()
             }
             .frame(maxWidth: .infinity, minHeight: 220)
-            .background(.quaternary.opacity(0.35))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .padding(1)
+            .controlPanelTextSurface()
         }
+        .controlPanelDetailSection()
     }
 
     private var resultPane: some View {
@@ -87,6 +94,7 @@ struct TranView: View {
 
             providerDeck
         }
+        .controlPanelDetailSection()
     }
 
     private func paneHeader(
@@ -112,18 +120,17 @@ struct TranView: View {
             Picker("原文语言", selection: sourceLanguageSelection) {
                 Text(TranslationLanguage.automaticSourceName)
                     .tag(TranslationLanguage.automaticSourceCode)
-                Divider()
                 ForEach(TranslationLanguage.supportedSources) { language in
                     Text(language.name).tag(language.code)
                 }
             }
             .labelsHidden()
-            .frame(width: 150)
+            .frame(width: 142)
 
             Button(action: swapLanguages) {
                 Image(systemName: "arrow.left.arrow.right")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(ControlPanelIconButtonStyle())
             .disabled(!canSwapLanguages)
             .help("交换语言")
 
@@ -133,12 +140,14 @@ struct TranView: View {
                 }
             }
             .labelsHidden()
-            .frame(width: 150)
+            .frame(width: 142)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .controlPanelRoundedSurface(
+            background: ControlPanelDesign.embeddedPanelBackground,
+            cornerRadius: ControlPanelDesign.compactRadius
+        )
         .disabled(controller.isTranslating)
     }
 
@@ -212,16 +221,20 @@ struct TranView: View {
     private var history: some View {
         let visibleItems = controller.history.filteredItems(matching: historySearchText)
         if controller.history.items.isEmpty {
-            ContentUnavailableView(
-                "还没有翻译记录",
+            ControlPanelEmptyState(
+                title: "还没有翻译记录",
                 systemImage: "text.bubble",
-                description: Text("输入文本并点击翻译后，成功的 provider 结果会出现在这里。")
+                tint: ControlPanelDesign.tint(for: .tran)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: 5) {
                     historyActions
+
+                    ControlPanelSearchField(text: $historySearchText, prompt: "搜索翻译历史")
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 6)
 
                     if let errorMessage = controller.history.persistenceErrorMessage {
                         Text(errorMessage)
@@ -232,7 +245,10 @@ struct TranView: View {
                     }
 
                     if visibleItems.isEmpty {
-                        ContentUnavailableView.search(text: historySearchText)
+                        ControlPanelNoResultsState(
+                            title: "没有匹配翻译",
+                            systemImage: "text.bubble.fill"
+                        )
                             .padding(.vertical, 36)
                     }
 
@@ -250,32 +266,32 @@ struct TranView: View {
                 }
                 .padding(.bottom, 8)
             }
-            .background(Color(nsColor: .textBackgroundColor))
+            .controlPanelSidebarSurface(.history, showsTrailingBoundary: false)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .searchable(
-                text: $historySearchText,
-                placement: .toolbar,
-                prompt: "搜索翻译历史"
-            )
         }
     }
 
     private var historyActions: some View {
         HStack {
-            Label(historyCountText, systemImage: "clock")
+            ControlPanelSectionLabel(title: "翻译历史", systemImage: "clock")
+
+            Text(historyCountText)
+                .font(.callout)
                 .foregroundStyle(.secondary)
 
             Spacer()
 
             Button(role: .destructive, action: controller.clearHistory) {
-                Label("清空全部", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(controller.history.items.isEmpty)
             .help("清空翻译历史")
         }
         .font(.callout)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     private var historyCountText: String {
@@ -417,10 +433,16 @@ private struct TranslationHistoryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+            ControlPanelIconTile(
+                systemImage: "text.bubble",
+                tint: ControlPanelDesign.tint(for: .tran),
+                size: 34
+            )
+
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(item.providerName)
-                        .font(.headline)
+                        .font(.callout.weight(.semibold))
 
                     Text(languageText)
                         .font(.caption)
@@ -441,25 +463,20 @@ private struct TranslationHistoryRow: View {
 
             HStack(spacing: 8) {
                 Button(action: onUse) {
-                    Label("使用", systemImage: "arrow.up.left")
+                    Image(systemName: "arrow.up.left")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle())
                 .help("载入这条翻译")
 
                 Button(role: .destructive, action: onDelete) {
-                    Label("删除", systemImage: "trash")
+                    Image(systemName: "trash")
                 }
+                .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
                 .help("删除翻译记录")
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 16)
-        .overlay(alignment: .bottom) {
-            Divider()
-                .padding(.horizontal, 16)
-        }
-        .contentShape(Rectangle())
+        .controlPanelHistoryRow(isSelected: false, tint: ControlPanelDesign.tint(for: .tran))
+        .padding(.horizontal, 12)
     }
 }
 
