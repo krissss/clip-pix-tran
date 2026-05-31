@@ -62,4 +62,14 @@ struct SystemClipboardServiceTests {
         heicData.append(contentsOf: Data("ftypheic".utf8))
         #expect(SystemImagePreviewService.imageFileExtension(from: heicData) == "heic")
     }
+
+    @Test func writesScreenshotItemPreviewURL() throws {
+        let data = Data([0x89, 0x50, 0x4E, 0x47])
+        let item = ScreenshotItem(id: UUID(), data: data)
+        let url = try #require(SystemImagePreviewService.imageURL(for: item))
+
+        #expect(url.lastPathComponent.hasPrefix("screenshot-\(item.id.uuidString)"))
+        #expect(url.pathExtension == "png")
+        #expect(try Data(contentsOf: url) == data)
+    }
 }

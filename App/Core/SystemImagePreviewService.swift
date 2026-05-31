@@ -8,6 +8,20 @@ enum SystemImagePreviewService {
             return
         }
 
+        openInPreviewApp(url: url)
+    }
+
+    @MainActor
+    static func openInPreviewApp(item: ScreenshotItem) {
+        guard let url = imageURL(for: item) else {
+            return
+        }
+
+        openInPreviewApp(url: url)
+    }
+
+    @MainActor
+    private static func openInPreviewApp(url: URL) {
         if let previewAppURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Preview") {
             let configuration = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open([url], withApplicationAt: previewAppURL, configuration: configuration) { _, error in
@@ -19,6 +33,10 @@ enum SystemImagePreviewService {
         }
 
         NSWorkspace.shared.open(url)
+    }
+
+    static func imageURL(for item: ScreenshotItem) -> URL? {
+        writeTemporaryImageFile(data: item.data, id: item.id, prefix: "screenshot")
     }
 
     static func imageURL(for item: ClipboardItem) -> URL? {
@@ -77,12 +95,16 @@ enum SystemImagePreviewService {
         return "png"
     }
 
-    private static func writeTemporaryImageFile(data: Data, id: UUID) -> URL? {
+    private static func writeTemporaryImageFile(
+        data: Data,
+        id: UUID,
+        prefix: String = "preview"
+    ) -> URL? {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "ClipPixTran-Preview",
             isDirectory: true
         )
-        let url = directory.appendingPathComponent("preview-\(id.uuidString).\(imageFileExtension(from: data))")
+        let url = directory.appendingPathComponent("\(prefix)-\(id.uuidString).\(imageFileExtension(from: data))")
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -18,7 +18,7 @@ final class ScreenshotController {
     }
 
     private var activeCaptureID: UUID?
-    private var activeCaptureTask: Task<Data, Error>?
+    private var activeCaptureTask: Task<ScreenshotCaptureOutput, Error>?
     private var captureKeyMonitor: Any?
 
     init(
@@ -37,19 +37,22 @@ final class ScreenshotController {
 
     func captureMainDisplay() async {
         let screenshotService = screenshotService
-        await capture {
-            try await screenshotService.captureMainDisplay()
+        await capture(usesTimeout: true) {
+            ScreenshotCaptureOutput(data: try await screenshotService.captureMainDisplay())
         }
     }
 
     func captureSelectedRegion() async {
         let screenshotService = screenshotService
-        await capture {
+        await capture(usesTimeout: false) {
             try await screenshotService.captureSelectedRegion()
         }
     }
 
-    private func capture(_ action: @Sendable @escaping () async throws -> Data) async {
+    private func capture(
+        usesTimeout: Bool,
+        _ action: @Sendable @escaping () async throws -> ScreenshotCaptureOutput
+    ) async {
         guard !isCapturing else {
             return
         }
@@ -65,37 +68,57 @@ final class ScreenshotController {
         }
         activeCaptureTask = captureTask
 
-        let captureTimeoutNanoseconds = captureTimeoutNanoseconds
-        let watchdog = Task(priority: .userInitiated) { [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: captureTimeoutNanoseconds)
-            } catch {
-                return
-            }
+        let watchdog: Task<Void, Never>?
+        if usesTimeout {
+            let captureTimeoutNanoseconds = captureTimeoutNanoseconds
+            watchdog = Task(priority: .userInitiated) { [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: captureTimeoutNanoseconds)
+                } catch {
+                    return
+                }
 
-            self?.cancelCapture(
-                captureID,
-                captureError: .timedOut
-            )
+                self?.cancelCapture(
+                    captureID,
+                    captureError: .timedOut
+                )
+            }
+        } else {
+            watchdog = nil
         }
         defer {
-            watchdog.cancel()
+            watchdog?.cancel()
             releaseCapture(captureID)
         }
 
         do {
-            let data = try await captureTask.value
+            let output = try await captureTask.value
             guard activeCaptureID == captureID else {
                 return
             }
 
-            history.record(data)
+            history.record(output.data)
+            switch output.completion {
+            case .recordOnly:
+                break
+            case .copy:
+                try pasteboard.writePNGData(output.data)
+            case .save:
+                try fileSaver.savePNGData(
+                    output.data,
+                    suggestedFileName: suggestedFileName(createdAt: Date())
+                )
+            }
             clearLastError()
         } catch is CancellationError {
             if activeCaptureID == captureID {
                 clearLastError()
             }
         } catch ScreenshotCaptureError.cancelled {
+            if activeCaptureID == captureID {
+                clearLastError()
+            }
+        } catch ScreenshotSaveError.cancelled {
             if activeCaptureID == captureID {
                 clearLastError()
             }
@@ -195,9 +218,13 @@ final class ScreenshotController {
     }
 
     private func suggestedFileName(for item: ScreenshotItem) -> String {
+        suggestedFileName(createdAt: item.createdAt)
+    }
+
+    private func suggestedFileName(createdAt: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        return "ClipPixTran-\(formatter.string(from: item.createdAt)).png"
+        return "ClipPixTran-\(formatter.string(from: createdAt)).png"
     }
 
     private func clearLastError() {

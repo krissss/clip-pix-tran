@@ -3,189 +3,254 @@ import SwiftUI
 
 struct PixView: View {
     @Bindable var controller: ScreenshotController
-    @State private var previewPresenter = ImagePreviewPresenter()
+
+    @State private var selectedItemID: ScreenshotItem.ID?
+    @State private var searchText = ""
+
+    private var visibleItems: [ScreenshotItem] {
+        controller.history.items.filtered(matching: searchText)
+    }
+
+    private var selectedItem: ScreenshotItem? {
+        guard let selectedItemID,
+              let selectedItem = visibleItems.first(where: { $0.id == selectedItemID }) else {
+            return visibleItems.first
+        }
+
+        return selectedItem
+    }
 
     var body: some View {
+        HSplitView {
+            sidebar
+                .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
+
+            detail
+                .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .navigationTitle("Pix")
+        .searchable(
+            text: $searchText,
+            placement: .toolbar,
+            prompt: "搜索截图历史"
+        )
+        .onAppear(perform: selectFirstVisibleItemIfNeeded)
+        .onChange(of: visibleItems.map(\.id)) { _, _ in
+            selectFirstVisibleItemIfNeeded()
+        }
+    }
+
+    private var sidebar: some View {
         VStack(spacing: 0) {
-            header
+            sidebarHeader
 
             Divider()
 
-            content
+            sidebarContent
         }
-        .navigationTitle("Pix")
+        .background(Color(nsColor: .textBackgroundColor))
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("最近截图")
-                    .font(.title3.weight(.semibold))
+    private var sidebarHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("截图历史")
+                        .font(.title3.weight(.semibold))
 
-                Text("支持主屏幕截图和拖拽选区截图；标注和 OCR 会在后续里程碑继续扩展。")
-                    .font(.callout)
+                    Text("\(visibleItems.count) 张截图")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("\(controller.history.items.count)/\(controller.history.limit)")
+                    .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
-
-            if controller.isCapturing {
-                Button {
-                    controller.stopCapture()
-                } label: {
-                    Label("停止", systemImage: "xmark.circle")
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button {
-                    Task {
-                        await controller.captureSelectedRegion()
-                    }
-                } label: {
-                    Label("选区截图", systemImage: "selection.pin.in.out")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-
-            Button {
-                Task {
-                    await controller.captureMainDisplay()
-                }
-            } label: {
-                Label("主屏幕", systemImage: "display")
-            }
-            .disabled(controller.isCapturing)
+            PixCaptureControls(
+                isCapturing: controller.isCapturing,
+                captureSelectedRegionAction: captureSelectedRegion,
+                captureMainDisplayAction: captureMainDisplay,
+                stopCaptureAction: controller.stopCapture
+            )
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(minHeight: 104)
     }
 
     @ViewBuilder
-    private var content: some View {
+    private var sidebarContent: some View {
         if controller.history.items.isEmpty {
-            emptyState
+            ContentUnavailableView(
+                "暂无截图",
+                systemImage: "camera.viewfinder",
+                description: Text("点击选区截图或主屏幕截图后，它会自动加入历史。")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if visibleItems.isEmpty {
+            ContentUnavailableView.search(text: searchText)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
+            List(selection: $selectedItemID) {
+                Section {
                     historyActions
-
-                    if let errorMessage = controller.history.persistenceErrorMessage {
-                        ScreenshotStatusRow(message: errorMessage)
-                    }
-
-                    if let errorMessage = controller.lastErrorMessage {
-                        ScreenshotStatusRow(
-                            message: errorMessage,
-                            showsSettingsButton: controller.needsScreenRecordingPermission
-                        )
-                    }
-
-                    ForEach(controller.history.items) { item in
-                        ScreenshotItemRow(
-                            item: item,
-                            onCopy: {
-                                controller.copyToPasteboard(item)
-                            },
-                            onSave: {
-                                controller.save(item)
-                            },
-                            onPreview: {
-                                showPreview(for: item)
-                            },
-                            onDelete: {
-                                controller.delete(item)
-                            }
-                        )
-                    }
                 }
-                .padding(.vertical, 8)
-            }
-            .background(Color(nsColor: .textBackgroundColor))
-        }
-    }
 
-    private func showPreview(for item: ScreenshotItem) {
-        previewPresenter.show(
-            data: item.data,
-            title: "截图预览",
-            subtitle: item.createdAt.formatted(date: .abbreviated, time: .shortened),
-            windowTitle: "截图预览",
-            onCopy: {
-                controller.copyToPasteboard(item)
-            },
-            onSave: {
-                controller.save(item)
+                ForEach(visibleItems) { item in
+                    ScreenshotItemRow(item: item)
+                        .tag(item.id)
+                        .contextMenu {
+                            contextMenu(for: item)
+                        }
+                        .onTapGesture {
+                            selectedItemID = item.id
+                        }
+                }
             }
-        )
+            .listStyle(.inset)
+        }
     }
 
     private var historyActions: some View {
         HStack {
-            Label("\(controller.history.items.count) 张截图", systemImage: "clock")
+            Label("\(visibleItems.count) 张截图", systemImage: "clock")
                 .foregroundStyle(.secondary)
 
             Spacer()
 
-            Button(role: .destructive, action: controller.clearHistory) {
+            Button(role: .destructive, action: clearHistory) {
                 Label("清空全部", systemImage: "trash")
             }
             .disabled(controller.history.items.isEmpty)
             .help("清空截图历史")
         }
         .font(.callout)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 4)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 42, weight: .regular))
-                .foregroundStyle(.secondary)
-
-            Text("还没有截图")
-                .font(.title3.weight(.semibold))
-
-            if let errorMessage = controller.lastErrorMessage {
-                VStack(spacing: 8) {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 420)
-
-                    if controller.needsScreenRecordingPermission {
-                        Button {
-                            openScreenRecordingSettings()
-                        } label: {
-                            Label("打开系统设置", systemImage: "gearshape")
-                        }
+    private var detail: some View {
+        Group {
+            if let selectedItem {
+                ScreenshotItemDetailPane(
+                    item: selectedItem,
+                    copyAction: {
+                        controller.copyToPasteboard(selectedItem)
+                    },
+                    saveAction: {
+                        controller.save(selectedItem)
+                    },
+                    previewAction: {
+                        SystemImagePreviewService.openInPreviewApp(item: selectedItem)
+                    },
+                    deleteAction: {
+                        delete(selectedItem)
                     }
-                }
+                )
             } else {
-                Text("点击选区截图并拖拽选择屏幕区域。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                ScreenshotEmptyDetailPane(
+                    needsScreenRecordingPermission: controller.needsScreenRecordingPermission
+                )
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(32)
+        .overlay(alignment: .top) {
+            statusMessages
+        }
+    }
+
+    @ViewBuilder
+    private var statusMessages: some View {
+        VStack(spacing: 8) {
+            if let errorMessage = controller.history.persistenceErrorMessage {
+                ScreenshotStatusBanner(message: errorMessage)
+            }
+
+            if let errorMessage = controller.lastErrorMessage {
+                ScreenshotStatusBanner(
+                    message: errorMessage,
+                    showsSettingsButton: controller.needsScreenRecordingPermission
+                )
+            }
+        }
+        .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private func contextMenu(for item: ScreenshotItem) -> some View {
+        Button {
+            controller.copyToPasteboard(item)
+        } label: {
+            Label("复制", systemImage: "doc.on.doc")
+        }
+
+        Button {
+            controller.save(item)
+        } label: {
+            Label("保存", systemImage: "square.and.arrow.down")
+        }
+
+        Button {
+            SystemImagePreviewService.openInPreviewApp(item: item)
+        } label: {
+            Label("预览", systemImage: "eye")
+        }
+
+        Button(role: .destructive) {
+            delete(item)
+        } label: {
+            Label("删除", systemImage: "trash")
+        }
+    }
+
+    private func selectFirstVisibleItemIfNeeded() {
+        guard !visibleItems.isEmpty else {
+            selectedItemID = nil
+            return
+        }
+
+        if let selectedItemID,
+           visibleItems.contains(where: { $0.id == selectedItemID }) {
+            return
+        }
+
+        selectedItemID = visibleItems.first?.id
+    }
+
+    private func delete(_ item: ScreenshotItem) {
+        controller.delete(item)
+        selectFirstVisibleItemIfNeeded()
+    }
+
+    private func clearHistory() {
+        controller.clearHistory()
+        selectFirstVisibleItemIfNeeded()
+    }
+
+    private func captureSelectedRegion() {
+        Task {
+            await controller.captureSelectedRegion()
+        }
+    }
+
+    private func captureMainDisplay() {
+        Task {
+            await controller.captureMainDisplay()
+        }
     }
 }
 
-private struct ScreenshotStatusRow: View {
+private struct ScreenshotStatusBanner: View {
     let message: String
     var showsSettingsButton = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.red)
-
-            Text(message)
+        HStack(spacing: 10) {
+            Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
                 .foregroundStyle(.red)
-
-            Spacer()
 
             if showsSettingsButton {
                 Button {
@@ -196,8 +261,310 @@ private struct ScreenshotStatusRow: View {
                 .controlSize(.small)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct ScreenshotItemRow: View {
+    let item: ScreenshotItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ImageThumbnailView(
+                data: item.data,
+                size: CGSize(width: 56, height: 44)
+            )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.createdAt.absoluteDisplayString)
+                    .font(.body)
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+
+                Text(item.fileSizeText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                RelativeTimeText(date: item.createdAt)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 6)
+    }
+}
+
+private struct ScreenshotItemDetailPane: View {
+    let item: ScreenshotItem
+    let copyAction: () -> Void
+    let saveAction: () -> Void
+    let previewAction: () -> Void
+    let deleteAction: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            actionBar
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    previewSection
+                    metadataSection
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 10) {
+            Button(action: copyAction) {
+                Label("复制", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(.borderedProminent)
+            .help("复制截图")
+
+            Button(action: saveAction) {
+                Label("保存", systemImage: "square.and.arrow.down")
+            }
+            .help("保存截图")
+
+            Button(action: previewAction) {
+                Label("预览", systemImage: "eye")
+            }
+            .help("用系统预览.app打开截图")
+
+            Spacer()
+
+            Button(role: .destructive, action: deleteAction) {
+                Label("删除", systemImage: "trash")
+            }
+            .help("删除截图")
+        }
+        .labelStyle(.titleAndIcon)
+        .padding(.horizontal, 20)
+        .frame(height: 70)
+    }
+
+    private var previewSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("图片预览")
+                    .font(.headline)
+            }
+
+            ScreenshotFittedPreviewImage(data: item.data)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(18)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(.quaternary)
+            }
+        }
+    }
+
+    private var metadataSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("详情")
+                .font(.headline)
+
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
+                ScreenshotMetadataRow(title: "类型", value: "PNG 图片")
+                ScreenshotMetadataRow(title: "创建时间", value: item.createdAt.absoluteDisplayString)
+                ScreenshotMetadataRow(title: "大小", value: item.fileSizeText)
+                ScreenshotMetadataRow(title: "数据", value: "\(item.data.count) bytes")
+            }
+        }
+    }
+}
+
+private struct ScreenshotFittedPreviewImage: View {
+    let data: Data
+
+    @State private var thumbnailData: Data?
+    @State private var didLoadThumbnail = false
+
+    private let previewHeight: CGFloat = 320
+    private let cornerRadius: CGFloat = 6
+
+    private var nsImage: NSImage? {
+        guard let thumbnailData else {
+            return nil
+        }
+
+        return NSImage(data: thumbnailData)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let availableSize = CGSize(
+                width: max(1, proxy.size.width),
+                height: previewHeight
+            )
+
+            ZStack {
+                if let nsImage {
+                    let displaySize = fittedImageSize(
+                        imageSize: nsImage.size,
+                        availableSize: availableSize
+                    )
+
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: displaySize.width, height: displaySize.height)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(.quaternary)
+                        }
+                } else {
+                    placeholder
+                }
+            }
+            .frame(width: proxy.size.width, height: previewHeight)
+        }
+        .frame(height: previewHeight)
+        .frame(maxWidth: .infinity)
+        .task(id: data) {
+            thumbnailData = nil
+            didLoadThumbnail = false
+            let sourceData = data
+            thumbnailData = await Task.detached(priority: .utility) {
+                ImageThumbnailRenderer.pngData(
+                    from: sourceData,
+                    maxPixelSize: 1400
+                )
+            }.value
+            didLoadThumbnail = true
+        }
+    }
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.quaternary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                if didLoadThumbnail {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+    }
+
+    private func fittedImageSize(
+        imageSize: CGSize,
+        availableSize: CGSize
+    ) -> CGSize {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              availableSize.width > 0,
+              availableSize.height > 0 else {
+            return .zero
+        }
+
+        let ratio = min(
+            availableSize.width / imageSize.width,
+            availableSize.height / imageSize.height
+        )
+
+        return CGSize(
+            width: imageSize.width * ratio,
+            height: imageSize.height * ratio
+        )
+    }
+}
+
+private struct PixCaptureControls: View {
+    let isCapturing: Bool
+    let captureSelectedRegionAction: () -> Void
+    let captureMainDisplayAction: () -> Void
+    let stopCaptureAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if isCapturing {
+                Button(action: stopCaptureAction) {
+                    Label("停止截图", systemImage: "xmark.circle")
+                }
+                .help("结束当前框选")
+            } else {
+                Button(action: captureSelectedRegionAction) {
+                    Label("选区截图", systemImage: "selection.pin.in.out")
+                }
+                .help("拖拽选择屏幕区域")
+
+                Button(action: captureMainDisplayAction) {
+                    Label("全屏截图", systemImage: "display")
+                }
+                .help("捕获主屏幕画面")
+            }
+        }
+        .labelStyle(.titleAndIcon)
+    }
+}
+
+private struct ScreenshotEmptyDetailPane: View {
+    let needsScreenRecordingPermission: Bool
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "camera.viewfinder")
+                .font(.system(size: 42, weight: .regular))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 6) {
+                Text("还没有截图")
+                    .font(.title3.weight(.semibold))
+
+                Text("开始一次截图后，历史会出现在左侧，右侧会显示预览和操作。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if needsScreenRecordingPermission {
+                Button {
+                    openScreenRecordingSettings()
+                } label: {
+                    Label("打开系统设置", systemImage: "gearshape")
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+private struct ScreenshotMetadataRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        GridRow {
+            Text(title)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .textSelection(.enabled)
+        }
+        .font(.callout)
     }
 }
 
@@ -211,83 +578,26 @@ private func openScreenRecordingSettings() {
     NSWorkspace.shared.open(url)
 }
 
-private struct ScreenshotItemRow: View {
-    let item: ScreenshotItem
-    let onCopy: () -> Void
-    let onSave: () -> Void
-    let onPreview: () -> Void
-    let onDelete: () -> Void
-
-    private var createdAtText: String {
-        item.createdAt.formatted(
-            date: .abbreviated,
-            time: .shortened
-        )
-    }
-
-    private var fileSizeText: String {
+private extension ScreenshotItem {
+    var fileSizeText: String {
         ByteCountFormatter.string(
-            fromByteCount: Int64(item.data.count),
+            fromByteCount: Int64(data.count),
             countStyle: .file
         )
     }
+}
 
-    var body: some View {
-        HStack(spacing: 14) {
-            thumbnail
-                .contentShape(RoundedRectangle(cornerRadius: 6))
-                .onTapGesture(count: 2, perform: onPreview)
-                .help("双击预览截图")
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(createdAtText)
-                    .font(.headline)
-
-                Text(fileSizeText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                Button(action: onCopy) {
-                    Label("复制", systemImage: "doc.on.doc")
-                }
-                .help("复制截图")
-
-                Button(action: onSave) {
-                    Label("保存", systemImage: "square.and.arrow.down")
-                }
-                .help("保存截图")
-
-                Button(action: onPreview) {
-                    Label("预览", systemImage: "eye")
-                }
-                .help("预览截图")
-
-                Button(role: .destructive, action: onDelete) {
-                    Label("删除", systemImage: "trash")
-                }
-                .help("删除截图")
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
+private extension [ScreenshotItem] {
+    func filtered(matching searchText: String) -> [ScreenshotItem] {
+        let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearchText.isEmpty else {
+            return self
         }
-        .frame(height: 96)
-        .padding(.horizontal, 16)
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
-        .contentShape(Rectangle())
-    }
 
-    @ViewBuilder
-    private var thumbnail: some View {
-        ImageThumbnailView(
-            data: item.data,
-            size: CGSize(width: 120, height: 76)
-        )
+        return filter { item in
+            item.createdAt.absoluteDisplayString.localizedCaseInsensitiveContains(trimmedSearchText)
+                || item.fileSizeText.localizedCaseInsensitiveContains(trimmedSearchText)
+        }
     }
 }
 

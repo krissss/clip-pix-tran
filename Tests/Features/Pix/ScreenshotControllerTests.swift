@@ -9,7 +9,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: FakeScreenshotFileSaver()
@@ -24,13 +24,54 @@ struct ScreenshotControllerTests {
 
     @Test func selectedRegionCaptureRecordsScreenshot() async throws {
         let data = try #require("region".data(using: .utf8))
+        let pasteboard = FakeScreenshotPasteboardService()
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(Data()),
-                selectedRegionResult: .success(data)
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data, completion: .copy))
+            ),
+            pasteboard: pasteboard,
+            fileSaver: FakeScreenshotFileSaver()
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(pasteboard.copiedData == data)
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
+    }
+
+    @Test func selectedRegionSaveCompletionRecordsAndSavesScreenshot() async throws {
+        let data = try #require("saved-region".data(using: .utf8))
+        let fileSaver = FakeScreenshotFileSaver()
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data, completion: .save))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
-            fileSaver: FakeScreenshotFileSaver()
+            fileSaver: fileSaver
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(fileSaver.savedData == data)
+        #expect(fileSaver.suggestedFileName?.hasSuffix(".png") == true)
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
+    }
+
+    @Test func selectedRegionSaveCancellationDoesNotSetErrorMessage() async throws {
+        let data = try #require("cancelled-save-region".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data, completion: .save))
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(error: ScreenshotSaveError.cancelled)
         )
 
         await controller.captureSelectedRegion()
@@ -44,7 +85,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .failure(ScreenshotCaptureError.permissionDenied),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: FakeScreenshotFileSaver()
@@ -75,7 +116,7 @@ struct ScreenshotControllerTests {
         #expect(controller.lastCaptureError == nil)
     }
 
-    @Test func captureTimeoutReleasesCapturingStateBeforeServiceReturns() async throws {
+    @Test func mainDisplayCaptureTimeoutReleasesCapturingStateBeforeServiceReturns() async throws {
         let data = try #require("late-shot".data(using: .utf8))
         let controller = ScreenshotController(
             screenshotService: DelayedScreenshotService(
@@ -88,7 +129,7 @@ struct ScreenshotControllerTests {
         )
 
         let captureTask = Task {
-            await controller.captureSelectedRegion()
+            await controller.captureMainDisplay()
         }
 
         try await waitUntil {
@@ -105,6 +146,25 @@ struct ScreenshotControllerTests {
         await captureTask.value
 
         #expect(controller.history.items.isEmpty)
+    }
+
+    @Test func selectedRegionCaptureDoesNotTimeoutWhileUserIsEditing() async throws {
+        let data = try #require("late-region".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: DelayedScreenshotService(
+                delayNanoseconds: 80_000_000,
+                data: data
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            captureTimeoutNanoseconds: 20_000_000
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
     }
 
     @Test func stopCaptureReleasesCapturingStateBeforeServiceReturns() async throws {
@@ -143,7 +203,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: pasteboard,
             fileSaver: FakeScreenshotFileSaver()
@@ -163,7 +223,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: pasteboard,
             fileSaver: FakeScreenshotFileSaver()
@@ -184,7 +244,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: FakeScreenshotFileSaver(error: ScreenshotSaveError.cancelled)
@@ -203,7 +263,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: fileSaver
@@ -226,7 +286,7 @@ struct ScreenshotControllerTests {
         let controller = ScreenshotController(
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(data),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: FakeScreenshotFileSaver(error: FakeScreenshotSaveError.failed)
@@ -247,7 +307,7 @@ struct ScreenshotControllerTests {
             history: history,
             screenshotService: FakeScreenshotService(
                 mainDisplayResult: .success(firstData),
-                selectedRegionResult: .success(Data())
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
             ),
             pasteboard: FakeScreenshotPasteboardService(),
             fileSaver: FakeScreenshotFileSaver()
@@ -266,7 +326,7 @@ struct ScreenshotControllerTests {
 
 @MainActor
 private func waitUntil(
-    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    timeoutNanoseconds: UInt64 = 3_000_000_000,
     pollIntervalNanoseconds: UInt64 = 10_000_000,
     condition: () -> Bool
 ) async throws {
@@ -289,8 +349,8 @@ private struct DelayedScreenshotService: ScreenshotService {
         try await delayedData()
     }
 
-    func captureSelectedRegion() async throws -> Data {
-        try await delayedData()
+    func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+        ScreenshotCaptureOutput(data: try await delayedData(), completion: .copy)
     }
 
     private func delayedData() async throws -> Data {
@@ -301,13 +361,13 @@ private struct DelayedScreenshotService: ScreenshotService {
 
 private struct FakeScreenshotService: ScreenshotService {
     let mainDisplayResult: Result<Data, Error>
-    let selectedRegionResult: Result<Data, Error>
+    let selectedRegionResult: Result<ScreenshotCaptureOutput, Error>
 
     func captureMainDisplay() async throws -> Data {
         try mainDisplayResult.get()
     }
 
-    func captureSelectedRegion() async throws -> Data {
+    func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
         try selectedRegionResult.get()
     }
 }

@@ -76,16 +76,24 @@ struct SystemScreenshotService: ScreenshotService {
         return try await capturePNGData(in: screenFrame)
     }
 
-    nonisolated func captureSelectedRegion() async throws -> Data {
-        let rect = try await RegionSelectionOverlay.selectRegion()
-        try Task.checkCancellation()
-        try await Task.sleep(nanoseconds: 120_000_000)
-
-        return try await capturePNGData(in: rect)
+    nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+        try await RegionSelectionOverlay.capture { rect, excludedWindowIDs in
+            try Task.checkCancellation()
+            return try await capturePNGData(
+                in: rect,
+                excludingWindowIDs: excludedWindowIDs
+            )
+        }
     }
 
-    nonisolated private func capturePNGData(in rect: CGRect) async throws -> Data {
-        let cgImage = try await captureDisplayImage(in: rect)
+    nonisolated private func capturePNGData(
+        in rect: CGRect,
+        excludingWindowIDs: Set<CGWindowID> = []
+    ) async throws -> Data {
+        let cgImage = try await captureDisplayImage(
+            in: rect,
+            excludingWindowIDs: excludingWindowIDs
+        )
         let bitmap = NSBitmapImageRep(cgImage: cgImage)
         guard let data = bitmap.representation(using: .png, properties: [:]) else {
             throw ScreenshotCaptureError.pngEncodingFailed
@@ -94,7 +102,10 @@ struct SystemScreenshotService: ScreenshotService {
         return data
     }
 
-    nonisolated private func captureDisplayImage(in rect: CGRect) async throws -> CGImage {
+    nonisolated private func captureDisplayImage(
+        in rect: CGRect,
+        excludingWindowIDs: Set<CGWindowID>
+    ) async throws -> CGImage {
         try await ensureScreenCaptureAccess()
 
         let shareableContent = try await loadShareableContent()
@@ -111,7 +122,10 @@ struct SystemScreenshotService: ScreenshotService {
             throw ScreenshotCaptureError.unavailable
         }
 
-        let filter = SCContentFilter(display: targetDisplay, excludingWindows: [])
+        let excludedWindows = shareableContent.windows.filter { window in
+            excludingWindowIDs.contains(window.windowID)
+        }
+        let filter = SCContentFilter(display: targetDisplay, excludingWindows: excludedWindows)
         let configuration = SCStreamConfiguration()
         configuration.sourceRect = sourceRect
         configuration.width = Int(sourceRect.width * CGFloat(filter.pointPixelScale))

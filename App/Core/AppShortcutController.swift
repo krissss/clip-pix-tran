@@ -63,7 +63,6 @@ final class AppShortcutController {
 
     private func observeCaptureSelectedRegionShortcut() async {
         for await event in KeyboardShortcuts.events(for: .captureSelectedRegion) where event == .keyUp {
-            openSection?(.pix)
             await screenshotController.captureSelectedRegion()
         }
     }
