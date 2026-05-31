@@ -32,7 +32,8 @@ struct Application: App {
             ),
             screenshotService: SystemScreenshotService(),
             pasteboard: SystemScreenshotPasteboardService(),
-            fileSaver: SystemScreenshotFileSaver()
+            fileSaver: SystemScreenshotFileSaver(),
+            pinning: ScreenshotPinToScreenPresenter()
         )
         let translationController = TranslationController(
             history: TranslationHistoryStore(

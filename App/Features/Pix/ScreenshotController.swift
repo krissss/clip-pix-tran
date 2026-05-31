@@ -8,6 +8,7 @@ final class ScreenshotController {
     private let screenshotService: ScreenshotService
     private let pasteboard: ScreenshotPasteboardService
     private let fileSaver: ScreenshotFileSaving
+    private let pinning: ScreenshotPinning
     private let captureTimeoutNanoseconds: UInt64
 
     var isCapturing = false
@@ -26,12 +27,14 @@ final class ScreenshotController {
         screenshotService: ScreenshotService,
         pasteboard: ScreenshotPasteboardService,
         fileSaver: ScreenshotFileSaving,
+        pinning: ScreenshotPinning? = nil,
         captureTimeoutNanoseconds: UInt64 = 5_000_000_000
     ) {
         self.history = history ?? ScreenshotHistoryStore()
         self.screenshotService = screenshotService
         self.pasteboard = pasteboard
         self.fileSaver = fileSaver
+        self.pinning = pinning ?? ScreenshotPinToScreenPresenter()
         self.captureTimeoutNanoseconds = captureTimeoutNanoseconds
     }
 
@@ -108,6 +111,8 @@ final class ScreenshotController {
                     output.data,
                     suggestedFileName: suggestedFileName(createdAt: Date())
                 )
+            case .pinToScreen:
+                try pinning.pinPNGData(output.data, sourceRect: output.sourceRect)
             }
             clearLastError()
         } catch is CancellationError {
@@ -203,6 +208,15 @@ final class ScreenshotController {
             )
             clearLastError()
         } catch ScreenshotSaveError.cancelled {
+            clearLastError()
+        } catch {
+            setOperationError(error)
+        }
+    }
+
+    func pinToScreen(_ item: ScreenshotItem) {
+        do {
+            try pinning.pinPNGData(item.data, sourceRect: nil)
             clearLastError()
         } catch {
             setOperationError(error)

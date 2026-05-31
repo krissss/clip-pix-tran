@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import Testing
 @testable import ClipPixTran
 
@@ -59,6 +60,35 @@ struct ScreenshotControllerTests {
         #expect(controller.history.items.map(\.data) == [data])
         #expect(fileSaver.savedData == data)
         #expect(fileSaver.suggestedFileName?.hasSuffix(".png") == true)
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
+    }
+
+    @Test func selectedRegionPinCompletionRecordsAndPinsScreenshot() async throws {
+        let data = try #require("pinned-region".data(using: .utf8))
+        let sourceRect = CGRect(x: 12, y: 34, width: 120, height: 80)
+        let pinning = FakeScreenshotPinning()
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(
+                    ScreenshotCaptureOutput(
+                        data: data,
+                        completion: .pinToScreen,
+                        sourceRect: sourceRect
+                    )
+                )
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            pinning: pinning
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(pinning.pinnedData == data)
+        #expect(pinning.sourceRect == sourceRect)
         #expect(controller.lastErrorMessage == nil)
         #expect(controller.lastCaptureError == nil)
     }
@@ -299,6 +329,49 @@ struct ScreenshotControllerTests {
         #expect(controller.lastCaptureError == nil)
     }
 
+    @Test func pinToScreenPinsExistingScreenshotAndClearsPreviousError() throws {
+        let data = try #require("shot".data(using: .utf8))
+        let pinning = FakeScreenshotPinning()
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(data),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            pinning: pinning
+        )
+        let item = ScreenshotItem(data: data)
+        controller.lastErrorMessage = "旧错误"
+        controller.lastCaptureError = .permissionDenied
+
+        controller.pinToScreen(item)
+
+        #expect(pinning.pinnedData == data)
+        #expect(pinning.sourceRect == nil)
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
+    }
+
+    @Test func pinToScreenFailureSetsOperationError() throws {
+        let data = try #require("shot".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(data),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data()))
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            pinning: FakeScreenshotPinning(error: FakeScreenshotPinError.failed)
+        )
+        let item = ScreenshotItem(data: data)
+
+        controller.pinToScreen(item)
+
+        #expect(controller.lastErrorMessage == FakeScreenshotPinError.failed.localizedDescription)
+        #expect(controller.lastCaptureError == nil)
+    }
+
     @Test func deleteAndClearHistoryDelegateToStore() throws {
         let firstData = try #require("first".data(using: .utf8))
         let secondData = try #require("second".data(using: .utf8))
@@ -408,10 +481,38 @@ private final class FakeScreenshotFileSaver: ScreenshotFileSaving {
     }
 }
 
+@MainActor
+private final class FakeScreenshotPinning: ScreenshotPinning {
+    private(set) var pinnedData: Data?
+    private(set) var sourceRect: CGRect?
+    private let error: Error?
+
+    init(error: Error? = nil) {
+        self.error = error
+    }
+
+    func pinPNGData(_ data: Data, sourceRect: CGRect?) throws {
+        if let error {
+            throw error
+        }
+
+        pinnedData = data
+        self.sourceRect = sourceRect
+    }
+}
+
 private enum FakeScreenshotSaveError: LocalizedError {
     case failed
 
     var errorDescription: String? {
         "保存失败。"
+    }
+}
+
+private enum FakeScreenshotPinError: LocalizedError {
+    case failed
+
+    var errorDescription: String? {
+        "固定失败。"
     }
 }

@@ -149,6 +149,9 @@ struct PixView: View {
                     saveAction: {
                         controller.save(selectedItem)
                     },
+                    pinAction: {
+                        controller.pinToScreen(selectedItem)
+                    },
                     previewAction: {
                         SystemImagePreviewService.openInPreviewApp(item: selectedItem)
                     },
@@ -197,6 +200,12 @@ struct PixView: View {
             controller.save(item)
         } label: {
             Label("保存", systemImage: "square.and.arrow.down")
+        }
+
+        Button {
+            controller.pinToScreen(item)
+        } label: {
+            Label("固定到屏幕", systemImage: "pin")
         }
 
         Button {
@@ -303,6 +312,7 @@ private struct ScreenshotItemDetailPane: View {
     let item: ScreenshotItem
     let copyAction: () -> Void
     let saveAction: () -> Void
+    let pinAction: () -> Void
     let previewAction: () -> Void
     let deleteAction: () -> Void
 
@@ -335,6 +345,12 @@ private struct ScreenshotItemDetailPane: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle())
             .help("保存截图")
+
+            Button(action: pinAction) {
+                Image(systemName: "pin")
+            }
+            .buttonStyle(ControlPanelIconButtonStyle())
+            .help("固定到屏幕")
 
             Button(action: previewAction) {
                 Image(systemName: "eye")

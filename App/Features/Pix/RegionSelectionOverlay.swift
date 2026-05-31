@@ -55,11 +55,11 @@ final class RegionSelectionOverlay {
             return
         }
 
-        NSApplication.shared.activate(ignoringOtherApps: true)
         installMonitors()
         windows = NSScreen.screens.map { screen in
             let view = RegionSelectionView(
                 screenFrame: screen.frame,
+                screenScale: screen.backingScaleFactor,
                 annotationStore: annotationStore,
                 actions: RegionSelectionActions(
                     finish: { [weak self] completion in
@@ -80,7 +80,7 @@ final class RegionSelectionOverlay {
 
             let window = RegionSelectionWindow(
                 contentRect: screen.frame,
-                styleMask: .borderless,
+                styleMask: [.borderless, .nonactivatingPanel],
                 backing: .buffered,
                 defer: false,
                 screen: screen
@@ -91,10 +91,13 @@ final class RegionSelectionOverlay {
             window.isOpaque = false
             window.level = .screenSaver
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.hidesOnDeactivate = false
             window.ignoresMouseEvents = false
             window.acceptsMouseMovedEvents = true
             window.isReleasedWhenClosed = false
-            window.makeKeyAndOrderFront(nil)
+            window.isExcludedFromWindowsMenu = true
+            window.orderFrontRegardless()
+            window.makeKey()
             window.makeFirstResponder(view)
             return window
         }
@@ -189,7 +192,15 @@ final class RegionSelectionOverlay {
                     annotations: translatedAnnotations(for: selection),
                     canvasSize: selection.rect.size
                 )
-                finish(.success(ScreenshotCaptureOutput(data: data, completion: completion)))
+                finish(
+                    .success(
+                        ScreenshotCaptureOutput(
+                            data: data,
+                            completion: completion,
+                            sourceRect: selection.rect
+                        )
+                    )
+                )
             } catch let error as ScreenshotCaptureError {
                 finish(.failure(error))
             } catch {
@@ -318,13 +329,13 @@ private struct RegionSelectionSnapshot {
     let basePNGData: Data?
 }
 
-private final class RegionSelectionWindow: NSWindow {
+private final class RegionSelectionWindow: NSPanel {
     override var canBecomeKey: Bool {
         true
     }
 
     override var canBecomeMain: Bool {
-        true
+        false
     }
 }
 
@@ -430,6 +441,7 @@ private struct RegionToolbarActions {
     let setMosaicBrushSize: (CGFloat) -> Void
     let undo: () -> Void
     let redo: () -> Void
+    let pin: () -> Void
     let copy: () -> Void
     let save: () -> Void
     let cancel: () -> Void
@@ -438,6 +450,7 @@ private struct RegionToolbarActions {
 
 private final class RegionSelectionView: NSView {
     private let screenFrame: CGRect
+    private let screenScale: CGFloat
     private let annotationStore: ScreenshotAnnotationStore
     private let actions: RegionSelectionActions
     private var selectionRect: CGRect?
@@ -462,16 +475,19 @@ private final class RegionSelectionView: NSView {
         let screenRect = screenRect(fromLocalRect: selectionRect)
         return RegionSelectionSnapshot(
             rect: screenRect,
-            basePNGData: baseImage?.screenRect.isApproximatelyEqual(to: screenRect) == true ? baseImage?.pngData : nil
+            basePNGData: shouldDrawCapturedBaseImage
+                && baseImage?.screenRect.isApproximatelyEqual(to: screenRect) == true ? baseImage?.pngData : nil
         )
     }
 
     init(
         screenFrame: CGRect,
+        screenScale: CGFloat,
         annotationStore: ScreenshotAnnotationStore,
         actions: RegionSelectionActions
     ) {
         self.screenFrame = screenFrame
+        self.screenScale = max(screenScale, 1)
         self.annotationStore = annotationStore
         self.actions = actions
         super.init(frame: CGRect(origin: .zero, size: screenFrame.size))
@@ -569,23 +585,28 @@ private final class RegionSelectionView: NSView {
                 to: point,
                 clampedTo: bounds
             )
+            .map(pixelAlignedLocalRect)
             clearBaseImage()
         case .moving(let start, let originalRect):
-            selectionRect = ScreenshotSelectionGeometry.moved(
-                originalRect,
-                by: CGSize(
-                    width: point.x - start.x,
-                    height: point.y - start.y
-                ),
-                clampedTo: bounds
+            selectionRect = pixelAlignedLocalRect(
+                ScreenshotSelectionGeometry.moved(
+                    originalRect,
+                    by: CGSize(
+                        width: point.x - start.x,
+                        height: point.y - start.y
+                    ),
+                    clampedTo: bounds
+                )
             )
             clearBaseImage()
         case .resizing(let handle, let originalRect):
-            selectionRect = ScreenshotSelectionGeometry.resized(
-                originalRect,
-                handle: handle,
-                to: point,
-                clampedTo: bounds
+            selectionRect = pixelAlignedLocalRect(
+                ScreenshotSelectionGeometry.resized(
+                    originalRect,
+                    handle: handle,
+                    to: point,
+                    clampedTo: bounds
+                )
             )
             clearBaseImage()
         case .annotating(_, let annotationID):
@@ -611,6 +632,7 @@ private final class RegionSelectionView: NSView {
                 to: point,
                 clampedTo: bounds
             )
+            .map(pixelAlignedLocalRect)
             interaction = .idle
             NSCursor.arrow.set()
             window?.invalidateCursorRects(for: self)
@@ -757,6 +779,9 @@ private final class RegionSelectionView: NSView {
         )
         annotationStore.append(annotation)
         interaction = .annotating(start: point, annotationID: annotation.id)
+        if activeTool == .mosaic {
+            requestBaseImageCaptureIfNeeded()
+        }
         hideToolbar()
         needsDisplay = true
     }
@@ -898,6 +923,10 @@ private final class RegionSelectionView: NSView {
     }
 
     private func drawBaseImage(in selectionRect: CGRect) {
+        guard shouldDrawCapturedBaseImage else {
+            return
+        }
+
         guard let baseImage,
               baseImage.screenRect.isApproximatelyEqual(to: screenRect(fromLocalRect: selectionRect)) else {
             return
@@ -910,6 +939,12 @@ private final class RegionSelectionView: NSView {
             operation: .sourceOver,
             fraction: 1
         )
+    }
+
+    private var shouldDrawCapturedBaseImage: Bool {
+        annotationStore.annotations.contains { annotation in
+            annotation.kind == .mosaic
+        }
     }
 
     private func drawSelectionHandles(in rect: CGRect) {
@@ -1139,6 +1174,9 @@ private final class RegionSelectionView: NSView {
                 guard let self else {
                     return
                 }
+                if tool == .mosaic {
+                    self.requestBaseImageCaptureIfNeeded()
+                }
                 self.window?.invalidateCursorRects(for: self)
             },
             setColor: { [weak self] color in
@@ -1174,6 +1212,10 @@ private final class RegionSelectionView: NSView {
                 self?.annotationStore.redo()
                 self?.refreshToolbar()
                 self?.actions.setNeedsDisplayOnAllScreens()
+            },
+            pin: { [weak self] in
+                self?.commitTextEditor()
+                self?.actions.finish(.pinToScreen)
             },
             copy: { [weak self] in
                 self?.commitTextEditor()
@@ -1251,6 +1293,28 @@ private final class RegionSelectionView: NSView {
             height: rect.height
         )
     }
+
+    private func localRect(fromScreenRect rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.minX - screenFrame.minX,
+            y: rect.minY - screenFrame.minY,
+            width: rect.width,
+            height: rect.height
+        )
+    }
+
+    private func pixelAlignedLocalRect(_ rect: CGRect) -> CGRect {
+        let screenRect = screenRect(fromLocalRect: rect.standardized)
+            .pixelAligned(scale: screenScale)
+        let localRect = localRect(fromScreenRect: screenRect)
+            .intersection(bounds)
+
+        guard !localRect.isNull else {
+            return rect
+        }
+
+        return localRect
+    }
 }
 
 extension RegionSelectionView: NSTextFieldDelegate {
@@ -1275,6 +1339,22 @@ private extension CGRect {
             && abs(minY - rect.minY) <= tolerance
             && abs(width - rect.width) <= tolerance
             && abs(height - rect.height) <= tolerance
+    }
+
+    func pixelAligned(scale: CGFloat) -> CGRect {
+        let scale = max(scale, 1)
+        let minX = (minX * scale).rounded() / scale
+        let minY = (minY * scale).rounded() / scale
+        let maxX = (maxX * scale).rounded() / scale
+        let maxY = (maxY * scale).rounded() / scale
+        let minimumSize = 1 / scale
+
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: max(maxX - minX, minimumSize),
+            height: max(maxY - minY, minimumSize)
+        )
     }
 }
 
@@ -1318,6 +1398,12 @@ private struct RegionSelectionToolbarView: View {
                 }
                 .disabled(!state.canRedo)
                 .help("重做")
+
+                Button(action: actions.pin) {
+                    Image(systemName: "pin")
+                        .frame(width: 22, height: 22)
+                }
+                .help("固定到屏幕")
 
                 Button(action: actions.save) {
                     Image(systemName: "square.and.arrow.down")
