@@ -210,6 +210,167 @@ struct TranslationServiceTests {
         #expect(result.targetLanguageCode == "zh-Hans")
     }
 
+    @Test func googleSpeechBuildsTextToSpeechRequest() throws {
+        let request = try GoogleTranslationSpeechService.makeRequest(
+            for: TranslationSpeechRequest(
+                text: " 你好 ",
+                languageCode: "zh-Hans"
+            )
+        )
+
+        let url = try #require(request.url)
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
+            item.value.map { (item.name, $0) }
+        })
+        #expect(components.host == "translate.google.com")
+        #expect(components.path == "/translate_tts")
+        #expect(queryItems["client"] == "tw-ob")
+        #expect(queryItems["tl"] == "zh-CN")
+        #expect(queryItems["q"] == "你好")
+        #expect(request.value(forHTTPHeaderField: "User-Agent") != nil)
+    }
+
+    @Test func openAITextToSpeechBuildsChatAudioRequest() throws {
+        let request = try OpenAITextToSpeechService.makeRequest(
+            for: TranslationSpeechRequest(text: " Hello ", languageCode: "en"),
+            configuration: OpenAITextToSpeechConfiguration(
+                baseURL: "https://api.openai.com/v1",
+                apiKey: "test-key",
+                model: "gpt-audio",
+                voice: "alloy"
+            )
+        )
+
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/chat/completions")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+        let body = try #require(request.httpBody)
+        let bodyObject = try JSONSerialization.jsonObject(with: body)
+        let payload = try #require(bodyObject as? [String: Any])
+        #expect(payload["model"] as? String == "gpt-audio")
+        #expect(payload["modalities"] as? [String] == ["text", "audio"])
+        let audio = try #require(payload["audio"] as? [String: Any])
+        #expect(audio["format"] as? String == "wav")
+        #expect(audio["voice"] as? String == "alloy")
+        let messages = try #require(payload["messages"] as? [[String: String]])
+        #expect(messages.map { $0["role"] } == ["user"])
+        #expect(messages.first?["content"]?.contains("Hello") == true)
+    }
+
+    @Test func openAITextToSpeechBuildsMiMoChatAudioRequest() throws {
+        let request = try OpenAITextToSpeechService.makeRequest(
+            for: TranslationSpeechRequest(text: "你好", languageCode: "zh-Hans"),
+            configuration: OpenAITextToSpeechConfiguration(
+                baseURL: "https://api.xiaomimimo.com/v1",
+                apiKey: "mimo-key",
+                model: "mimo-v2.5-tts",
+                voice: "mimo_default"
+            )
+        )
+
+        #expect(request.url?.absoluteString == "https://api.xiaomimimo.com/v1/chat/completions")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer mimo-key")
+        #expect(request.value(forHTTPHeaderField: "api-key") == "mimo-key")
+        let body = try #require(request.httpBody)
+        let bodyObject = try JSONSerialization.jsonObject(with: body)
+        let payload = try #require(bodyObject as? [String: Any])
+        #expect(payload["model"] as? String == "mimo-v2.5-tts")
+        #expect(payload["modalities"] == nil)
+        let audio = try #require(payload["audio"] as? [String: Any])
+        #expect(audio["format"] as? String == "wav")
+        #expect(audio["voice"] as? String == "mimo_default")
+        let messages = try #require(payload["messages"] as? [[String: String]])
+        #expect(messages[1]["role"] == "assistant")
+        #expect(messages[1]["content"] == "你好")
+    }
+
+    @Test func openAITextToSpeechBuildsMiMoRequestFromHostBaseURLAndDefaultVoice() throws {
+        let request = try OpenAITextToSpeechService.makeRequest(
+            for: TranslationSpeechRequest(text: "你好", languageCode: "zh-Hans"),
+            configuration: OpenAITextToSpeechConfiguration(
+                baseURL: "https://token-plan-cn.xiaomimimo.com",
+                apiKey: "mimo-key",
+                model: "mimo-v2.5-tts",
+                voice: "alloy"
+            )
+        )
+
+        #expect(request.url?.absoluteString == "https://token-plan-cn.xiaomimimo.com/v1/chat/completions")
+        let body = try #require(request.httpBody)
+        let bodyObject = try JSONSerialization.jsonObject(with: body)
+        let payload = try #require(bodyObject as? [String: Any])
+        #expect(payload["modalities"] == nil)
+        let audio = try #require(payload["audio"] as? [String: Any])
+        #expect(audio["voice"] as? String == "mimo_default")
+    }
+
+    @Test func openAITextToSpeechAcceptsDirectChatCompletionsEndpointBaseURL() throws {
+        let request = try OpenAITextToSpeechService.makeRequest(
+            for: TranslationSpeechRequest(text: "Hello", languageCode: "en"),
+            configuration: OpenAITextToSpeechConfiguration(
+                baseURL: "https://api.openai.com/v1/chat/completions/",
+                apiKey: "test-key",
+                model: "gpt-audio",
+                voice: "alloy"
+            )
+        )
+
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/chat/completions")
+    }
+
+    @Test func openAITextToSpeechRequiresConfiguration() throws {
+        #expect(throws: TranslationSpeechError.providerNotConfigured) {
+            try OpenAITextToSpeechService.makeRequest(
+                for: TranslationSpeechRequest(text: "Hello", languageCode: "en"),
+                configuration: OpenAITextToSpeechConfiguration(
+                    baseURL: "",
+                    apiKey: "",
+                    model: "",
+                    voice: ""
+                )
+            )
+        }
+    }
+
+    @Test func openAITextToSpeechReportsTopLevelErrorMessage() async {
+        let service = OpenAITextToSpeechService(
+            configurationProvider: {
+                OpenAITextToSpeechConfiguration(
+                    baseURL: "https://token-plan-cn.xiaomimimo.com",
+                    apiKey: "mimo-key",
+                    model: "mimo-v2.5-tts",
+                    voice: "mimo_default"
+                )
+            },
+            dataLoader: { request in
+                (
+                    #"{"message":"voice is invalid"}"#.data(using: .utf8)!,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 400,
+                        httpVersion: nil,
+                        headerFields: nil
+                    )!
+                )
+            }
+        )
+
+        let error = await withCheckedContinuation { continuation in
+            service.speak(
+                TranslationSpeechRequest(text: "你好", languageCode: "zh-Hans"),
+                onStart: {},
+                onFinish: { error in
+                    continuation.resume(returning: error)
+                }
+            )
+        }
+
+        #expect(error?.localizedDescription == "voice is invalid")
+    }
+
     @Test func openAICompatibleTranslationBuildsChatCompletionRequest() async throws {
         var capturedRequest: URLRequest?
         let responseData = #"{"choices":[{"message":{"role":"assistant","content":"你好"}}]}"#.data(using: .utf8)!

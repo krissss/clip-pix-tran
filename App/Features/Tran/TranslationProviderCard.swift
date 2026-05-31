@@ -6,7 +6,9 @@ struct TranslationProviderCard: View {
     let translatedText: String
     let canCopy: Bool
     let canSpeak: Bool
+    let isPreparingSpeech: Bool
     let isSpeaking: Bool
+    var speechProviderName: String?
     let onCopy: () -> Void
     let onSpeak: () -> Void
     let onRetry: () -> Void
@@ -159,9 +161,11 @@ struct TranslationProviderCard: View {
     private var resultActions: some View {
         HStack(spacing: 6) {
             TranslationSpeechButton(
+                isPreparing: isPreparingSpeech,
                 isSpeaking: isSpeaking,
                 canSpeak: canSpeak,
                 idleHelp: "朗读译文",
+                speechProviderName: speechProviderName,
                 action: onSpeak
             )
 

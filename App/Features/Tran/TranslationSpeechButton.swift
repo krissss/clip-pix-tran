@@ -1,17 +1,32 @@
 import SwiftUI
 
 struct TranslationSpeechButton: View {
+    let isPreparing: Bool
     let isSpeaking: Bool
     let canSpeak: Bool
     let idleHelp: String
+    var speechProviderName: String?
     let action: () -> Void
 
     private let tint = ControlPanelDesign.tint(for: .tran)
+    private var helpText: String {
+        let actionText = (isPreparing || isSpeaking) ? "停止朗读" : idleHelp
+        guard let speechProviderName, !speechProviderName.isEmpty else {
+            return actionText
+        }
+
+        return "\(actionText)（\(speechProviderName)）"
+    }
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                Image(systemName: isSpeaking ? "speaker.wave.3.fill" : "speaker.wave.2")
+                if isPreparing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: isSpeaking ? "speaker.wave.3.fill" : "speaker.wave.2")
+                }
 
                 if isSpeaking {
                     speechPulse
@@ -20,12 +35,12 @@ struct TranslationSpeechButton: View {
         }
         .buttonStyle(
             ControlPanelIconButtonStyle(
-                role: isSpeaking ? .selected : .normal,
+                role: (isPreparing || isSpeaking) ? .selected : .normal,
                 tint: tint
             )
         )
-        .disabled(!canSpeak && !isSpeaking)
-        .help(isSpeaking ? "停止朗读" : idleHelp)
+        .disabled(!canSpeak && !isPreparing && !isSpeaking)
+        .help(helpText)
     }
 
     private var speechPulse: some View {

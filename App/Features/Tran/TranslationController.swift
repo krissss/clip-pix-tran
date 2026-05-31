@@ -8,17 +8,20 @@ final class TranslationController {
 
     private let providers: [TranslationProvider]
     private let pasteboard: ClipboardService
-    private let speechService: TranslationSpeechService
+    private let speechProviders: [TranslationSpeechProvider]
     private let languageDetector: TranslationLanguageDetecting
     private var historyProviderID: String?
     private var sessionDetectedSourceLanguageCode: String?
+    private var activeSpeechProviderID: String?
 
     var sourceText = ""
     private(set) var providerStates: [TranslationProviderState]
     private(set) var sourceLanguageCode: String?
     private(set) var targetLanguageCode: String
     var isTranslating = false
+    private(set) var preparingSpeechTarget: TranslationSpeechTarget?
     private(set) var speakingTarget: TranslationSpeechTarget?
+    private(set) var speechErrorMessage: String?
     var lastErrorMessage: String?
 
     private static let defaultIdleMessage = "输入文本后点击翻译，结果会显示在这里。"
@@ -76,6 +79,10 @@ final class TranslationController {
         primarySuccessfulState?.translatedText
     }
 
+    var currentSpeechProviderName: String {
+        selectedSpeechProvider.descriptor.name
+    }
+
     var effectiveSourceLanguageCode: String? {
         sourceLanguageCode ?? detectedSourceLanguageCode
     }
@@ -97,6 +104,7 @@ final class TranslationController {
         providers: [TranslationProvider]? = nil,
         pasteboard: ClipboardService,
         speechService: TranslationSpeechService? = nil,
+        speechProviders: [TranslationSpeechProvider]? = nil,
         languageDetector: TranslationLanguageDetecting? = nil
     ) {
         self.history = history ?? TranslationHistoryStore()
@@ -114,7 +122,18 @@ final class TranslationController {
             self.providers = TranslationProvider.builtIn(preferences: self.preferences)
         }
         self.pasteboard = pasteboard
-        self.speechService = speechService ?? SystemTranslationSpeechService()
+        if let speechProviders, !speechProviders.isEmpty {
+            self.speechProviders = speechProviders
+        } else if let speechService {
+            self.speechProviders = [
+                TranslationSpeechProvider(
+                    descriptor: .system,
+                    service: speechService
+                )
+            ]
+        } else {
+            self.speechProviders = TranslationSpeechProvider.builtIn(preferences: self.preferences)
+        }
         self.languageDetector = languageDetector ?? NaturalLanguageTranslationLanguageDetector()
         self.sourceLanguageCode = self.preferences.defaultSourceLanguageCode
         self.targetLanguageCode = self.preferences.defaultTargetLanguageCode
@@ -127,7 +146,7 @@ final class TranslationController {
         }
     }
 
-    func selectSourceLanguage(_ code: String?, persistsDefault: Bool = true) {
+    func selectSourceLanguage(_ code: String?, persistsDefault: Bool = false) {
         guard let code else {
             guard sourceLanguageCode != nil else {
                 if persistsDefault {
@@ -163,7 +182,7 @@ final class TranslationController {
         resetProviderResults()
     }
 
-    func selectTargetLanguage(_ code: String, persistsDefault: Bool = true) {
+    func selectTargetLanguage(_ code: String, persistsDefault: Bool = false) {
         guard TranslationLanguage.isSupported(code) else {
             return
         }
@@ -186,6 +205,17 @@ final class TranslationController {
     func setProvider(_ providerID: String, isEnabled: Bool) {
         preferences.updateEnabledProvider(providerID, isEnabled: isEnabled)
         resetDisabledProviderStates()
+    }
+
+    func selectSpeechProvider(_ providerID: String) {
+        let availableProviderIDs = Set(speechProviders.map(\.id))
+        guard availableProviderIDs.contains(providerID),
+              providerID != preferences.speechProviderID else {
+            return
+        }
+
+        stopSpeech()
+        preferences.updateSpeechProvider(providerID)
     }
 
     func translate() async {
@@ -212,6 +242,7 @@ final class TranslationController {
 
         isTranslating = true
         lastErrorMessage = nil
+        speechErrorMessage = nil
         setActiveProviderStates(status: .loading("正在翻译..."), result: nil)
         defer { isTranslating = false }
 
@@ -264,6 +295,7 @@ final class TranslationController {
         } else {
             history.record(request: historyRequest, providerResults: successfulResults)
             lastErrorMessage = nil
+            speechErrorMessage = nil
         }
     }
 
@@ -304,6 +336,7 @@ final class TranslationController {
         do {
             try pasteboard.writePlainText(state.translatedText)
             lastErrorMessage = nil
+            speechErrorMessage = nil
         } catch {
             lastErrorMessage = error.localizedDescription
             upsertProviderState(
@@ -323,6 +356,7 @@ final class TranslationController {
         do {
             try pasteboard.writePlainText(sourceText)
             lastErrorMessage = nil
+            speechErrorMessage = nil
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -363,16 +397,22 @@ final class TranslationController {
     }
 
     func stopSpeech() {
-        guard speakingTarget != nil else {
+        guard preparingSpeechTarget != nil || speakingTarget != nil else {
             return
         }
 
+        preparingSpeechTarget = nil
         speakingTarget = nil
-        speechService.stop()
+        activeSpeechProvider?.service.stop()
+        activeSpeechProviderID = nil
     }
 
     func isSpeakingResult(providerID: String) -> Bool {
         speakingTarget == .result(providerID: providerID)
+    }
+
+    func isPreparingSpeechResult(providerID: String) -> Bool {
+        preparingSpeechTarget == .result(providerID: providerID)
     }
 
     func useHistoryItem(_ item: TranslationHistoryItem) {
@@ -408,6 +448,7 @@ final class TranslationController {
             providerStates.insert(historyState, at: 0)
         }
         lastErrorMessage = nil
+        speechErrorMessage = nil
     }
 
     func deleteHistoryItem(_ item: TranslationHistoryItem) {
@@ -467,11 +508,27 @@ final class TranslationController {
             )
         }
         lastErrorMessage = nil
+        speechErrorMessage = nil
     }
 
     private var detectedSourceLanguageCode: String? {
         sessionDetectedSourceLanguageCode
             ?? activeProviderStates.compactMap(\.detectedSourceLanguageCode).first
+    }
+
+    private var selectedSpeechProvider: TranslationSpeechProvider {
+        speechProviders.first { $0.id == preferences.speechProviderID }
+            ?? speechProviders.first { $0.id == TranslationSpeechProviderDescriptor.system.id }
+            ?? speechProviders[0]
+    }
+
+    private var activeSpeechProvider: TranslationSpeechProvider? {
+        guard let activeSpeechProviderID else {
+            return selectedSpeechProvider
+        }
+
+        return speechProviders.first { $0.id == activeSpeechProviderID }
+            ?? selectedSpeechProvider
     }
 
     private func resolveLanguages(for text: String) -> LanguageResolution {
@@ -566,22 +623,45 @@ final class TranslationController {
         target: TranslationSpeechTarget,
         _ request: TranslationSpeechRequest
     ) {
-        if speakingTarget == target {
+        if preparingSpeechTarget == target || speakingTarget == target {
             stopSpeech()
             return
         }
 
-        if speakingTarget != nil {
+        if preparingSpeechTarget != nil || speakingTarget != nil {
             stopSpeech()
         }
-        speakingTarget = target
-        speechService.speak(request) { [weak self] in
-            guard self?.speakingTarget == target else {
-                return
-            }
 
-            self?.speakingTarget = nil
-        }
+        let speechProvider = selectedSpeechProvider
+        preparingSpeechTarget = target
+        speakingTarget = nil
+        speechErrorMessage = nil
+        activeSpeechProviderID = speechProvider.id
+        speechProvider.service.speak(
+            request,
+            onStart: { [weak self] in
+                guard self?.preparingSpeechTarget == target,
+                      self?.activeSpeechProviderID == speechProvider.id else {
+                    return
+                }
+
+                self?.preparingSpeechTarget = nil
+                self?.speakingTarget = target
+            },
+            onFinish: { [weak self] error in
+                guard self?.preparingSpeechTarget == target || self?.speakingTarget == target,
+                  self?.activeSpeechProviderID == speechProvider.id else {
+                    return
+                }
+
+                self?.preparingSpeechTarget = nil
+                self?.speakingTarget = nil
+                self?.activeSpeechProviderID = nil
+                if let error {
+                    self?.speechErrorMessage = "发音失败：\(error.localizedDescription)"
+                }
+            }
+        )
     }
 
     private func upsertProviderState(

@@ -145,6 +145,44 @@ struct TranslationPreferencesTests {
         #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultTargetLanguage") == false)
     }
 
+    @Test func migratesAccidentalGermanEnglishDefaultPair() {
+        let defaults = makeDefaults()
+        defaults.set("de", forKey: "tran.defaultSourceLanguageCode")
+        defaults.set("en", forKey: "tran.defaultTargetLanguageCode")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultSourceLanguage")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultTargetLanguage")
+
+        let preferences = TranslationPreferences(
+            defaults: defaults,
+            preferredLanguages: ["zh-Hans-CN"]
+        )
+
+        #expect(preferences.defaultSourceLanguageCode == nil)
+        #expect(preferences.defaultTargetLanguageCode == "zh-Hans")
+        #expect(defaults.string(forKey: "tran.defaultSourceLanguageCode") == nil)
+        #expect(defaults.string(forKey: "tran.defaultTargetLanguageCode") == "zh-Hans")
+        #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultSourceLanguage") == false)
+        #expect(defaults.bool(forKey: "tran.hasUserSelectedDefaultTargetLanguage") == false)
+        #expect(defaults.integer(forKey: "tran.languageDefaultsMigrationVersion") == 1)
+    }
+
+    @Test func keepsGermanEnglishDefaultPairAfterLanguageDefaultsMigration() {
+        let defaults = makeDefaults()
+        defaults.set("de", forKey: "tran.defaultSourceLanguageCode")
+        defaults.set("en", forKey: "tran.defaultTargetLanguageCode")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultSourceLanguage")
+        defaults.set(true, forKey: "tran.hasUserSelectedDefaultTargetLanguage")
+        defaults.set(1, forKey: "tran.languageDefaultsMigrationVersion")
+
+        let preferences = TranslationPreferences(
+            defaults: defaults,
+            preferredLanguages: ["zh-Hans-CN"]
+        )
+
+        #expect(preferences.defaultSourceLanguageCode == "de")
+        #expect(preferences.defaultTargetLanguageCode == "en")
+    }
+
     @Test func ignoresUnsupportedStoredLanguage() {
         let defaults = makeDefaults()
         defaults.set("unknown", forKey: "tran.defaultTargetLanguageCode")
@@ -213,6 +251,40 @@ struct TranslationPreferencesTests {
         #expect(preferences.enabledProviderIDs == [TranslationProviderDescriptor.systemTranslation.id])
     }
 
+    @Test func defaultsToSystemSpeechProvider() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+
+        #expect(preferences.speechProviderID == TranslationSpeechProviderDescriptor.system.id)
+    }
+
+    @Test func builtInSpeechProviderListIncludesExternalProviders() {
+        #expect(TranslationSpeechProviderDescriptor.builtIn.map(\.id) == [
+            TranslationSpeechProviderDescriptor.system.id,
+            TranslationSpeechProviderDescriptor.google.id,
+            TranslationSpeechProviderDescriptor.openAITextToSpeech.id
+        ])
+    }
+
+    @Test func persistsSpeechProvider() {
+        let defaults = makeDefaults()
+        var preferences = TranslationPreferences(defaults: defaults)
+
+        preferences.updateSpeechProvider(TranslationSpeechProviderDescriptor.google.id)
+        preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.speechProviderID == TranslationSpeechProviderDescriptor.google.id)
+    }
+
+    @Test func ignoresUnknownStoredSpeechProvider() {
+        let defaults = makeDefaults()
+        defaults.set("unknown", forKey: "tran.speechProviderID")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.speechProviderID == TranslationSpeechProviderDescriptor.system.id)
+        #expect(defaults.string(forKey: "tran.speechProviderID") == TranslationSpeechProviderDescriptor.system.id)
+    }
+
     @Test func persistsOpenAICompatibleConfiguration() {
         let defaults = makeDefaults()
         let secretStore = CapturingTranslationSecretStore()
@@ -231,6 +303,97 @@ struct TranslationPreferencesTests {
         #expect(preferences.openAICompatibleConfiguration.apiKey == "test-key")
         #expect(preferences.openAICompatibleConfiguration.model == "deepseek-chat")
         #expect(defaults.string(forKey: "tran.openAICompatible.apiKey") == nil)
+    }
+
+    @Test func defaultsOpenAITextToSpeechConfigurationFromOpenAICompatibleCredentials() {
+        let defaults = makeDefaults()
+        defaults.set("https://proxy.example.com/v1", forKey: "tran.openAICompatible.baseURL")
+        let secretStore = CapturingTranslationSecretStore()
+        secretStore.updateOpenAICompatibleAPIKey("test-key")
+
+        let preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        #expect(preferences.openAITextToSpeechConfiguration.baseURL == "https://proxy.example.com/v1")
+        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "test-key")
+        #expect(preferences.openAITextToSpeechConfiguration.model == OpenAITextToSpeechConfiguration.defaultModel)
+        #expect(preferences.openAITextToSpeechConfiguration.voice == OpenAITextToSpeechConfiguration.defaultVoice)
+    }
+
+    @Test func migratesLegacyOpenAITextToSpeechSpeechEndpointDefaultModel() {
+        let defaults = makeDefaults()
+        defaults.set("gpt-4o-mini-tts", forKey: "tran.openAITextToSpeech.model")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.openAITextToSpeechConfiguration.model == OpenAITextToSpeechConfiguration.defaultModel)
+        #expect(defaults.string(forKey: "tran.openAITextToSpeech.model") == OpenAITextToSpeechConfiguration.defaultModel)
+    }
+
+    @Test func persistsOpenAITextToSpeechModelAndVoiceOnly() {
+        let defaults = makeDefaults()
+        let secretStore = CapturingTranslationSecretStore()
+        var preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        preferences.updateOpenAITextToSpeechConfiguration(
+            OpenAITextToSpeechConfiguration(
+                baseURL: "https://ignored.example.com/v1",
+                apiKey: "ignored-key",
+                model: "mimo-v2.5-tts",
+                voice: "mimo_default"
+            )
+        )
+        preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        #expect(preferences.openAITextToSpeechConfiguration.baseURL == OpenAICompatibleTranslationConfiguration.defaultBaseURL)
+        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "")
+        #expect(preferences.openAITextToSpeechConfiguration.model == "mimo-v2.5-tts")
+        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
+        #expect(defaults.string(forKey: "tran.openAITextToSpeech.apiKey") == nil)
+    }
+
+    @Test func normalizesOpenAIDefaultTextToSpeechVoiceForMiMoModel() {
+        let defaults = makeDefaults()
+        var preferences = TranslationPreferences(defaults: defaults)
+
+        preferences.updateOpenAITextToSpeechConfiguration(
+            OpenAITextToSpeechConfiguration(
+                baseURL: "https://token-plan-cn.xiaomimimo.com",
+                apiKey: "mimo-key",
+                model: "mimo-v2.5-tts",
+                voice: "alloy"
+            )
+        )
+        preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
+        #expect(defaults.string(forKey: "tran.openAITextToSpeech.voice") == "mimo_default")
+    }
+
+    @Test func openAICompatibleUpdatesRefreshTextToSpeechCredentials() {
+        let defaults = makeDefaults()
+        let secretStore = CapturingTranslationSecretStore()
+        let preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        preferences.updateOpenAITextToSpeechConfiguration(
+            OpenAITextToSpeechConfiguration(
+                baseURL: "",
+                apiKey: "",
+                model: "mimo-v2.5-tts",
+                voice: "mimo_default"
+            )
+        )
+        preferences.updateOpenAICompatibleConfiguration(
+            OpenAICompatibleTranslationConfiguration(
+                baseURL: "https://api.example.com/v1",
+                apiKey: "shared-key",
+                model: "gpt-test"
+            )
+        )
+
+        #expect(preferences.openAITextToSpeechConfiguration.baseURL == "https://api.example.com/v1")
+        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "shared-key")
+        #expect(preferences.openAITextToSpeechConfiguration.model == "mimo-v2.5-tts")
+        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
     }
 }
 

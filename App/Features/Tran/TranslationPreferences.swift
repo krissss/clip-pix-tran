@@ -4,18 +4,27 @@ import Foundation
 final class TranslationPreferences {
     private let defaults: UserDefaults
     private let secretStore: TranslationSecretStore
-    private let defaultSourceLanguageKey = "tran.defaultSourceLanguageCode"
-    private let hasUserSelectedDefaultSourceLanguageKey = "tran.hasUserSelectedDefaultSourceLanguage"
-    private let defaultTargetLanguageKey = "tran.defaultTargetLanguageCode"
-    private let hasUserSelectedDefaultTargetLanguageKey = "tran.hasUserSelectedDefaultTargetLanguage"
-    private let enabledProviderIDsKey = "tran.enabledProviderIDs"
-    private let openAICompatibleBaseURLKey = "tran.openAICompatible.baseURL"
-    private let openAICompatibleModelKey = "tran.openAICompatible.model"
+
+    private static let defaultSourceLanguageKey = "tran.defaultSourceLanguageCode"
+    private static let hasUserSelectedDefaultSourceLanguageKey = "tran.hasUserSelectedDefaultSourceLanguage"
+    private static let defaultTargetLanguageKey = "tran.defaultTargetLanguageCode"
+    private static let hasUserSelectedDefaultTargetLanguageKey = "tran.hasUserSelectedDefaultTargetLanguage"
+    private static let enabledProviderIDsKey = "tran.enabledProviderIDs"
+    private static let speechProviderIDKey = "tran.speechProviderID"
+    private static let openAICompatibleBaseURLKey = "tran.openAICompatible.baseURL"
+    private static let openAICompatibleModelKey = "tran.openAICompatible.model"
+    private static let openAITextToSpeechModelKey = "tran.openAITextToSpeech.model"
+    private static let openAITextToSpeechVoiceKey = "tran.openAITextToSpeech.voice"
+    private static let legacyOpenAITextToSpeechModel = "gpt-4o-mini-tts"
+    private static let languageDefaultsMigrationVersionKey = "tran.languageDefaultsMigrationVersion"
+    private static let currentLanguageDefaultsMigrationVersion = 1
 
     private(set) var defaultSourceLanguageCode: String?
     private(set) var defaultTargetLanguageCode: String
     private(set) var enabledProviderIDs: [String]
+    private(set) var speechProviderID: String
     private(set) var openAICompatibleConfiguration: OpenAICompatibleTranslationConfiguration
+    private(set) var openAITextToSpeechConfiguration: OpenAITextToSpeechConfiguration
 
     init(
         defaults: UserDefaults = .standard,
@@ -24,10 +33,14 @@ final class TranslationPreferences {
     ) {
         self.defaults = defaults
         self.secretStore = secretStore
+        Self.migrateAccidentalGermanEnglishDefaultsIfNeeded(
+            defaults: defaults,
+            preferredLanguages: preferredLanguages
+        )
 
-        let storedSourceCode = defaults.string(forKey: defaultSourceLanguageKey)
+        let storedSourceCode = defaults.string(forKey: Self.defaultSourceLanguageKey)
         let hasUserSelectedDefaultSourceLanguage = defaults.bool(
-            forKey: hasUserSelectedDefaultSourceLanguageKey
+            forKey: Self.hasUserSelectedDefaultSourceLanguageKey
         )
         let hasLegacyUnmarkedSourceLanguage = storedSourceCode != nil
             && !hasUserSelectedDefaultSourceLanguage
@@ -37,14 +50,14 @@ final class TranslationPreferences {
             self.defaultSourceLanguageCode = storedSourceCode
         } else {
             self.defaultSourceLanguageCode = nil
-            defaults.removeObject(forKey: defaultSourceLanguageKey)
-            defaults.set(false, forKey: hasUserSelectedDefaultSourceLanguageKey)
+            defaults.removeObject(forKey: Self.defaultSourceLanguageKey)
+            defaults.set(false, forKey: Self.hasUserSelectedDefaultSourceLanguageKey)
         }
 
         let hasUserSelectedDefaultTargetLanguage = defaults.bool(
-            forKey: hasUserSelectedDefaultTargetLanguageKey
+            forKey: Self.hasUserSelectedDefaultTargetLanguageKey
         ) && !hasLegacyUnmarkedSourceLanguage
-        let storedCode = defaults.string(forKey: defaultTargetLanguageKey)
+        let storedCode = defaults.string(forKey: Self.defaultTargetLanguageKey)
         if hasUserSelectedDefaultTargetLanguage,
            let storedCode,
            TranslationLanguage.isSupported(storedCode) {
@@ -54,38 +67,75 @@ final class TranslationPreferences {
                 forPreferredLanguages: preferredLanguages
             )
             self.defaultTargetLanguageCode = defaultTargetLanguageCode
-            defaults.set(defaultTargetLanguageCode, forKey: defaultTargetLanguageKey)
-            defaults.set(false, forKey: hasUserSelectedDefaultTargetLanguageKey)
+            defaults.set(defaultTargetLanguageCode, forKey: Self.defaultTargetLanguageKey)
+            defaults.set(false, forKey: Self.hasUserSelectedDefaultTargetLanguageKey)
         }
 
-        let storedProviderIDs = defaults.stringArray(forKey: enabledProviderIDsKey) ?? []
+        let storedProviderIDs = defaults.stringArray(forKey: Self.enabledProviderIDsKey) ?? []
         let knownProviderIDs = Set(TranslationProviderDescriptor.builtIn.map(\.id))
         let validProviderIDs = storedProviderIDs.filter { knownProviderIDs.contains($0) }
         if validProviderIDs.isEmpty {
             let enabledProviderIDs = Self.defaultEnabledProviderIDs
             self.enabledProviderIDs = enabledProviderIDs
-            defaults.set(enabledProviderIDs, forKey: enabledProviderIDsKey)
+            defaults.set(enabledProviderIDs, forKey: Self.enabledProviderIDsKey)
         } else {
             self.enabledProviderIDs = validProviderIDs
             if validProviderIDs != storedProviderIDs {
-                defaults.set(validProviderIDs, forKey: enabledProviderIDsKey)
+                defaults.set(validProviderIDs, forKey: Self.enabledProviderIDsKey)
             }
         }
 
-        self.openAICompatibleConfiguration = OpenAICompatibleTranslationConfiguration(
-            baseURL: defaults.string(forKey: openAICompatibleBaseURLKey)
+        let openAICompatibleConfiguration = OpenAICompatibleTranslationConfiguration(
+            baseURL: defaults.string(forKey: Self.openAICompatibleBaseURLKey)
                 ?? OpenAICompatibleTranslationConfiguration.defaultBaseURL,
             apiKey: secretStore.openAICompatibleAPIKey(),
-            model: defaults.string(forKey: openAICompatibleModelKey)
+            model: defaults.string(forKey: Self.openAICompatibleModelKey)
                 ?? OpenAICompatibleTranslationConfiguration.defaultModel
         )
+        self.openAICompatibleConfiguration = openAICompatibleConfiguration
+        let storedTextToSpeechModel = Self.storedNonEmptyString(
+            defaults: defaults,
+            key: Self.openAITextToSpeechModelKey
+        )
+        let textToSpeechModel = storedTextToSpeechModel == Self.legacyOpenAITextToSpeechModel
+            ? OpenAITextToSpeechConfiguration.defaultModel
+            : storedTextToSpeechModel ?? OpenAITextToSpeechConfiguration.defaultModel
+        if storedTextToSpeechModel == Self.legacyOpenAITextToSpeechModel {
+            defaults.set(textToSpeechModel, forKey: Self.openAITextToSpeechModelKey)
+        }
+        let storedTextToSpeechVoice = Self.storedNonEmptyString(
+            defaults: defaults,
+            key: Self.openAITextToSpeechVoiceKey
+        ) ?? OpenAITextToSpeechConfiguration.defaultVoice
+        let textToSpeechVoice = Self.normalizedTextToSpeechVoice(
+            storedTextToSpeechVoice,
+            model: textToSpeechModel
+        )
+        if textToSpeechVoice != storedTextToSpeechVoice {
+            defaults.set(textToSpeechVoice, forKey: Self.openAITextToSpeechVoiceKey)
+        }
+        self.openAITextToSpeechConfiguration = OpenAITextToSpeechConfiguration(
+            baseURL: openAICompatibleConfiguration.baseURL,
+            apiKey: openAICompatibleConfiguration.apiKey,
+            model: textToSpeechModel,
+            voice: textToSpeechVoice
+        )
+
+        let knownSpeechProviderIDs = Set(TranslationSpeechProviderDescriptor.builtIn.map(\.id))
+        if let storedSpeechProviderID = defaults.string(forKey: Self.speechProviderIDKey),
+           knownSpeechProviderIDs.contains(storedSpeechProviderID) {
+            self.speechProviderID = storedSpeechProviderID
+        } else {
+            self.speechProviderID = TranslationSpeechProviderDescriptor.system.id
+            defaults.set(self.speechProviderID, forKey: Self.speechProviderIDKey)
+        }
     }
 
     func updateDefaultSourceLanguage(_ code: String?) {
         guard let code else {
             defaultSourceLanguageCode = nil
-            defaults.removeObject(forKey: defaultSourceLanguageKey)
-            defaults.set(false, forKey: hasUserSelectedDefaultSourceLanguageKey)
+            defaults.removeObject(forKey: Self.defaultSourceLanguageKey)
+            defaults.set(false, forKey: Self.hasUserSelectedDefaultSourceLanguageKey)
             return
         }
 
@@ -94,8 +144,8 @@ final class TranslationPreferences {
         }
 
         defaultSourceLanguageCode = code
-        defaults.set(code, forKey: defaultSourceLanguageKey)
-        defaults.set(true, forKey: hasUserSelectedDefaultSourceLanguageKey)
+        defaults.set(code, forKey: Self.defaultSourceLanguageKey)
+        defaults.set(true, forKey: Self.hasUserSelectedDefaultSourceLanguageKey)
     }
 
     func updateDefaultTargetLanguage(_ code: String) {
@@ -104,8 +154,8 @@ final class TranslationPreferences {
         }
 
         defaultTargetLanguageCode = code
-        defaults.set(code, forKey: defaultTargetLanguageKey)
-        defaults.set(true, forKey: hasUserSelectedDefaultTargetLanguageKey)
+        defaults.set(code, forKey: Self.defaultTargetLanguageKey)
+        defaults.set(true, forKey: Self.hasUserSelectedDefaultTargetLanguageKey)
     }
 
     func updateEnabledProvider(_ providerID: String, isEnabled: Bool) {
@@ -133,14 +183,102 @@ final class TranslationPreferences {
         }
 
         enabledProviderIDs = nextProviderIDs
-        defaults.set(enabledProviderIDs, forKey: enabledProviderIDsKey)
+        defaults.set(enabledProviderIDs, forKey: Self.enabledProviderIDsKey)
     }
 
     func updateOpenAICompatibleConfiguration(_ configuration: OpenAICompatibleTranslationConfiguration) {
         openAICompatibleConfiguration = configuration
-        defaults.set(configuration.baseURL, forKey: openAICompatibleBaseURLKey)
-        defaults.set(configuration.model, forKey: openAICompatibleModelKey)
+        openAITextToSpeechConfiguration = OpenAITextToSpeechConfiguration(
+            baseURL: configuration.baseURL,
+            apiKey: configuration.apiKey,
+            model: openAITextToSpeechConfiguration.model,
+            voice: openAITextToSpeechConfiguration.voice
+        )
+        defaults.set(configuration.baseURL, forKey: Self.openAICompatibleBaseURLKey)
+        defaults.set(configuration.model, forKey: Self.openAICompatibleModelKey)
         secretStore.updateOpenAICompatibleAPIKey(configuration.apiKey)
+    }
+
+    func updateOpenAITextToSpeechConfiguration(_ configuration: OpenAITextToSpeechConfiguration) {
+        let model = configuration.trimmedModel.isEmpty
+            ? OpenAITextToSpeechConfiguration.defaultModel
+            : configuration.trimmedModel
+        let rawVoice = configuration.trimmedVoice.isEmpty
+            ? OpenAITextToSpeechConfiguration.defaultVoice
+            : configuration.trimmedVoice
+        let voice = Self.normalizedTextToSpeechVoice(rawVoice, model: model)
+
+        openAITextToSpeechConfiguration = OpenAITextToSpeechConfiguration(
+            baseURL: openAICompatibleConfiguration.baseURL,
+            apiKey: openAICompatibleConfiguration.apiKey,
+            model: model,
+            voice: voice
+        )
+        defaults.set(model, forKey: Self.openAITextToSpeechModelKey)
+        defaults.set(voice, forKey: Self.openAITextToSpeechVoiceKey)
+    }
+
+    func updateSpeechProvider(_ providerID: String) {
+        let knownProviderIDs = TranslationSpeechProviderDescriptor.builtIn.map(\.id)
+        guard knownProviderIDs.contains(providerID) else {
+            return
+        }
+
+        speechProviderID = providerID
+        defaults.set(providerID, forKey: Self.speechProviderIDKey)
+    }
+
+    private static func migrateAccidentalGermanEnglishDefaultsIfNeeded(
+        defaults: UserDefaults,
+        preferredLanguages: [String]
+    ) {
+        guard defaults.integer(forKey: languageDefaultsMigrationVersionKey) < currentLanguageDefaultsMigrationVersion
+        else {
+            return
+        }
+
+        defer {
+            defaults.set(currentLanguageDefaultsMigrationVersion, forKey: languageDefaultsMigrationVersionKey)
+        }
+
+        guard defaults.bool(forKey: hasUserSelectedDefaultSourceLanguageKey),
+              defaults.bool(forKey: hasUserSelectedDefaultTargetLanguageKey),
+              defaults.string(forKey: defaultSourceLanguageKey) == "de",
+              defaults.string(forKey: defaultTargetLanguageKey) == "en"
+        else {
+            return
+        }
+
+        let defaultTargetLanguageCode = TranslationLanguage.bestTargetCode(
+            forPreferredLanguages: preferredLanguages
+        )
+        defaults.removeObject(forKey: defaultSourceLanguageKey)
+        defaults.set(false, forKey: hasUserSelectedDefaultSourceLanguageKey)
+        defaults.set(defaultTargetLanguageCode, forKey: defaultTargetLanguageKey)
+        defaults.set(false, forKey: hasUserSelectedDefaultTargetLanguageKey)
+    }
+
+    private static func storedNonEmptyString(defaults: UserDefaults, key: String) -> String? {
+        guard let rawValue = defaults.string(forKey: key) else {
+            return nil
+        }
+
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private static func normalizedTextToSpeechVoice(_ voice: String, model: String) -> String {
+        let normalizedModel = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedVoice = voice.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedModel.hasPrefix("mimo-"),
+           normalizedVoice == OpenAITextToSpeechConfiguration.defaultVoice {
+            return OpenAITextToSpeechConfiguration.defaultMiMoVoice
+        }
+
+        return normalizedVoice
     }
 
     private static let defaultEnabledProviderIDs = [

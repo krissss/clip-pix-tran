@@ -29,6 +29,10 @@ struct TranView: View {
                     .frame(minWidth: 300, maxWidth: .infinity)
             }
             .frame(minHeight: 260)
+
+            if let speechErrorMessage = controller.speechErrorMessage {
+                speechErrorBanner(speechErrorMessage)
+            }
         }
         .padding(ControlPanelDesign.Layout.pagePadding)
         .overlay(alignment: .bottom) {
@@ -92,9 +96,11 @@ struct TranView: View {
                 .foregroundStyle(.secondary)
 
             TranslationSpeechButton(
+                isPreparing: controller.preparingSpeechTarget == .source,
                 isSpeaking: controller.speakingTarget == .source,
                 canSpeak: canSpeakSourceText,
                 idleHelp: "朗读原文",
+                speechProviderName: controller.currentSpeechProviderName,
                 action: controller.speakSourceText
             )
         }
@@ -130,6 +136,20 @@ struct TranView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(height: 26)
+    }
+
+    private func speechErrorBanner(_ message: String) -> some View {
+        Label(message, systemImage: "speaker.slash")
+            .font(.caption)
+            .foregroundStyle(.red)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .controlPanelRoundedSurface(
+                background: ControlPanelDesign.quietFill,
+                cornerRadius: ControlPanelDesign.compactRadius
+            )
     }
 
     private var languageBar: some View {
@@ -188,7 +208,9 @@ struct TranView: View {
                 translatedText: provider.translatedText,
                 canCopy: hasTranslatedText(for: provider),
                 canSpeak: hasTranslatedText(for: provider),
+                isPreparingSpeech: controller.isPreparingSpeechResult(providerID: provider.provider.id),
                 isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
+                speechProviderName: controller.currentSpeechProviderName,
                 onCopy: {
                     controller.copyResultToPasteboard(providerID: provider.provider.id)
                 },

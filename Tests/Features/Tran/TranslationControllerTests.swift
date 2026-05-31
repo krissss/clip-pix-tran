@@ -354,7 +354,7 @@ struct TranslationControllerTests {
             pasteboard: CapturingClipboardService()
         )
 
-        controller.selectTargetLanguage("de")
+        controller.selectTargetLanguage("de", persistsDefault: true)
 
         #expect(preferences.defaultTargetLanguageCode == "de")
     }
@@ -422,7 +422,7 @@ struct TranslationControllerTests {
         )
         controller.selectTargetLanguage("de", persistsDefault: false)
 
-        controller.selectTargetLanguage("de")
+        controller.selectTargetLanguage("de", persistsDefault: true)
 
         #expect(controller.targetLanguageCode == "de")
         #expect(preferences.defaultTargetLanguageCode == "de")
@@ -474,7 +474,7 @@ struct TranslationControllerTests {
             pasteboard: CapturingClipboardService()
         )
 
-        controller.selectSourceLanguage("ja")
+        controller.selectSourceLanguage("ja", persistsDefault: true)
 
         #expect(controller.sourceLanguageCode == "ja")
         #expect(preferences.defaultSourceLanguageCode == "ja")
@@ -519,7 +519,7 @@ struct TranslationControllerTests {
         )
         controller.selectSourceLanguage("de", persistsDefault: false)
 
-        controller.selectSourceLanguage("de")
+        controller.selectSourceLanguage("de", persistsDefault: true)
 
         #expect(controller.sourceLanguageCode == "de")
         #expect(preferences.defaultSourceLanguageCode == "de")
@@ -586,9 +586,9 @@ struct TranslationControllerTests {
             ),
             pasteboard: CapturingClipboardService()
         )
-        controller.selectSourceLanguage("ja")
+        controller.selectSourceLanguage("ja", persistsDefault: true)
 
-        controller.selectSourceLanguage(nil)
+        controller.selectSourceLanguage(nil, persistsDefault: true)
 
         #expect(controller.sourceLanguageCode == nil)
         #expect(preferences.defaultSourceLanguageCode == nil)
@@ -985,6 +985,34 @@ struct TranslationControllerTests {
         #expect(speechService.stopCount == 1)
     }
 
+    @Test func preparingSpeechShowsPreparingTargetUntilPlaybackStarts() {
+        let speechService = CapturingTranslationSpeechService(startsAutomatically: false)
+        let controller = TranslationController(
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.sourceText = "hello"
+
+        controller.speakSourceText()
+
+        #expect(controller.preparingSpeechTarget == .source)
+        #expect(controller.speakingTarget == nil)
+
+        speechService.startLatest()
+
+        #expect(controller.preparingSpeechTarget == nil)
+        #expect(controller.speakingTarget == .source)
+    }
+
     @Test func naturalSpeechFinishClearsPlaybackState() {
         let speechService = CapturingTranslationSpeechService()
         let controller = TranslationController(
@@ -1006,6 +1034,107 @@ struct TranslationControllerTests {
         speechService.finishLatest()
 
         #expect(controller.speakingTarget == nil)
+    }
+
+    @Test func speechFailureShowsErrorMessage() {
+        let speechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechService: speechService
+        )
+        controller.sourceText = "hello"
+
+        controller.speakSourceText()
+        speechService.finishLatest(error: TranslationSpeechError.requestFailed("voice is invalid"))
+
+        #expect(controller.speakingTarget == nil)
+        #expect(controller.speechErrorMessage == "发音失败：voice is invalid")
+    }
+
+    @Test func speaksUsingConfiguredSpeechProvider() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        preferences.updateSpeechProvider(TranslationSpeechProviderDescriptor.google.id)
+        let systemSpeechService = CapturingTranslationSpeechService()
+        let googleSpeechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechProviders: [
+                TranslationSpeechProvider(
+                    descriptor: .system,
+                    service: systemSpeechService
+                ),
+                TranslationSpeechProvider(
+                    descriptor: .google,
+                    service: googleSpeechService
+                )
+            ]
+        )
+        controller.sourceText = "hello"
+        controller.selectSourceLanguage("en", persistsDefault: false)
+
+        controller.speakSourceText()
+
+        #expect(systemSpeechService.requests.isEmpty)
+        #expect(googleSpeechService.requests == [
+            TranslationSpeechRequest(text: "hello", languageCode: "en")
+        ])
+    }
+
+    @Test func selectingSpeechProviderStopsCurrentPlaybackAndPersistsChoice() {
+        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let systemSpeechService = CapturingTranslationSpeechService()
+        let googleSpeechService = CapturingTranslationSpeechService()
+        let controller = TranslationController(
+            preferences: preferences,
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "unused",
+                        sourceLanguageCode: nil,
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
+            pasteboard: CapturingClipboardService(),
+            speechProviders: [
+                TranslationSpeechProvider(
+                    descriptor: .system,
+                    service: systemSpeechService
+                ),
+                TranslationSpeechProvider(
+                    descriptor: .google,
+                    service: googleSpeechService
+                )
+            ]
+        )
+        controller.sourceText = "hello"
+        controller.speakSourceText()
+
+        controller.selectSpeechProvider(TranslationSpeechProviderDescriptor.google.id)
+
+        #expect(controller.speakingTarget == nil)
+        #expect(systemSpeechService.stopCount == 1)
+        #expect(googleSpeechService.stopCount == 0)
+        #expect(preferences.speechProviderID == TranslationSpeechProviderDescriptor.google.id)
     }
 
 }
@@ -1084,21 +1213,39 @@ private final class CapturingClipboardService: ClipboardService {
 }
 
 private final class CapturingTranslationSpeechService: TranslationSpeechService {
+    private let startsAutomatically: Bool
     private(set) var requests: [TranslationSpeechRequest] = []
-    private var finishHandlers: [() -> Void] = []
+    private var startHandlers: [() -> Void] = []
+    private var finishHandlers: [(Error?) -> Void] = []
     private(set) var stopCount = 0
 
-    func speak(_ request: TranslationSpeechRequest, onFinish: @escaping () -> Void) {
+    init(startsAutomatically: Bool = true) {
+        self.startsAutomatically = startsAutomatically
+    }
+
+    func speak(
+        _ request: TranslationSpeechRequest,
+        onStart: @escaping () -> Void,
+        onFinish: @escaping (Error?) -> Void
+    ) {
         requests.append(request)
+        startHandlers.append(onStart)
         finishHandlers.append(onFinish)
+        if startsAutomatically {
+            onStart()
+        }
     }
 
     func stop() {
         stopCount += 1
     }
 
-    func finishLatest() {
-        finishHandlers.last?()
+    func finishLatest(error: Error? = nil) {
+        finishHandlers.last?(error)
+    }
+
+    func startLatest() {
+        startHandlers.last?()
     }
 }
 

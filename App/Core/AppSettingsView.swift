@@ -242,6 +242,8 @@ private struct TranSettingsSection: View {
     @State private var openAIBaseURL: String
     @State private var openAIAPIKey: String
     @State private var openAIModel: String
+    @State private var openAITTSModel: String
+    @State private var openAITTSVoice: String
 
     init(controller: TranslationController) {
         self.controller = controller
@@ -251,6 +253,9 @@ private struct TranSettingsSection: View {
         self._openAIBaseURL = State(initialValue: configuration.baseURL)
         self._openAIAPIKey = State(initialValue: configuration.apiKey)
         self._openAIModel = State(initialValue: configuration.model)
+        let ttsConfiguration = controller.preferences.openAITextToSpeechConfiguration
+        self._openAITTSModel = State(initialValue: ttsConfiguration.model)
+        self._openAITTSVoice = State(initialValue: ttsConfiguration.voice)
     }
 
     var body: some View {
@@ -293,6 +298,23 @@ private struct TranSettingsSection: View {
                 .settingsRowGroup()
             }
 
+            SettingsGroup(title: "发音服务") {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: "默认发音") {
+                        Picker("", selection: speechProviderSelection) {
+                            ForEach(TranslationSpeechProviderDescriptor.builtIn) { provider in
+                                Label(provider.name, systemImage: provider.systemImage)
+                                    .tag(provider.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .settingsRowGroup()
+            }
+
             SettingsGroup(title: "OpenAI Compatible") {
                 VStack(spacing: 0) {
                     SettingsFormRow(title: "Base URL") {
@@ -307,17 +329,33 @@ private struct TranSettingsSection: View {
                             .onSubmit(saveOpenAICompatibleConfiguration)
                     }
 
-                    SettingsFormRow(title: "Model") {
+                    SettingsFormRow(title: "Translation Model") {
                         TextField("gpt-4o-mini", text: $openAIModel)
                             .textFieldStyle(.roundedBorder)
                             .onSubmit(saveOpenAICompatibleConfiguration)
                     }
+
+                    SettingsFormRow(title: "TTS Model") {
+                        TextField(OpenAITextToSpeechConfiguration.defaultModel, text: $openAITTSModel)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(saveOpenAITextToSpeechConfiguration)
+                    }
+
+                    SettingsFormRow(title: "TTS Voice") {
+                        TextField(OpenAITextToSpeechConfiguration.defaultVoice, text: $openAITTSVoice)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(saveOpenAITextToSpeechConfiguration)
+                    }
                 }
                 .settingsRowGroup()
+
+                SettingsFootnote("MiMo 发音：Base URL 可填到 host 或 /v1；TTS Voice 使用 mimo_default、Chloe 等，alloy 会自动按 mimo_default 处理。")
             }
             .onChange(of: openAIBaseURL) { _, _ in saveOpenAICompatibleConfiguration() }
             .onChange(of: openAIAPIKey) { _, _ in saveOpenAICompatibleConfiguration() }
             .onChange(of: openAIModel) { _, _ in saveOpenAICompatibleConfiguration() }
+            .onChange(of: openAITTSModel) { _, _ in saveOpenAITextToSpeechConfiguration() }
+            .onChange(of: openAITTSVoice) { _, _ in saveOpenAITextToSpeechConfiguration() }
 
             SettingsGroup(title: "历史") {
                 VStack(spacing: 0) {
@@ -337,14 +375,14 @@ private struct TranSettingsSection: View {
             }
         }
 
-        SettingsFootnote("目标语言默认跟随系统；翻译历史会保存到本机。")
+        SettingsFootnote("目标语言默认跟随系统；发音默认使用系统语音；翻译历史会保存到本机。")
     }
 
     private var targetLanguageSelection: Binding<String> {
         Binding {
             controller.preferences.defaultTargetLanguageCode
         } set: { newValue in
-            controller.selectTargetLanguage(newValue)
+            controller.selectTargetLanguage(newValue, persistsDefault: true)
         }
     }
 
@@ -353,8 +391,17 @@ private struct TranSettingsSection: View {
             controller.preferences.defaultSourceLanguageCode ?? TranslationLanguage.automaticSourceCode
         } set: { newValue in
             controller.selectSourceLanguage(
-                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue
+                newValue == TranslationLanguage.automaticSourceCode ? nil : newValue,
+                persistsDefault: true
             )
+        }
+    }
+
+    private var speechProviderSelection: Binding<String> {
+        Binding {
+            controller.preferences.speechProviderID
+        } set: { newValue in
+            controller.selectSpeechProvider(newValue)
         }
     }
 
@@ -394,6 +441,24 @@ private struct TranSettingsSection: View {
                 model: openAIModel
             )
         )
+    }
+
+    private func saveOpenAITextToSpeechConfiguration() {
+        controller.preferences.updateOpenAITextToSpeechConfiguration(
+            OpenAITextToSpeechConfiguration(
+                baseURL: openAIBaseURL,
+                apiKey: openAIAPIKey,
+                model: openAITTSModel,
+                voice: openAITTSVoice
+            )
+        )
+        let configuration = controller.preferences.openAITextToSpeechConfiguration
+        if openAITTSModel != configuration.model {
+            openAITTSModel = configuration.model
+        }
+        if openAITTSVoice != configuration.voice {
+            openAITTSVoice = configuration.voice
+        }
     }
 }
 
