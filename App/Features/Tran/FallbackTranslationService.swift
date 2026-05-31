@@ -185,6 +185,8 @@ private enum LocalTranslationDictionary {
 enum TranslationProviderError: LocalizedError, Equatable {
     case unavailable
     case noEnabledProviders
+    case providerNotConfigured
+    case requestFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -192,6 +194,10 @@ enum TranslationProviderError: LocalizedError, Equatable {
             "当前翻译服务不可用。请稍后重试，或检查系统翻译语言包。"
         case .noEnabledProviders:
             "请至少启用一个翻译 provider。"
+        case .providerNotConfigured:
+            "此翻译 provider 尚未配置。请到设置里填写必要信息。"
+        case .requestFailed(let message):
+            message
         }
     }
 }

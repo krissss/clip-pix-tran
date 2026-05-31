@@ -37,6 +37,27 @@ extension TranslationLanguage {
             ?? code
     }
 
+    nonisolated static func englishName(for code: String) -> String {
+        switch code {
+        case "zh-Hans":
+            "Simplified Chinese"
+        case "zh-Hant":
+            "Traditional Chinese"
+        case "en":
+            "English"
+        case "ja":
+            "Japanese"
+        case "ko":
+            "Korean"
+        case "fr":
+            "French"
+        case "de":
+            "German"
+        default:
+            code
+        }
+    }
+
     static func isSupported(_ code: String) -> Bool {
         supported.contains { $0.code == code }
     }

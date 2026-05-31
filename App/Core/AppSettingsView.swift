@@ -239,11 +239,18 @@ private struct TranSettingsSection: View {
     @Bindable var controller: TranslationController
     @State private var maximumItems: Double
     @State private var persistsHistory: Bool
+    @State private var openAIBaseURL: String
+    @State private var openAIAPIKey: String
+    @State private var openAIModel: String
 
     init(controller: TranslationController) {
         self.controller = controller
         self._maximumItems = State(initialValue: Double(controller.history.limit))
         self._persistsHistory = State(initialValue: controller.history.persistsHistory)
+        let configuration = controller.preferences.openAICompatibleConfiguration
+        self._openAIBaseURL = State(initialValue: configuration.baseURL)
+        self._openAIAPIKey = State(initialValue: configuration.apiKey)
+        self._openAIModel = State(initialValue: configuration.model)
     }
 
     var body: some View {
@@ -286,6 +293,32 @@ private struct TranSettingsSection: View {
                 .settingsRowGroup()
             }
 
+            SettingsGroup(title: "OpenAI Compatible") {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: "Base URL") {
+                        TextField("https://api.openai.com/v1", text: $openAIBaseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(saveOpenAICompatibleConfiguration)
+                    }
+
+                    SettingsFormRow(title: "API Key") {
+                        SecureField("sk-...", text: $openAIAPIKey)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(saveOpenAICompatibleConfiguration)
+                    }
+
+                    SettingsFormRow(title: "Model") {
+                        TextField("gpt-4o-mini", text: $openAIModel)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(saveOpenAICompatibleConfiguration)
+                    }
+                }
+                .settingsRowGroup()
+            }
+            .onChange(of: openAIBaseURL) { _, _ in saveOpenAICompatibleConfiguration() }
+            .onChange(of: openAIAPIKey) { _, _ in saveOpenAICompatibleConfiguration() }
+            .onChange(of: openAIModel) { _, _ in saveOpenAICompatibleConfiguration() }
+
             SettingsGroup(title: "历史") {
                 VStack(spacing: 0) {
                     toggleRow("重启后保留翻译历史", isOn: $persistsHistory) { newValue in
@@ -327,9 +360,17 @@ private struct TranSettingsSection: View {
 
     private func providerToggleRow(_ provider: TranslationProviderDescriptor) -> some View {
         SettingsFormRow {
-            Label(provider.name, systemImage: provider.systemImage)
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Label(provider.name, systemImage: provider.systemImage)
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.primary)
+
+                if provider.requiresConfiguration {
+                    Text("需要配置")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
         } control: {
             Toggle("", isOn: providerEnabledBinding(provider.id))
                 .labelsHidden()
@@ -343,6 +384,16 @@ private struct TranSettingsSection: View {
         } set: { newValue in
             controller.setProvider(providerID, isEnabled: newValue)
         }
+    }
+
+    private func saveOpenAICompatibleConfiguration() {
+        controller.preferences.updateOpenAICompatibleConfiguration(
+            OpenAICompatibleTranslationConfiguration(
+                baseURL: openAIBaseURL,
+                apiKey: openAIAPIKey,
+                model: openAIModel
+            )
+        )
     }
 }
 

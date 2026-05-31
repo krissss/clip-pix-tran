@@ -111,7 +111,7 @@ final class TranslationController {
                 )
             ]
         } else {
-            self.providers = TranslationProvider.builtIn()
+            self.providers = TranslationProvider.builtIn(preferences: self.preferences)
         }
         self.pasteboard = pasteboard
         self.speechService = speechService ?? SystemTranslationSpeechService()
@@ -130,6 +130,9 @@ final class TranslationController {
     func selectSourceLanguage(_ code: String?, persistsDefault: Bool = true) {
         guard let code else {
             guard sourceLanguageCode != nil else {
+                if persistsDefault {
+                    preferences.updateDefaultSourceLanguage(nil)
+                }
                 return
             }
 
@@ -146,6 +149,9 @@ final class TranslationController {
         }
 
         guard code != sourceLanguageCode else {
+            if persistsDefault {
+                preferences.updateDefaultSourceLanguage(code)
+            }
             return
         }
 
@@ -163,6 +169,9 @@ final class TranslationController {
         }
 
         guard code != targetLanguageCode else {
+            if persistsDefault {
+                preferences.updateDefaultTargetLanguage(code)
+            }
             return
         }
 
@@ -214,6 +223,11 @@ final class TranslationController {
             targetLanguageCode: languageResolution.targetLanguageCode,
             sourceLanguageCode: languageResolution.sourceLanguageCode
         )
+        let historyRequest = TranslationRequest(
+            sourceText: trimmedText,
+            targetLanguageCode: languageResolution.targetLanguageCode,
+            sourceLanguageCode: sourceLanguageCode
+        )
 
         var successfulResults: [TranslationProviderResult] = []
         var failureMessages: [String] = []
@@ -231,7 +245,6 @@ final class TranslationController {
                     status: .success,
                     result: result
                 )
-                history.record(request: request, providerResult: providerResult)
             } catch {
                 let message = error.localizedDescription
                 let displayMessage = activeProviders.count > 1
@@ -249,6 +262,7 @@ final class TranslationController {
         if successfulResults.isEmpty {
             lastErrorMessage = failureMessages.first
         } else {
+            history.record(request: historyRequest, providerResults: successfulResults)
             lastErrorMessage = nil
         }
     }
@@ -366,17 +380,20 @@ final class TranslationController {
         sourceLanguageCode = item.sourceLanguageCode
         targetLanguageCode = item.targetLanguageCode
         historyProviderID = item.providerID
-        let historyState = TranslationProviderState(
-            provider: TranslationProviderDescriptor.descriptor(for: item.providerID),
-            status: .success,
-            result: TranslationResult(
-                translatedText: item.translatedText,
-                sourceLanguageCode: item.detectedSourceLanguageCode,
-                targetLanguageCode: item.targetLanguageCode
+        let historyStates = item.providerResults.map { providerResult in
+            TranslationProviderState(
+                provider: TranslationProviderDescriptor.descriptor(for: providerResult.providerID),
+                status: .success,
+                result: TranslationResult(
+                    translatedText: providerResult.translatedText,
+                    sourceLanguageCode: providerResult.detectedSourceLanguageCode,
+                    targetLanguageCode: providerResult.targetLanguageCode
+                )
             )
-        )
+        }
+        let historyStateByID = Dictionary(uniqueKeysWithValues: historyStates.map { ($0.provider.id, $0) })
         providerStates = providers.map { provider in
-            if provider.id == item.providerID {
+            if let historyState = historyStateByID[provider.id] {
                 return historyState
             }
 
@@ -386,7 +403,8 @@ final class TranslationController {
                 result: nil
             )
         }
-        if !providerStates.contains(where: { $0.provider.id == item.providerID }) {
+        for historyState in historyStates.reversed()
+            where !providerStates.contains(where: { $0.provider.id == historyState.provider.id }) {
             providerStates.insert(historyState, at: 0)
         }
         lastErrorMessage = nil

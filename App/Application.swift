@@ -39,16 +39,6 @@ struct Application: App {
                 persistence: FileTranslationHistoryPersistence(),
                 persistsHistoryDefaultsKey: HistoryPersistencePreferenceKey.translation
             ),
-            providers: [
-                TranslationProvider(
-                    descriptor: .systemTranslation,
-                    service: HybridTranslationService()
-                ),
-                TranslationProvider(
-                    descriptor: .localDictionary,
-                    service: FallbackTranslationService()
-                )
-            ],
             pasteboard: SystemClipboardService()
         )
 

@@ -22,6 +22,7 @@ final class TranslationQuickPanelPresenter {
         currentSourceText = sourceText
         currentErrorMessage = errorMessage
 
+        let shouldPositionPanel = panel == nil || panel?.isVisible != true
         if panel == nil {
             panel = makePanel()
         }
@@ -56,7 +57,9 @@ final class TranslationQuickPanelPresenter {
         )
 
         panel.contentView = NSHostingView(rootView: rootView)
-        panel.setFrameOrigin(panelOrigin(for: panel.frame.size))
+        if shouldPositionPanel {
+            panel.setFrameOrigin(panelOrigin(for: panel.frame.size))
+        }
         panel.deminiaturize(nil)
         panel.orderFrontRegardless()
         panel.makeKey()
@@ -423,6 +426,10 @@ private struct TranslationQuickPanelView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Text("Enter 翻译 / ⌘↩ 换行")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
                 TranslationSpeechButton(
                     isSpeaking: controller.speakingTarget == .source,
                     canSpeak: canSpeakSource,
@@ -442,7 +449,8 @@ private struct TranslationQuickPanelView: View {
             ZStack(alignment: .topLeading) {
                 TranslationQuickPanelSourceEditor(
                     text: sourceTextBinding,
-                    isEditable: canEditSource
+                    isEditable: canEditSource,
+                    onReturn: translateCurrentSelection
                 )
                 .padding(1)
 
@@ -450,8 +458,8 @@ private struct TranslationQuickPanelView: View {
                     Text(sourcePreviewText)
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 13)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
                         .allowsHitTesting(false)
                 }
             }
@@ -469,7 +477,7 @@ private struct TranslationQuickPanelView: View {
     private var resultsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             ControlPanelCompactSectionHeader(title: "翻译结果", systemImage: "rectangle.stack") {
-                Text("\(visibleProviders.count) 个服务")
+                Text(resultSummaryText)
             }
 
             if visibleProviders.isEmpty {
@@ -480,7 +488,7 @@ private struct TranslationQuickPanelView: View {
                 .frame(maxWidth: .infinity, minHeight: 112)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: 5) {
                         providerCards
                     }
                     .padding(.vertical, 1)
@@ -499,7 +507,6 @@ private struct TranslationQuickPanelView: View {
                 provider: provider.provider,
                 status: providerStatus(for: provider),
                 translatedText: providerTranslatedText(for: provider),
-                detectedSourceLanguageCode: provider.detectedSourceLanguageCode,
                 canCopy: providerCanCopy(for: provider),
                 canSpeak: providerCanCopy(for: provider),
                 isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
@@ -510,7 +517,7 @@ private struct TranslationQuickPanelView: View {
                     controller.speakResult(providerID: provider.provider.id)
                 },
                 onRetry: translateCurrentSelection,
-                contentMinHeight: ControlPanelDesign.Layout.QuickPanel.providerMinHeight,
+                contentMinHeight: 30,
                 isCompact: true
             )
         }
@@ -548,6 +555,15 @@ private struct TranslationQuickPanelView: View {
         case .idle, .loading, .failed:
             false
         }
+    }
+
+    private var resultSummaryText: String {
+        let providerCount = "\(visibleProviders.count) 个服务"
+        guard let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
+            return providerCount
+        }
+
+        return "检测：\(TranslationLanguage.name(for: sourceLanguageCode)) · \(providerCount)"
     }
 
     private var targetLanguageSelection: Binding<String> {
@@ -616,7 +632,7 @@ private struct TranslationQuickPanelView: View {
             onClose()
             return true
         case 36, 76:
-            guard modifierFlags.contains(.command) else {
+            guard !modifierFlags.contains(.command) else {
                 return false
             }
 
@@ -634,9 +650,10 @@ private struct TranslationQuickPanelView: View {
 private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
     @Binding var text: String
     let isEditable: Bool
+    let onReturn: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, onReturn: onReturn)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -645,8 +662,9 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
 
-        let textView = NSTextView()
+        let textView = ReturnHandlingTextView()
         textView.delegate = context.coordinator
+        textView.onReturn = context.coordinator.handleReturn
         textView.string = text
         textView.font = .systemFont(ofSize: NSFont.systemFontSize)
         textView.drawsBackground = false
@@ -654,7 +672,7 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.textContainerInset = NSSize(width: 8, height: 5)
         textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
@@ -670,8 +688,9 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.text = $text
+        context.coordinator.onReturn = onReturn
 
-        guard let textView = scrollView.documentView as? NSTextView else {
+        guard let textView = scrollView.documentView as? ReturnHandlingTextView else {
             return
         }
 
@@ -684,9 +703,11 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var onReturn: () -> Void
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, onReturn: @escaping () -> Void) {
             self.text = text
+            self.onReturn = onReturn
         }
 
         func textDidChange(_ notification: Notification) {
@@ -696,6 +717,31 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
 
             text.wrappedValue = textView.string
         }
+
+        func handleReturn() {
+            onReturn()
+        }
+    }
+}
+
+private final class ReturnHandlingTextView: NSTextView {
+    var onReturn: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isReturnKey = event.keyCode == 36 || event.keyCode == 76
+
+        if isReturnKey, modifierFlags.contains(.command) {
+            insertNewlineIgnoringFieldEditor(self)
+            return
+        }
+
+        if isReturnKey {
+            onReturn?()
+            return
+        }
+
+        super.keyDown(with: event)
     }
 }
 

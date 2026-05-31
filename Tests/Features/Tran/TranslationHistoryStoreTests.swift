@@ -69,7 +69,7 @@ struct TranslationHistoryStoreTests {
         #expect(store.items.first?.translatedText == "您好")
     }
 
-    @Test func keepsSameTextResultsFromDifferentProviders() {
+    @Test func mergesSameTextResultsFromDifferentProviders() {
         let store = TranslationHistoryStore()
         let request = TranslationRequest(
             sourceText: "hello",
@@ -79,31 +79,74 @@ struct TranslationHistoryStoreTests {
 
         store.record(
             request: request,
-            providerResult: TranslationProviderResult(
-                provider: .systemTranslation,
-                result: TranslationResult(
-                    translatedText: "你好",
-                    sourceLanguageCode: "en",
-                    targetLanguageCode: "zh-Hans"
+            providerResults: [
+                TranslationProviderResult(
+                    provider: .systemTranslation,
+                    result: TranslationResult(
+                        translatedText: "你好",
+                        sourceLanguageCode: "en",
+                        targetLanguageCode: "zh-Hans"
+                    )
+                ),
+                TranslationProviderResult(
+                    provider: .google,
+                    result: TranslationResult(
+                        translatedText: "您好",
+                        sourceLanguageCode: "en",
+                        targetLanguageCode: "zh-Hans"
+                    )
                 )
-            )
-        )
-        store.record(
-            request: request,
-            providerResult: TranslationProviderResult(
-                provider: .localDictionary,
-                result: TranslationResult(
-                    translatedText: "您好",
-                    sourceLanguageCode: "en",
-                    targetLanguageCode: "zh-Hans"
-                )
-            )
+            ]
         )
 
-        #expect(store.items.count == 2)
-        #expect(store.items.map(\.providerID) == [
-            TranslationProviderDescriptor.localDictionary.id,
-            TranslationProviderDescriptor.systemTranslation.id
+        #expect(store.items.count == 1)
+        #expect(store.items.first?.providerID == TranslationProviderDescriptor.systemTranslation.id)
+        #expect(store.items.first?.translatedText == "你好")
+        #expect(store.items.first?.providerResults.map(\.providerID) == [
+            TranslationProviderDescriptor.systemTranslation.id,
+            TranslationProviderDescriptor.google.id
+        ])
+    }
+
+    @Test func selectsProviderResultForHistoryItem() throws {
+        let store = TranslationHistoryStore()
+        let request = TranslationRequest(
+            sourceText: "hello",
+            targetLanguageCode: "zh-Hans",
+            sourceLanguageCode: "en"
+        )
+
+        store.record(
+            request: request,
+            providerResults: [
+                TranslationProviderResult(
+                    provider: .systemTranslation,
+                    result: TranslationResult(
+                        translatedText: "你好",
+                        sourceLanguageCode: "en",
+                        targetLanguageCode: "zh-Hans"
+                    )
+                ),
+                TranslationProviderResult(
+                    provider: .google,
+                    result: TranslationResult(
+                        translatedText: "您好",
+                        sourceLanguageCode: "en",
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ]
+        )
+
+        let item = try #require(store.items.first)
+        store.selectProviderResult(TranslationProviderDescriptor.google.id, for: item)
+
+        #expect(store.items.first?.providerID == TranslationProviderDescriptor.google.id)
+        #expect(store.items.first?.providerName == TranslationProviderDescriptor.google.name)
+        #expect(store.items.first?.translatedText == "您好")
+        #expect(store.items.first?.providerResults.map(\.providerID) == [
+            TranslationProviderDescriptor.systemTranslation.id,
+            TranslationProviderDescriptor.google.id
         ])
     }
 
@@ -112,12 +155,12 @@ struct TranslationHistoryStoreTests {
         store.record(
             request: TranslationRequest(sourceText: "hello", targetLanguageCode: "zh-Hans", sourceLanguageCode: "en"),
             providerResult: TranslationProviderResult(
-                provider: .localDictionary,
+                provider: .google,
                 result: TranslationResult(translatedText: "你好", sourceLanguageCode: "en", targetLanguageCode: "zh-Hans")
             )
         )
 
-        #expect(store.filteredItems(matching: "dictionary").count == 1)
+        #expect(store.filteredItems(matching: "google").count == 1)
         #expect(store.filteredItems(matching: "你好").count == 1)
         #expect(store.filteredItems(matching: "missing").isEmpty)
     }

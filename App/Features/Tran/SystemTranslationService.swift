@@ -37,7 +37,7 @@ struct SystemTranslationService: TranslationService {
             throw TranslationValidationError.emptySource
         }
 
-        let targetLanguage = Locale.Language(identifier: request.targetLanguageCode)
+        let targetLanguage = Self.systemLanguage(for: request.targetLanguageCode)
         let sourceLanguage = try await sourceLanguage(
             for: request,
             sourceText: sourceText,
@@ -76,7 +76,7 @@ struct SystemTranslationService: TranslationService {
         targetLanguage: Locale.Language
     ) async throws -> Locale.Language {
         if let sourceLanguageCode = request.sourceLanguageCode {
-            let sourceLanguage = Locale.Language(identifier: sourceLanguageCode)
+            let sourceLanguage = Self.systemLanguage(for: sourceLanguageCode)
             guard await isInstalled(from: sourceLanguage, to: targetLanguage) else {
                 throw TranslationProviderError.unavailable
             }
@@ -128,7 +128,7 @@ struct SystemTranslationService: TranslationService {
                 return nil
             }
 
-            return Locale.Language(identifier: languageCode)
+            return Self.systemLanguage(for: languageCode)
         }
     }
 
@@ -167,5 +167,16 @@ struct SystemTranslationService: TranslationService {
         }
 
         return nil
+    }
+
+    private static func systemLanguage(for code: String) -> Locale.Language {
+        switch code {
+        case "zh-Hans":
+            Locale.Language(identifier: "zh-Hans-CN")
+        case "zh-Hant":
+            Locale.Language(identifier: "zh-Hant-TW")
+        default:
+            Locale.Language(identifier: code)
+        }
     }
 }

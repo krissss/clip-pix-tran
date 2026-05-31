@@ -170,12 +170,12 @@ struct TranView: View {
 
     private var providerDeck: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: 8) {
                 providerCards
             }
             .padding(.vertical, 1)
         }
-        .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 300)
+        .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 300)
         .scrollContentBackground(.hidden)
     }
 
@@ -186,7 +186,6 @@ struct TranView: View {
                 provider: provider.provider,
                 status: provider.status,
                 translatedText: provider.translatedText,
-                detectedSourceLanguageCode: provider.detectedSourceLanguageCode,
                 canCopy: hasTranslatedText(for: provider),
                 canSpeak: hasTranslatedText(for: provider),
                 isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
@@ -197,7 +196,7 @@ struct TranView: View {
                     controller.speakResult(providerID: provider.provider.id)
                 },
                 onRetry: translate,
-                contentMinHeight: 150
+                contentMinHeight: 34
             )
         }
     }
@@ -289,6 +288,9 @@ struct TranView: View {
                             item: item,
                             onUse: {
                                 controller.useHistoryItem(item)
+                            },
+                            onSelectProvider: { providerID in
+                                controller.history.selectProviderResult(providerID, for: item)
                             },
                             onDelete: {
                                 controller.deleteHistoryItem(item)
@@ -453,6 +455,7 @@ private final class CommandReturnTextView: NSTextView {
 private struct TranslationHistoryRow: View {
     let item: TranslationHistoryItem
     let onUse: () -> Void
+    let onSelectProvider: (String) -> Void
     let onDelete: () -> Void
 
     private var languageText: String {
@@ -472,24 +475,39 @@ private struct TranslationHistoryRow: View {
                 size: 34
             )
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(item.providerName)
-                        .font(.callout.weight(.semibold))
-
                     Text(languageText)
-                        .font(.caption)
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+
+                    ForEach(item.providerResults.prefix(3)) { providerResult in
+                        providerChip(providerResult)
+                    }
+
+                    if item.providerResults.count > 3 {
+                        Text("+\(item.providerResults.count - 3)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                Text(item.sourceText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                CompactTranslationText(
+                    text: item.sourceText,
+                    font: .subheadline,
+                    foregroundColor: .secondary,
+                    maxDisplayLines: 2,
+                    lineLimitPerDisplayLine: 1,
+                    lineSpacing: 1
+                )
 
-                Text(item.translatedText)
-                    .font(.body)
-                    .lineLimit(3)
+                CompactTranslationText(
+                    text: item.translatedText,
+                    font: .body,
+                    maxDisplayLines: 3,
+                    lineLimitPerDisplayLine: 1,
+                    lineSpacing: 1
+                )
             }
 
             Spacer()
@@ -510,6 +528,29 @@ private struct TranslationHistoryRow: View {
         }
         .controlPanelHistoryRow(isSelected: false, tint: ControlPanelDesign.tint(for: .tran))
         .padding(.horizontal, 12)
+    }
+
+    private func providerChip(_ providerResult: TranslationHistoryProviderResult) -> some View {
+        let isSelected = providerResult.providerID == item.providerID
+        return Button {
+            onSelectProvider(providerResult.providerID)
+        } label: {
+            Text(providerResult.providerName)
+                .font(.caption2.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .primary : .secondary)
+                .lineLimit(1)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .controlPanelRoundedSurface(
+                    background: isSelected
+                        ? ControlPanelDesign.tint(for: .tran).opacity(0.12)
+                        : ControlPanelDesign.quietFill,
+                    cornerRadius: ControlPanelDesign.compactRadius
+                )
+        }
+        .buttonStyle(.plain)
+        .help("切换到 \(providerResult.providerName) 的结果")
+        .disabled(isSelected)
     }
 }
 

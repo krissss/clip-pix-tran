@@ -3,21 +3,27 @@ import Foundation
 @Observable
 final class TranslationPreferences {
     private let defaults: UserDefaults
+    private let secretStore: TranslationSecretStore
     private let defaultSourceLanguageKey = "tran.defaultSourceLanguageCode"
     private let hasUserSelectedDefaultSourceLanguageKey = "tran.hasUserSelectedDefaultSourceLanguage"
     private let defaultTargetLanguageKey = "tran.defaultTargetLanguageCode"
     private let hasUserSelectedDefaultTargetLanguageKey = "tran.hasUserSelectedDefaultTargetLanguage"
     private let enabledProviderIDsKey = "tran.enabledProviderIDs"
+    private let openAICompatibleBaseURLKey = "tran.openAICompatible.baseURL"
+    private let openAICompatibleModelKey = "tran.openAICompatible.model"
 
     private(set) var defaultSourceLanguageCode: String?
     private(set) var defaultTargetLanguageCode: String
     private(set) var enabledProviderIDs: [String]
+    private(set) var openAICompatibleConfiguration: OpenAICompatibleTranslationConfiguration
 
     init(
         defaults: UserDefaults = .standard,
+        secretStore: TranslationSecretStore = KeychainTranslationSecretStore(),
         preferredLanguages: [String] = Locale.preferredLanguages
     ) {
         self.defaults = defaults
+        self.secretStore = secretStore
 
         let storedSourceCode = defaults.string(forKey: defaultSourceLanguageKey)
         let hasUserSelectedDefaultSourceLanguage = defaults.bool(
@@ -56,12 +62,23 @@ final class TranslationPreferences {
         let knownProviderIDs = Set(TranslationProviderDescriptor.builtIn.map(\.id))
         let validProviderIDs = storedProviderIDs.filter { knownProviderIDs.contains($0) }
         if validProviderIDs.isEmpty {
-            let enabledProviderIDs = TranslationProviderDescriptor.builtIn.map(\.id)
+            let enabledProviderIDs = Self.defaultEnabledProviderIDs
             self.enabledProviderIDs = enabledProviderIDs
             defaults.set(enabledProviderIDs, forKey: enabledProviderIDsKey)
         } else {
             self.enabledProviderIDs = validProviderIDs
+            if validProviderIDs != storedProviderIDs {
+                defaults.set(validProviderIDs, forKey: enabledProviderIDsKey)
+            }
         }
+
+        self.openAICompatibleConfiguration = OpenAICompatibleTranslationConfiguration(
+            baseURL: defaults.string(forKey: openAICompatibleBaseURLKey)
+                ?? OpenAICompatibleTranslationConfiguration.defaultBaseURL,
+            apiKey: secretStore.openAICompatibleAPIKey(),
+            model: defaults.string(forKey: openAICompatibleModelKey)
+                ?? OpenAICompatibleTranslationConfiguration.defaultModel
+        )
     }
 
     func updateDefaultSourceLanguage(_ code: String?) {
@@ -118,4 +135,15 @@ final class TranslationPreferences {
         enabledProviderIDs = nextProviderIDs
         defaults.set(enabledProviderIDs, forKey: enabledProviderIDsKey)
     }
+
+    func updateOpenAICompatibleConfiguration(_ configuration: OpenAICompatibleTranslationConfiguration) {
+        openAICompatibleConfiguration = configuration
+        defaults.set(configuration.baseURL, forKey: openAICompatibleBaseURLKey)
+        defaults.set(configuration.model, forKey: openAICompatibleModelKey)
+        secretStore.updateOpenAICompatibleAPIKey(configuration.apiKey)
+    }
+
+    private static let defaultEnabledProviderIDs = [
+        TranslationProviderDescriptor.systemTranslation.id
+    ]
 }

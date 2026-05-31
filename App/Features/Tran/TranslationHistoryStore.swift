@@ -66,11 +66,30 @@ final class TranslationHistoryStore {
 
     func record(
         request: TranslationRequest,
-        providerResult: TranslationProviderResult,
+        providerResults: [TranslationProviderResult],
         at date: Date = Date()
     ) {
         let sourceText = request.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let translatedText = providerResult.result.translatedText
+        let cleanProviderResults = providerResults.compactMap { providerResult -> TranslationProviderResult? in
+            let translatedText = providerResult.result.translatedText
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !translatedText.isEmpty else {
+                return nil
+            }
+
+            return TranslationProviderResult(
+                provider: providerResult.provider,
+                result: TranslationResult(
+                    translatedText: translatedText,
+                    sourceLanguageCode: providerResult.result.sourceLanguageCode,
+                    targetLanguageCode: providerResult.result.targetLanguageCode
+                )
+            )
+        }
+        guard let primaryResult = cleanProviderResults.first else {
+            return
+        }
+        let translatedText = primaryResult.result.translatedText
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sourceText.isEmpty, !translatedText.isEmpty else {
             return
@@ -79,8 +98,7 @@ final class TranslationHistoryStore {
         var nextItems = items
         if let existingIndex = nextItems.firstIndex(where: {
             $0.sourceText == sourceText
-                && $0.targetLanguageCode == providerResult.result.targetLanguageCode
-                && $0.providerID == providerResult.provider.id
+                && $0.targetLanguageCode == primaryResult.result.targetLanguageCode
         }) {
             nextItems.remove(at: existingIndex)
         }
@@ -90,10 +108,19 @@ final class TranslationHistoryStore {
                 sourceText: sourceText,
                 translatedText: translatedText,
                 sourceLanguageCode: request.sourceLanguageCode,
-                detectedSourceLanguageCode: providerResult.result.sourceLanguageCode,
-                targetLanguageCode: providerResult.result.targetLanguageCode,
-                providerID: providerResult.provider.id,
-                providerName: providerResult.provider.name,
+                detectedSourceLanguageCode: primaryResult.result.sourceLanguageCode,
+                targetLanguageCode: primaryResult.result.targetLanguageCode,
+                providerID: primaryResult.provider.id,
+                providerName: primaryResult.provider.name,
+                providerResults: cleanProviderResults.map { providerResult in
+                    TranslationHistoryProviderResult(
+                        providerID: providerResult.provider.id,
+                        providerName: providerResult.provider.name,
+                        translatedText: providerResult.result.translatedText,
+                        detectedSourceLanguageCode: providerResult.result.sourceLanguageCode,
+                        targetLanguageCode: providerResult.result.targetLanguageCode
+                    )
+                },
                 createdAt: date
             ),
             at: 0
@@ -101,6 +128,14 @@ final class TranslationHistoryStore {
         items = nextItems
         trimToLimit()
         persistIfNeeded()
+    }
+
+    func record(
+        request: TranslationRequest,
+        providerResult: TranslationProviderResult,
+        at date: Date = Date()
+    ) {
+        record(request: request, providerResults: [providerResult], at: date)
     }
 
     func record(
@@ -128,9 +163,40 @@ final class TranslationHistoryStore {
             item.sourceText.localizedCaseInsensitiveContains(query)
                 || item.translatedText.localizedCaseInsensitiveContains(query)
                 || item.providerName.localizedCaseInsensitiveContains(query)
+                || item.providerResults.contains { providerResult in
+                    providerResult.providerName.localizedCaseInsensitiveContains(query)
+                        || providerResult.translatedText.localizedCaseInsensitiveContains(query)
+                }
                 || TranslationLanguage.name(for: item.targetLanguageCode)
                     .localizedCaseInsensitiveContains(query)
         }
+    }
+
+    func selectProviderResult(_ providerID: String, for item: TranslationHistoryItem) {
+        guard let itemIndex = items.firstIndex(where: { $0.id == item.id }),
+              let providerResult = items[itemIndex].providerResults.first(where: { $0.providerID == providerID })
+        else {
+            return
+        }
+
+        let currentItem = items[itemIndex]
+        guard currentItem.providerID != providerResult.providerID else {
+            return
+        }
+
+        items[itemIndex] = TranslationHistoryItem(
+            id: currentItem.id,
+            sourceText: currentItem.sourceText,
+            translatedText: providerResult.translatedText,
+            sourceLanguageCode: currentItem.sourceLanguageCode,
+            detectedSourceLanguageCode: providerResult.detectedSourceLanguageCode,
+            targetLanguageCode: providerResult.targetLanguageCode,
+            providerID: providerResult.providerID,
+            providerName: providerResult.providerName,
+            providerResults: currentItem.providerResults,
+            createdAt: currentItem.createdAt
+        )
+        persistIfNeeded()
     }
 
     func delete(_ item: TranslationHistoryItem) {

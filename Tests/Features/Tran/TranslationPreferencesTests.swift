@@ -161,27 +161,76 @@ struct TranslationPreferencesTests {
     @Test func defaultsToAllBuiltInProvidersEnabled() {
         let preferences = TranslationPreferences(defaults: makeDefaults())
 
-        #expect(preferences.enabledProviderIDs == TranslationProviderDescriptor.builtIn.map(\.id))
+        #expect(preferences.enabledProviderIDs == [
+            TranslationProviderDescriptor.systemTranslation.id
+        ])
+    }
+
+    @Test func builtInProviderListIncludesExternalProviders() {
+        #expect(TranslationProviderDescriptor.builtIn.map(\.id) == [
+            TranslationProviderDescriptor.systemTranslation.id,
+            TranslationProviderDescriptor.google.id,
+            TranslationProviderDescriptor.openAICompatible.id
+        ])
     }
 
     @Test func persistsEnabledProviders() {
         let defaults = makeDefaults()
         var preferences = TranslationPreferences(defaults: defaults)
 
-        preferences.updateEnabledProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
+        preferences.updateEnabledProvider(TranslationProviderDescriptor.google.id, isEnabled: true)
         preferences = TranslationPreferences(defaults: defaults)
 
-        #expect(preferences.enabledProviderIDs == [TranslationProviderDescriptor.systemTranslation.id])
+        #expect(preferences.enabledProviderIDs == [
+            TranslationProviderDescriptor.systemTranslation.id,
+            TranslationProviderDescriptor.google.id
+        ])
+    }
+
+    @Test func removesLegacyLocalDictionaryProviderFromStoredProviders() {
+        let defaults = makeDefaults()
+        defaults.set([
+            TranslationProviderDescriptor.systemTranslation.id,
+            "local-dictionary"
+        ], forKey: "tran.enabledProviderIDs")
+
+        let preferences = TranslationPreferences(defaults: defaults)
+
+        #expect(preferences.enabledProviderIDs == [
+            TranslationProviderDescriptor.systemTranslation.id
+        ])
+        #expect(defaults.stringArray(forKey: "tran.enabledProviderIDs") == [
+            TranslationProviderDescriptor.systemTranslation.id
+        ])
     }
 
     @Test func keepsAtLeastOneProviderEnabled() {
         let defaults = makeDefaults()
         let preferences = TranslationPreferences(defaults: defaults)
 
-        preferences.updateEnabledProvider(TranslationProviderDescriptor.localDictionary.id, isEnabled: false)
         preferences.updateEnabledProvider(TranslationProviderDescriptor.systemTranslation.id, isEnabled: false)
 
         #expect(preferences.enabledProviderIDs == [TranslationProviderDescriptor.systemTranslation.id])
+    }
+
+    @Test func persistsOpenAICompatibleConfiguration() {
+        let defaults = makeDefaults()
+        let secretStore = CapturingTranslationSecretStore()
+        var preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        preferences.updateOpenAICompatibleConfiguration(
+            OpenAICompatibleTranslationConfiguration(
+                baseURL: "https://api.deepseek.com/v1",
+                apiKey: "test-key",
+                model: "deepseek-chat"
+            )
+        )
+        preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
+
+        #expect(preferences.openAICompatibleConfiguration.baseURL == "https://api.deepseek.com/v1")
+        #expect(preferences.openAICompatibleConfiguration.apiKey == "test-key")
+        #expect(preferences.openAICompatibleConfiguration.model == "deepseek-chat")
+        #expect(defaults.string(forKey: "tran.openAICompatible.apiKey") == nil)
     }
 }
 
@@ -190,4 +239,16 @@ private func makeDefaults() -> UserDefaults {
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
+}
+
+private final class CapturingTranslationSecretStore: TranslationSecretStore {
+    private var apiKey = ""
+
+    func openAICompatibleAPIKey() -> String {
+        apiKey
+    }
+
+    func updateOpenAICompatibleAPIKey(_ apiKey: String) {
+        self.apiKey = apiKey
+    }
 }

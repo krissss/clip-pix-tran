@@ -86,10 +86,6 @@ final class AppShortcutController {
                 sourceText: text
             )
             await translationController.translate()
-            translationQuickPanelPresenter.show(
-                controller: translationController,
-                sourceText: text
-            )
         }
     }
 

@@ -4,7 +4,6 @@ struct TranslationProviderCard: View {
     let provider: TranslationProviderDescriptor
     let status: TranslationProviderStatus
     let translatedText: String
-    var detectedSourceLanguageCode: String? = nil
     let canCopy: Bool
     let canSpeak: Bool
     let isSpeaking: Bool
@@ -15,19 +14,19 @@ struct TranslationProviderCard: View {
     var isCompact = false
 
     private var horizontalPadding: CGFloat {
-        isCompact ? 10 : 12
+        isCompact ? 8 : 10
     }
 
     private var headerTopPadding: CGFloat {
-        isCompact ? 6 : 10
+        isCompact ? 5 : 6
     }
 
     private var headerBottomPadding: CGFloat {
-        isCompact ? 4 : 6
+        isCompact ? 2 : 3
     }
 
     private var bodyBottomPadding: CGFloat {
-        isCompact ? 8 : 12
+        isCompact ? 7 : 9
     }
 
     private var contentSpacing: CGFloat {
@@ -53,7 +52,8 @@ struct TranslationProviderCard: View {
                 .frame(width: isCompact ? 16 : 18)
 
             Text(provider.name)
-                .font((isCompact ? Font.callout : Font.subheadline).weight(.semibold))
+                .font(isCompact ? .caption : .caption.weight(.semibold))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             if provider.isLocal {
@@ -71,7 +71,11 @@ struct TranslationProviderCard: View {
 
             Spacer()
 
-            statusIndicator
+            if case .success = status {
+                resultActions
+            } else {
+                statusIndicator
+            }
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.top, headerTopPadding)
@@ -106,7 +110,7 @@ struct TranslationProviderCard: View {
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: min(contentMinHeight, 34), alignment: .topLeading)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.bottom, bodyBottomPadding)
         case .loading(let message):
@@ -118,45 +122,19 @@ struct TranslationProviderCard: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: min(contentMinHeight, 34), alignment: .topLeading)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bodyBottomPadding)
         case .success:
-            VStack(alignment: .leading, spacing: contentSpacing) {
-                if let detectedSourceLanguageCode {
-                    Label(
-                        "检测：\(TranslationLanguage.name(for: detectedSourceLanguageCode))",
-                        systemImage: "waveform.badge.magnifyingglass"
-                    )
-                    .font(isCompact ? .caption2 : .caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                HStack(alignment: .top, spacing: 10) {
-                    Text(translatedText)
-                        .font(.callout)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
-
-                    VStack(spacing: 6) {
-                        TranslationSpeechButton(
-                            isSpeaking: isSpeaking,
-                            canSpeak: canSpeak,
-                            idleHelp: "朗读译文",
-                            action: onSpeak
-                        )
-
-                        Button(action: onCopy) {
-                            Image(systemName: "doc.on.doc")
-                        }
-                        .buttonStyle(ControlPanelIconButtonStyle())
-                        .disabled(!canCopy)
-                        .help("复制译文")
-                    }
-                }
-            }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, bodyBottomPadding)
+            CompactTranslationText(
+                text: translatedText,
+                font: isCompact ? .callout : .body,
+                lineSpacing: isCompact ? 1 : 2,
+                enableSelection: true
+            )
+                .layoutPriority(1)
+                .padding(.horizontal, horizontalPadding)
+                .padding(.bottom, bodyBottomPadding)
         case .failed(let message):
             VStack(alignment: .leading, spacing: contentSpacing) {
                 HStack(alignment: .top, spacing: 10) {
@@ -164,7 +142,7 @@ struct TranslationProviderCard: View {
                         .font(.callout)
                         .foregroundStyle(.red)
                         .lineLimit(3)
-                        .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, minHeight: min(contentMinHeight, 44), alignment: .topLeading)
 
                     Button(action: onRetry) {
                         Image(systemName: "arrow.clockwise")
@@ -175,6 +153,24 @@ struct TranslationProviderCard: View {
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bodyBottomPadding)
+        }
+    }
+
+    private var resultActions: some View {
+        HStack(spacing: 6) {
+            TranslationSpeechButton(
+                isSpeaking: isSpeaking,
+                canSpeak: canSpeak,
+                idleHelp: "朗读译文",
+                action: onSpeak
+            )
+
+            Button(action: onCopy) {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(ControlPanelIconButtonStyle())
+            .disabled(!canCopy)
+            .help("复制译文")
         }
     }
 }

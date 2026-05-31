@@ -5,6 +5,21 @@ struct TranslationProviderDescriptor: Identifiable, Codable, Equatable, Sendable
     let name: String
     let systemImage: String
     let isLocal: Bool
+    let requiresConfiguration: Bool
+
+    init(
+        id: String,
+        name: String,
+        systemImage: String,
+        isLocal: Bool,
+        requiresConfiguration: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.systemImage = systemImage
+        self.isLocal = isLocal
+        self.requiresConfiguration = requiresConfiguration
+    }
 }
 
 extension TranslationProviderDescriptor {
@@ -15,20 +30,38 @@ extension TranslationProviderDescriptor {
         isLocal: true
     )
 
-    static let localDictionary = TranslationProviderDescriptor(
-        id: "local-dictionary",
-        name: "Local Dictionary",
-        systemImage: "book.closed",
-        isLocal: true
+    static let google = TranslationProviderDescriptor(
+        id: "google",
+        name: "Google Translate",
+        systemImage: "globe",
+        isLocal: false
+    )
+
+    static let openAICompatible = TranslationProviderDescriptor(
+        id: "openai-compatible",
+        name: "OpenAI Compatible",
+        systemImage: "sparkles",
+        isLocal: false,
+        requiresConfiguration: true
     )
 
     static let builtIn: [TranslationProviderDescriptor] = [
         .systemTranslation,
-        .localDictionary
+        .google,
+        .openAICompatible
     ]
 
     static func descriptor(for id: String) -> TranslationProviderDescriptor {
-        builtIn.first { $0.id == id } ?? TranslationProviderDescriptor(
+        if id == "local-dictionary" {
+            return TranslationProviderDescriptor(
+                id: id,
+                name: "Local Dictionary",
+                systemImage: "book.closed",
+                isLocal: true
+            )
+        }
+
+        return builtIn.first { $0.id == id } ?? TranslationProviderDescriptor(
             id: id,
             name: id,
             systemImage: "questionmark.app",
@@ -47,15 +80,22 @@ struct TranslationProvider: Identifiable {
 }
 
 extension TranslationProvider {
-    static func builtIn() -> [TranslationProvider] {
-        [
+    static func builtIn(preferences: TranslationPreferences? = nil) -> [TranslationProvider] {
+        let preferences = preferences ?? TranslationPreferences()
+        return [
             TranslationProvider(
                 descriptor: .systemTranslation,
-                service: SystemTranslationService()
+                service: HybridTranslationService()
             ),
             TranslationProvider(
-                descriptor: .localDictionary,
-                service: FallbackTranslationService()
+                descriptor: .google,
+                service: GoogleTranslationService()
+            ),
+            TranslationProvider(
+                descriptor: .openAICompatible,
+                service: OpenAICompatibleTranslationService(
+                    configurationProvider: { preferences.openAICompatibleConfiguration }
+                )
             )
         ]
     }
