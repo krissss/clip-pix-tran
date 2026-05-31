@@ -16,15 +16,18 @@ final class RegionSelectionOverlay {
     private var didFinish = false
     private var activeBaseCaptureID: UUID?
     private let captureProvider: CaptureProvider
+    private let autoSelectionDetector: ScreenshotAutoSelectionDetecting
     private let annotationStore = ScreenshotAnnotationStore()
 
     static func capture(
+        autoSelectionDetector: ScreenshotAutoSelectionDetecting? = nil,
         captureProvider: @escaping CaptureProvider
     ) async throws -> ScreenshotCaptureOutput {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 let overlay = RegionSelectionOverlay(
                     continuation: continuation,
+                    autoSelectionDetector: autoSelectionDetector,
                     captureProvider: captureProvider
                 )
                 activeOverlay = overlay
@@ -43,9 +46,11 @@ final class RegionSelectionOverlay {
 
     private init(
         continuation: CheckedContinuation<ScreenshotCaptureOutput, Error>,
+        autoSelectionDetector: ScreenshotAutoSelectionDetecting?,
         captureProvider: @escaping CaptureProvider
     ) {
         self.continuation = continuation
+        self.autoSelectionDetector = autoSelectionDetector ?? SystemScreenshotAutoSelectionDetector()
         self.captureProvider = captureProvider
     }
 
@@ -70,6 +75,16 @@ final class RegionSelectionOverlay {
                     },
                     requestBaseImageCapture: { [weak self] view, screenRect in
                         self?.captureBaseImage(for: view, screenRect: screenRect)
+                    },
+                    detectAutoSelectionRect: { [weak self] screenPoint in
+                        guard let self else {
+                            return nil
+                        }
+
+                        return self.autoSelectionDetector.autoSelectionRect(
+                            at: screenPoint,
+                            excludingWindowIDs: self.excludedWindowIDs
+                        )
                     },
                     setNeedsDisplayOnAllScreens: { [weak self] in
                         self?.setNeedsDisplayOnAllScreens()
@@ -321,6 +336,7 @@ private struct RegionSelectionActions {
     let finish: (ScreenshotCaptureCompletion) -> Void
     let cancel: () -> Void
     let requestBaseImageCapture: (RegionSelectionView, CGRect) -> Void
+    let detectAutoSelectionRect: (CGPoint) -> CGRect?
     let setNeedsDisplayOnAllScreens: () -> Void
 }
 
@@ -341,6 +357,7 @@ private final class RegionSelectionWindow: NSPanel {
 
 private enum RegionSelectionInteraction {
     case idle
+    case autoSelecting(start: CGPoint, candidateRect: CGRect)
     case drawing(start: CGPoint)
     case moving(start: CGPoint, originalRect: CGRect)
     case resizing(handle: ScreenshotSelectionHandle, originalRect: CGRect)
@@ -449,11 +466,14 @@ private struct RegionToolbarActions {
 }
 
 private final class RegionSelectionView: NSView {
+    private static let manualSelectionDragThreshold: CGFloat = 3
+
     private let screenFrame: CGRect
     private let screenScale: CGFloat
     private let annotationStore: ScreenshotAnnotationStore
     private let actions: RegionSelectionActions
     private var selectionRect: CGRect?
+    private var autoSelectionCandidateRect: CGRect?
     private var interaction: RegionSelectionInteraction = .idle
     private var activeTool: RegionAnnotationTool?
     private var activeStyle = ScreenshotAnnotationStyle()
@@ -536,6 +556,14 @@ private final class RegionSelectionView: NSView {
         window?.makeFirstResponder(self)
         let point = convert(event.locationInWindow, from: nil)
 
+        if selectionRect == nil,
+           let candidateRect = autoSelectionCandidateRect,
+           candidateRect.contains(point) {
+            interaction = .autoSelecting(start: point, candidateRect: candidateRect)
+            hideToolbar()
+            return
+        }
+
         if let selectionRect {
             if let annotation = annotation(at: point, in: selectionRect) {
                 annotationStore.prepareUndoForMutation()
@@ -562,6 +590,7 @@ private final class RegionSelectionView: NSView {
         }
 
         selectionRect = nil
+        autoSelectionCandidateRect = nil
         clearBaseImage()
         annotationStore.reset()
         interaction = .drawing(start: point)
@@ -579,6 +608,22 @@ private final class RegionSelectionView: NSView {
         switch interaction {
         case .idle:
             break
+        case .autoSelecting(let start, let candidateRect):
+            if distance(from: start, to: point) > Self.manualSelectionDragThreshold {
+                selectionRect = nil
+                autoSelectionCandidateRect = nil
+                clearBaseImage()
+                annotationStore.reset()
+                interaction = .drawing(start: start)
+                selectionRect = ScreenshotSelectionGeometry.rect(
+                    from: start,
+                    to: point,
+                    clampedTo: bounds
+                )
+                .map(pixelAlignedLocalRect)
+            } else {
+                autoSelectionCandidateRect = candidateRect
+            }
         case .drawing(let start):
             selectionRect = ScreenshotSelectionGeometry.rect(
                 from: start,
@@ -626,6 +671,16 @@ private final class RegionSelectionView: NSView {
 
         let point = convert(event.locationInWindow, from: nil)
         switch interaction {
+        case .autoSelecting(_, let candidateRect):
+            selectionRect = pixelAlignedLocalRect(candidateRect)
+            autoSelectionCandidateRect = nil
+            annotationStore.reset()
+            clearBaseImage()
+            interaction = .idle
+            NSCursor.arrow.set()
+            window?.invalidateCursorRects(for: self)
+            showToolbarIfNeeded()
+            requestBaseImageCaptureIfNeeded()
         case .drawing(let start):
             selectionRect = ScreenshotSelectionGeometry.rect(
                 from: start,
@@ -655,12 +710,21 @@ private final class RegionSelectionView: NSView {
             break
         }
 
+        updateAutoSelectionCandidate(at: point)
         needsDisplay = true
         actions.setNeedsDisplayOnAllScreens()
     }
 
     override func mouseMoved(with event: NSEvent) {
+        guard !hiddenForCapture else {
+            return
+        }
+
+        let point = convert(event.locationInWindow, from: nil)
+        updateAutoSelectionCandidate(at: point)
         window?.invalidateCursorRects(for: self)
+        needsDisplay = true
+        actions.setNeedsDisplayOnAllScreens()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -684,6 +748,8 @@ private final class RegionSelectionView: NSView {
             drawSelectionHandles(in: selectionRect)
             drawSizeBadge(for: selectionRect)
             drawAnnotations(in: selectionRect)
+        } else if let autoSelectionCandidateRect {
+            drawAutoSelectionCandidate(autoSelectionCandidateRect)
         }
     }
 
@@ -697,6 +763,7 @@ private final class RegionSelectionView: NSView {
         hiddenForCapture = hidden
         if hidden {
             hideToolbar()
+            autoSelectionCandidateRect = nil
         } else {
             showToolbarIfNeeded()
         }
@@ -728,6 +795,7 @@ private final class RegionSelectionView: NSView {
 
     func closeTransientUI() {
         hideToolbar()
+        autoSelectionCandidateRect = nil
         textEditor?.removeFromSuperview()
         textEditor = nil
     }
@@ -947,6 +1015,32 @@ private final class RegionSelectionView: NSView {
         }
     }
 
+    private func updateAutoSelectionCandidate(at point: CGPoint) {
+        guard case .idle = interaction,
+              selectionRect == nil,
+              activeTool == nil else {
+            autoSelectionCandidateRect = nil
+            return
+        }
+
+        guard let detectedRect = actions.detectAutoSelectionRect(
+            screenPoint(fromLocalPoint: point)
+        ) else {
+            autoSelectionCandidateRect = nil
+            return
+        }
+
+        let localRect = pixelAlignedLocalRect(localRect(fromScreenRect: detectedRect))
+        guard localRect.contains(point),
+              localRect.width >= ScreenshotSelectionGeometry.minimumSize.width,
+              localRect.height >= ScreenshotSelectionGeometry.minimumSize.height else {
+            autoSelectionCandidateRect = nil
+            return
+        }
+
+        autoSelectionCandidateRect = localRect
+    }
+
     private func drawSelectionHandles(in rect: CGRect) {
         NSColor.white.setFill()
         NSColor.black.withAlphaComponent(0.45).setStroke()
@@ -956,6 +1050,19 @@ private final class RegionSelectionView: NSView {
             path.fill()
             path.stroke()
         }
+    }
+
+    private func drawAutoSelectionCandidate(_ rect: CGRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+        NSColor.clear.setFill()
+        rect.fill(using: .clear)
+        NSColor.systemBlue.withAlphaComponent(0.95).setStroke()
+        path.lineWidth = 2
+        path.stroke()
+
+        NSColor.systemBlue.withAlphaComponent(0.12).setFill()
+        path.fill()
+        drawSizeBadge(for: rect)
     }
 
     private func drawSizeBadge(for rect: CGRect) {
