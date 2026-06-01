@@ -7,9 +7,18 @@ private let mainWindowIdentifier = NSUserInterfaceItemIdentifier("ClipPixTran.Ma
 enum AppWindowPresenter {
     private static weak var mainWindow: NSWindow?
 
+    static var hasVisibleMainWindow: Bool {
+        guard let window = mainWindowIfAvailable() else {
+            return false
+        }
+
+        return window.isVisible && !window.isMiniaturized
+    }
+
     static func registerMainWindow(_ window: NSWindow) {
         mainWindow = window
         window.identifier = mainWindowIdentifier
+        AppDockIconController.shared.updateActivationPolicy()
     }
 
     @discardableResult
@@ -18,15 +27,18 @@ enum AppWindowPresenter {
             return false
         }
 
+        NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
         let window = mainWindowIfAvailable()
 
         guard let window else {
+            AppDockIconController.shared.updateActivationPolicy()
             return false
         }
 
         window.deminiaturize(nil)
         window.makeKeyAndOrderFront(nil)
+        AppDockIconController.shared.updateActivationPolicy()
         return true
     }
 
@@ -59,6 +71,10 @@ struct MainWindowRegistrationView: NSViewRepresentable {
 
         AppWindowPresenter.registerMainWindow(window)
     }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        NotificationCenter.default.removeObserver(nsView)
+    }
 }
 
 private final class MainWindowRegistrationNSView: NSView {
@@ -70,5 +86,32 @@ private final class MainWindowRegistrationNSView: NSView {
         }
 
         AppWindowPresenter.registerMainWindow(window)
+        observeWindowLifecycle(window)
+    }
+
+    private func observeWindowLifecycle(_ window: NSWindow) {
+        NotificationCenter.default.removeObserver(self)
+
+        let notifications: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didMiniaturizeNotification,
+            NSWindow.didDeminiaturizeNotification,
+            NSWindow.didChangeOcclusionStateNotification,
+            NSWindow.willCloseNotification
+        ]
+        for notification in notifications {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowVisibilityChanged),
+                name: notification,
+                object: window
+            )
+        }
+    }
+
+    @objc private func windowVisibilityChanged() {
+        DispatchQueue.main.async {
+            AppDockIconController.shared.updateActivationPolicy()
+        }
     }
 }

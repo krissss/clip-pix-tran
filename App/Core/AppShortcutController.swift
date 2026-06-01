@@ -49,15 +49,41 @@ final class AppShortcutController {
         tasks.removeAll()
     }
 
+    func showClip() {
+        openSection?(.clip)
+    }
+
+    func showClipboardQuickPanel() {
+        clipboardQuickPanelPresenter.toggle(monitor: clipboardMonitor)
+    }
+
+    func captureSelectedRegion() {
+        Task {
+            await screenshotController.captureSelectedRegion()
+        }
+    }
+
+    func translateSelectedText() {
+        Task {
+            await performTranslateSelectedText()
+        }
+    }
+
+    func translateClipboardText() {
+        Task {
+            await performTranslateClipboardText()
+        }
+    }
+
     private func observeShowClipShortcut() async {
         for await event in KeyboardShortcuts.events(for: .showClip) where event == .keyUp {
-            openSection?(.clip)
+            showClip()
         }
     }
 
     private func observeClipboardQuickPanelShortcut() async {
         for await event in KeyboardShortcuts.events(for: .showClipboardQuickPanel) where event == .keyUp {
-            clipboardQuickPanelPresenter.toggle(monitor: clipboardMonitor)
+            showClipboardQuickPanel()
         }
     }
 
@@ -69,35 +95,43 @@ final class AppShortcutController {
 
     private func observeTranslateSelectedTextShortcut() async {
         for await event in KeyboardShortcuts.events(for: .translateSelectedText) where event == .keyUp {
-            translationController.prefillSourceText("")
-
-            guard let text = await textSelectionService.selectedText() else {
-                translationQuickPanelPresenter.show(
-                    controller: translationController,
-                    sourceText: nil,
-                    errorMessage: TextSelectionError.noSelection.localizedDescription
-                )
-                continue
-            }
-
-            translationController.prefillSourceText(text)
-            translationQuickPanelPresenter.show(
-                controller: translationController,
-                sourceText: text
-            )
-            await translationController.translate()
+            await performTranslateSelectedText()
         }
     }
 
     private func observeTranslateClipboardShortcut() async {
         for await event in KeyboardShortcuts.events(for: .translateClipboardText) where event == .keyUp {
-            guard let text = SystemClipboardService().readPlainText() else {
-                continue
-            }
-
-            translationController.prefillSourceText(text)
-            openSection?(.tran)
-            await translationController.translate()
+            await performTranslateClipboardText()
         }
+    }
+
+    private func performTranslateSelectedText() async {
+        translationController.prefillSourceText("")
+
+        guard let text = await textSelectionService.selectedText() else {
+            translationQuickPanelPresenter.show(
+                controller: translationController,
+                sourceText: nil,
+                errorMessage: TextSelectionError.noSelection.localizedDescription
+            )
+            return
+        }
+
+        translationController.prefillSourceText(text)
+        translationQuickPanelPresenter.show(
+            controller: translationController,
+            sourceText: text
+        )
+        await translationController.translate()
+    }
+
+    private func performTranslateClipboardText() async {
+        guard let text = SystemClipboardService().readPlainText() else {
+            return
+        }
+
+        translationController.prefillSourceText(text)
+        openSection?(.tran)
+        await translationController.translate()
     }
 }

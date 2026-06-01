@@ -5,7 +5,8 @@ struct AppSettingsView: View {
     @Bindable var clipboardHistory: ClipboardHistoryStore
     @Bindable var screenshotHistory: ScreenshotHistoryStore
     @Bindable var translationController: TranslationController
-    @State private var selectedPane: SettingsPane = .shortcuts
+    @Bindable var dockIconPreference: DockIconPreference
+    @State private var selectedPane: SettingsPane = .general
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +37,8 @@ struct AppSettingsView: View {
     @ViewBuilder
     private var selectedPaneView: some View {
         switch selectedPane {
+        case .general:
+            GeneralSettingsSection(preference: dockIconPreference)
         case .shortcuts:
             ShortcutsSettingsSection()
         case .clip:
@@ -51,6 +54,7 @@ struct AppSettingsView: View {
 }
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
+    case general
     case shortcuts
     case clip
     case pix
@@ -61,6 +65,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .general:
+            "通用"
         case .shortcuts:
             "快捷键"
         case .clip:
@@ -76,6 +82,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .general:
+            "slider.horizontal.3"
         case .shortcuts:
             "keyboard"
         case .clip:
@@ -89,6 +97,34 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         }
     }
 
+}
+
+private struct GeneralSettingsSection: View {
+    @Bindable var preference: DockIconPreference
+    @State private var hidesDockIconWhenMainWindowClosed: Bool
+
+    init(preference: DockIconPreference) {
+        self.preference = preference
+        self._hidesDockIconWhenMainWindowClosed = State(
+            initialValue: preference.hidesDockIconWhenMainWindowClosed
+        )
+    }
+
+    var body: some View {
+        SettingsGroup(title: "Dock") {
+            VStack(spacing: 0) {
+                toggleRow(
+                    "关闭主窗口后隐藏 Dock 图标",
+                    isOn: $hidesDockIconWhenMainWindowClosed
+                ) { newValue in
+                    preference.updateHidesDockIconWhenMainWindowClosed(newValue)
+                }
+            }
+            .settingsRowGroup()
+        }
+
+        SettingsFootnote("开启后，关闭主窗口时应用会留在菜单栏；从菜单栏打开主窗口时会临时恢复 Dock 图标。")
+    }
 }
 
 private struct SettingsPaneToolbar: View {
@@ -110,7 +146,7 @@ private struct SettingsPaneToolbar: View {
                             .font(.caption)
                     }
                     .foregroundStyle(selectedPane == pane ? Color.accentColor : Color.secondary)
-                    .frame(width: 74, height: 30)
+                    .frame(width: 62, height: 30)
                     .controlPanelRoundedSurface(
                         background: ControlPanelDesign.selectedFill(
                             tint: Color.accentColor,
@@ -151,19 +187,17 @@ private struct ShortcutsSettingsSection: View {
     var body: some View {
         SettingsGroup(title: "全局快捷键") {
             VStack(spacing: 0) {
-                shortcutRow(title: "打开 Clip", name: .showClip)
-                shortcutRow(title: "剪贴板快速面板", name: .showClipboardQuickPanel)
-                shortcutRow(title: "区域截图", name: .captureSelectedRegion)
-                shortcutRow(title: "翻译选中文本", name: .translateSelectedText)
-                shortcutRow(title: "翻译剪贴板文本", name: .translateClipboardText)
+                ForEach(AppKeyboardShortcut.all) { shortcut in
+                    shortcutRow(shortcut)
+                }
             }
             .settingsRowGroup()
         }
     }
 
-    private func shortcutRow(title: String, name: KeyboardShortcuts.Name) -> some View {
-        SettingsFormRow(title: title) {
-            KeyboardShortcuts.Recorder("", name: name)
+    private func shortcutRow(_ shortcut: AppKeyboardShortcut) -> some View {
+        SettingsFormRow(title: shortcut.title) {
+            KeyboardShortcuts.Recorder("", name: shortcut.name)
                 .labelsHidden()
         }
     }
@@ -603,6 +637,7 @@ private func historyLimitRow(
             history: .preview,
             translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
-        )
+        ),
+        dockIconPreference: DockIconPreference()
     )
 }

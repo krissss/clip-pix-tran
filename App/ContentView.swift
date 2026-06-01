@@ -9,7 +9,6 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.openWindow) private var openWindow
 
     @Bindable var clipboardMonitor: ClipboardMonitor
     @Bindable var screenshotController: ScreenshotController
@@ -28,17 +27,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(ControlPanelBackground())
         .background(MainWindowRegistrationView())
-        .onAppear {
-            shortcutController.openSection = { section in
-                selectedSection = section
-                if !AppWindowPresenter.bringMainWindowForward() {
-                    openWindow(id: "main")
-                    DispatchQueue.main.async {
-                        AppWindowPresenter.bringMainWindowForward()
-                    }
-                }
-            }
-        }
     }
 
     private var mainSidebar: some View {
