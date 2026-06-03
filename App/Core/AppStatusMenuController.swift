@@ -35,11 +35,6 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         rebuildMenu()
-        KeyboardShortcuts.disable(AppKeyboardShortcut.all.map(\.name))
-    }
-
-    func menuDidClose(_ menu: NSMenu) {
-        KeyboardShortcuts.enable(AppKeyboardShortcut.all.map(\.name))
     }
 
     func openMainWindow() {

@@ -12,14 +12,18 @@ final class RegionSelectionOverlay {
     private var windows: [NSWindow] = []
     private var selectionViews: [RegionSelectionView] = []
     private var keyMonitor: Any?
+    private var globalKeyMonitor: Any?
+    private var cancelEventTap: RegionSelectionCancelEventTap?
     private var resignObserver: NSObjectProtocol?
     private var didFinish = false
     private var activeBaseCaptureID: UUID?
     private let captureProvider: CaptureProvider
+    private let initialSnapshots: [ScreenCaptureSnapshot]
     private let autoSelectionDetector: ScreenshotAutoSelectionDetecting
     private let annotationStore = ScreenshotAnnotationStore()
 
     static func capture(
+        initialSnapshots: [ScreenCaptureSnapshot] = [],
         autoSelectionDetector: ScreenshotAutoSelectionDetecting? = nil,
         captureProvider: @escaping CaptureProvider
     ) async throws -> ScreenshotCaptureOutput {
@@ -27,6 +31,7 @@ final class RegionSelectionOverlay {
             try await withCheckedThrowingContinuation { continuation in
                 let overlay = RegionSelectionOverlay(
                     continuation: continuation,
+                    initialSnapshots: initialSnapshots,
                     autoSelectionDetector: autoSelectionDetector,
                     captureProvider: captureProvider
                 )
@@ -46,10 +51,12 @@ final class RegionSelectionOverlay {
 
     private init(
         continuation: CheckedContinuation<ScreenshotCaptureOutput, Error>,
+        initialSnapshots: [ScreenCaptureSnapshot],
         autoSelectionDetector: ScreenshotAutoSelectionDetecting?,
         captureProvider: @escaping CaptureProvider
     ) {
         self.continuation = continuation
+        self.initialSnapshots = initialSnapshots
         self.autoSelectionDetector = autoSelectionDetector ?? SystemScreenshotAutoSelectionDetector()
         self.captureProvider = captureProvider
     }
@@ -65,6 +72,7 @@ final class RegionSelectionOverlay {
             let view = RegionSelectionView(
                 screenFrame: screen.frame,
                 screenScale: screen.backingScaleFactor,
+                initialSnapshot: initialSnapshots.bestSnapshot(for: screen.frame),
                 annotationStore: annotationStore,
                 actions: RegionSelectionActions(
                     finish: { [weak self] completion in
@@ -111,6 +119,9 @@ final class RegionSelectionOverlay {
             window.acceptsMouseMovedEvents = true
             window.isReleasedWhenClosed = false
             window.isExcludedFromWindowsMenu = true
+            window.cancelHandler = { [weak self] in
+                self?.cancel()
+            }
             window.orderFrontRegardless()
             window.makeKey()
             window.makeFirstResponder(view)
@@ -121,14 +132,27 @@ final class RegionSelectionOverlay {
     }
 
     private func installMonitors() {
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        cancelEventTap = RegionSelectionCancelEventTap { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.cancel()
+            }
+        }
+
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .rightMouseDown]) { [weak self] event in
             guard let self else {
                 return event
             }
 
+            if event.type == .rightMouseDown {
+                Task { @MainActor [weak self] in
+                    self?.cancel()
+                }
+                return nil
+            }
+
             if event.keyCode == 53 {
                 Task { @MainActor [weak self] in
-                    self?.finish(.failure(ScreenshotCaptureError.cancelled))
+                    self?.cancel()
                 }
                 return nil
             }
@@ -156,6 +180,16 @@ final class RegionSelectionOverlay {
             return event
         }
 
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else {
+                return
+            }
+
+            Task { @MainActor [weak self] in
+                self?.cancel()
+            }
+        }
+
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil,
@@ -173,10 +207,21 @@ final class RegionSelectionOverlay {
             self.keyMonitor = nil
         }
 
+        if let globalKeyMonitor {
+            NSEvent.removeMonitor(globalKeyMonitor)
+            self.globalKeyMonitor = nil
+        }
+
+        cancelEventTap = nil
+
         if let resignObserver {
             NotificationCenter.default.removeObserver(resignObserver)
             self.resignObserver = nil
         }
+    }
+
+    private func cancel() {
+        finish(.failure(ScreenshotCaptureError.cancelled))
     }
 
     private func complete(completion: ScreenshotCaptureCompletion) {
@@ -196,6 +241,8 @@ final class RegionSelectionOverlay {
                 let baseData: Data
                 if let cachedBaseData = selection.basePNGData {
                     baseData = cachedBaseData
+                } else if let snapshotBaseData = try selection.snapshot?.pngData(in: selection.rect) {
+                    baseData = snapshotBaseData
                 } else {
                     baseData = try await captureProvider(
                         selection.rect,
@@ -343,15 +390,105 @@ private struct RegionSelectionActions {
 private struct RegionSelectionSnapshot {
     let rect: CGRect
     let basePNGData: Data?
+    let snapshot: ScreenCaptureSnapshot?
+}
+
+private final class RegionSelectionCancelEventTap {
+    private let action: @MainActor () -> Void
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+
+    init(action: @escaping @MainActor () -> Void) {
+        self.action = action
+        install()
+    }
+
+    deinit {
+        uninstall()
+    }
+
+    private func install() {
+        guard CGPreflightListenEventAccess() else {
+            return
+        }
+
+        let mask = (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.rightMouseDown.rawValue)
+        let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        guard let eventTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(mask),
+            callback: Self.handleEvent,
+            userInfo: userInfo
+        ) else {
+            return
+        }
+
+        let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+
+        self.eventTap = eventTap
+        self.runLoopSource = runLoopSource
+    }
+
+    private func uninstall() {
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+        }
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+    }
+
+    private static let handleEvent: CGEventTapCallBack = { _, type, event, userInfo in
+        guard let userInfo else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let monitor = Unmanaged<RegionSelectionCancelEventTap>
+            .fromOpaque(userInfo)
+            .takeUnretainedValue()
+
+        return monitor.handle(type: type, event: event)
+    }
+
+    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .rightMouseDown || type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
+            Task { @MainActor [action] in
+                action()
+            }
+            return nil
+        }
+
+        return Unmanaged.passUnretained(event)
+    }
 }
 
 private final class RegionSelectionWindow: NSPanel {
+    var cancelHandler: (() -> Void)?
+
     override var canBecomeKey: Bool {
         true
     }
 
     override var canBecomeMain: Bool {
         false
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .keyDown where event.keyCode == 53:
+            cancelHandler?()
+        case .rightMouseDown:
+            cancelHandler?()
+        default:
+            super.sendEvent(event)
+        }
     }
 }
 
@@ -470,6 +607,7 @@ private final class RegionSelectionView: NSView {
 
     private let screenFrame: CGRect
     private let screenScale: CGFloat
+    private let initialSnapshot: ScreenCaptureSnapshot?
     private let annotationStore: ScreenshotAnnotationStore
     private let actions: RegionSelectionActions
     private var selectionRect: CGRect?
@@ -496,18 +634,21 @@ private final class RegionSelectionView: NSView {
         return RegionSelectionSnapshot(
             rect: screenRect,
             basePNGData: shouldDrawCapturedBaseImage
-                && baseImage?.screenRect.isApproximatelyEqual(to: screenRect) == true ? baseImage?.pngData : nil
+                && baseImage?.screenRect.isApproximatelyEqual(to: screenRect) == true ? baseImage?.pngData : nil,
+            snapshot: initialSnapshot
         )
     }
 
     init(
         screenFrame: CGRect,
         screenScale: CGFloat,
+        initialSnapshot: ScreenCaptureSnapshot?,
         annotationStore: ScreenshotAnnotationStore,
         actions: RegionSelectionActions
     ) {
         self.screenFrame = screenFrame
         self.screenScale = max(screenScale, 1)
+        self.initialSnapshot = initialSnapshot
         self.annotationStore = annotationStore
         self.actions = actions
         super.init(frame: CGRect(origin: .zero, size: screenFrame.size))
@@ -545,6 +686,10 @@ private final class RegionSelectionView: NSView {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        actions.cancel()
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -732,13 +877,10 @@ private final class RegionSelectionView: NSView {
             return
         }
 
-        NSColor.black.withAlphaComponent(0.32).setFill()
-        bounds.fill()
+        drawDimmedBackground()
 
         if let selectionRect {
-            NSColor.clear.setFill()
-            selectionRect.fill(using: .clear)
-            drawBaseImage(in: selectionRect)
+            drawUndimmedBackground(in: selectionRect)
 
             NSColor.white.withAlphaComponent(0.95).setStroke()
             let path = NSBezierPath(rect: selectionRect)
@@ -749,8 +891,46 @@ private final class RegionSelectionView: NSView {
             drawSizeBadge(for: selectionRect)
             drawAnnotations(in: selectionRect)
         } else if let autoSelectionCandidateRect {
+            drawUndimmedBackground(in: autoSelectionCandidateRect)
             drawAutoSelectionCandidate(autoSelectionCandidateRect)
         }
+    }
+
+    private func drawDimmedBackground() {
+        if !drawFullInitialSnapshotIfNeeded() {
+            NSColor.black.withAlphaComponent(0.32).setFill()
+            bounds.fill()
+        }
+    }
+
+    private func drawFullInitialSnapshotIfNeeded() -> Bool {
+        guard let initialSnapshot,
+              let croppedImage = initialSnapshot.croppedImage(in: screenFrame) else {
+            return false
+        }
+
+        NSGraphicsContext.current?.imageInterpolation = .none
+        NSImage(cgImage: croppedImage, size: bounds.size).draw(
+            in: bounds,
+            from: CGRect(origin: .zero, size: bounds.size),
+            operation: .sourceOver,
+            fraction: 1
+        )
+
+        NSColor.black.withAlphaComponent(0.32).setFill()
+        bounds.fill()
+        return true
+    }
+
+    private func drawUndimmedBackground(in rect: CGRect) {
+        if let initialSnapshot {
+            drawInitialSnapshot(initialSnapshot, in: rect)
+        } else {
+            NSColor.clear.setFill()
+            rect.fill(using: .clear)
+        }
+
+        drawBaseImage(in: rect)
     }
 
     func prepareForCapture() {
@@ -987,6 +1167,12 @@ private final class RegionSelectionView: NSView {
             return
         }
 
+        if let initialSnapshot,
+           let snapshotData = try? initialSnapshot.pngData(in: screenRect) {
+            setBaseImageData(snapshotData, for: screenRect)
+            return
+        }
+
         actions.requestBaseImageCapture(self, screenRect)
     }
 
@@ -1004,6 +1190,20 @@ private final class RegionSelectionView: NSView {
         baseImage.nsImage.draw(
             in: selectionRect,
             from: CGRect(origin: .zero, size: baseImage.nsImage.size),
+            operation: .sourceOver,
+            fraction: 1
+        )
+    }
+
+    private func drawInitialSnapshot(_ snapshot: ScreenCaptureSnapshot, in selectionRect: CGRect) {
+        guard let croppedImage = snapshot.croppedImage(in: screenRect(fromLocalRect: selectionRect)) else {
+            return
+        }
+
+        NSGraphicsContext.current?.imageInterpolation = .none
+        NSImage(cgImage: croppedImage, size: selectionRect.size).draw(
+            in: selectionRect,
+            from: CGRect(origin: .zero, size: selectionRect.size),
             operation: .sourceOver,
             fraction: 1
         )
@@ -1054,8 +1254,6 @@ private final class RegionSelectionView: NSView {
 
     private func drawAutoSelectionCandidate(_ rect: CGRect) {
         let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
-        NSColor.clear.setFill()
-        rect.fill(using: .clear)
         NSColor.systemBlue.withAlphaComponent(0.95).setStroke()
         path.lineWidth = 2
         path.stroke()
@@ -1462,6 +1660,19 @@ private extension CGRect {
             width: max(maxX - minX, minimumSize),
             height: max(maxY - minY, minimumSize)
         )
+    }
+}
+
+private extension [ScreenCaptureSnapshot] {
+    func bestSnapshot(for screenFrame: CGRect) -> ScreenCaptureSnapshot? {
+        guard let snapshot = self.max(by: { first, second in
+            first.screenFrame.intersection(screenFrame).area < second.screenFrame.intersection(screenFrame).area
+        }),
+        snapshot.screenFrame.intersection(screenFrame).area > 0 else {
+            return nil
+        }
+
+        return snapshot
     }
 }
 

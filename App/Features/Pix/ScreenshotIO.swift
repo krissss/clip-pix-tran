@@ -77,12 +77,21 @@ struct SystemScreenshotService: ScreenshotService {
     }
 
     nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
-        try await RegionSelectionOverlay.capture { rect, excludedWindowIDs in
+        let snapshots = await captureDisplaySnapshotsBestEffort()
+        return try await RegionSelectionOverlay.capture(initialSnapshots: snapshots) { rect, excludedWindowIDs in
             try Task.checkCancellation()
             return try await capturePNGData(
                 in: rect,
                 excludingWindowIDs: excludedWindowIDs
             )
+        }
+    }
+
+    nonisolated private func captureDisplaySnapshotsBestEffort() async -> [ScreenCaptureSnapshot] {
+        do {
+            return try await captureDisplaySnapshots()
+        } catch {
+            return []
         }
     }
 
@@ -110,6 +119,114 @@ struct SystemScreenshotService: ScreenshotService {
 
         let shareableContent = try await loadShareableContent()
         let screenRegion = try await screenRegion(for: rect)
+        return try await captureDisplayImage(
+            in: screenRegion,
+            excludingWindowIDs: excludingWindowIDs,
+            shareableContent: shareableContent
+        )
+    }
+
+    nonisolated private func captureDisplaySnapshots() async throws -> [ScreenCaptureSnapshot] {
+        try await ensureScreenCaptureAccess()
+
+        if let snapshots = try await captureDisplaySnapshotsWithScreenRectCapture(),
+           !snapshots.isEmpty {
+            return snapshots
+        }
+
+        let shareableContent = try await loadShareableContent()
+        let regions = try await screenRegionsForAllScreens()
+        var snapshots: [ScreenCaptureSnapshot] = []
+        snapshots.reserveCapacity(regions.count)
+
+        for region in regions {
+            do {
+                let image = try await captureDisplayImage(
+                    in: region,
+                    excludingWindowIDs: [],
+                    shareableContent: shareableContent
+                )
+                snapshots.append(
+                    ScreenCaptureSnapshot(
+                        screenFrame: region.screenFrame,
+                        displayID: region.displayID,
+                        image: image
+                    )
+                )
+            } catch {
+                continue
+            }
+        }
+
+        return snapshots
+    }
+
+    nonisolated private func captureDisplaySnapshotsWithScreenRectCapture() async throws -> [ScreenCaptureSnapshot]? {
+        let regions = try await screenRegionsForAllScreens()
+        guard !regions.isEmpty else {
+            return nil
+        }
+
+        var snapshots: [ScreenCaptureSnapshot] = []
+        snapshots.reserveCapacity(regions.count)
+
+        for region in regions {
+            do {
+                let image = try await captureScreenRectImage(in: region.rect)
+                snapshots.append(
+                    ScreenCaptureSnapshot(
+                        screenFrame: region.screenFrame,
+                        displayID: region.displayID,
+                        image: image
+                    )
+                )
+            } catch {
+                return nil
+            }
+        }
+
+        return snapshots
+    }
+
+    nonisolated private func captureScreenRectImage(in rect: CGRect) async throws -> CGImage {
+        let configuration = SCScreenshotConfiguration()
+        configuration.showsCursor = false
+        configuration.dynamicRange = .sdr
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let continuationBox = ScreenshotContinuationBox(continuation)
+            let timeoutTask = Task.detached(priority: .userInitiated) {
+                do {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                } catch {
+                    return
+                }
+
+                continuationBox.resume(.failure(ScreenshotCaptureError.timedOut))
+            }
+
+            SCScreenshotManager.captureScreenshot(
+                rect: rect.standardized,
+                configuration: configuration
+            ) { output, error in
+                timeoutTask.cancel()
+
+                if let image = output?.sdrImage {
+                    continuationBox.resume(.success(image))
+                } else if let error {
+                    continuationBox.resume(.failure(mapCaptureError(error)))
+                } else {
+                    continuationBox.resume(.failure(ScreenshotCaptureError.unavailable))
+                }
+            }
+        }
+    }
+
+    nonisolated private func captureDisplayImage(
+        in screenRegion: ScreenCaptureRegion,
+        excludingWindowIDs: Set<CGWindowID>,
+        shareableContent: SCShareableContent
+    ) async throws -> CGImage {
         let targetDisplay = try display(
             matching: screenRegion.displayID,
             in: shareableContent.displays
@@ -128,8 +245,8 @@ struct SystemScreenshotService: ScreenshotService {
         let filter = SCContentFilter(display: targetDisplay, excludingWindows: excludedWindows)
         let configuration = SCStreamConfiguration()
         configuration.sourceRect = sourceRect
-        configuration.width = Int(sourceRect.width * CGFloat(filter.pointPixelScale))
-        configuration.height = Int(sourceRect.height * CGFloat(filter.pointPixelScale))
+        configuration.width = max(Int(sourceRect.width * CGFloat(filter.pointPixelScale)), 1)
+        configuration.height = max(Int(sourceRect.height * CGFloat(filter.pointPixelScale)), 1)
         configuration.showsCursor = false
         configuration.queueDepth = 1
 
@@ -158,6 +275,24 @@ struct SystemScreenshotService: ScreenshotService {
                 } else {
                     continuationBox.resume(.failure(ScreenshotCaptureError.unavailable))
                 }
+            }
+        }
+    }
+
+    nonisolated private func screenRegionsForAllScreens() async throws -> [ScreenCaptureRegion] {
+        try await MainActor.run {
+            try NSScreen.screens.map { screen in
+                guard let displayID = screen.deviceDescription[
+                    NSDeviceDescriptionKey("NSScreenNumber")
+                ] as? CGDirectDisplayID else {
+                    throw ScreenshotCaptureError.displayNotFound
+                }
+
+                return ScreenCaptureRegion(
+                    rect: screen.frame.standardized,
+                    screenFrame: screen.frame,
+                    displayID: displayID
+                )
             }
         }
     }
@@ -257,6 +392,83 @@ struct ScreenCaptureRegion: Sendable {
     let rect: CGRect
     let screenFrame: CGRect
     let displayID: CGDirectDisplayID
+}
+
+struct ScreenCaptureSnapshot: @unchecked Sendable {
+    let screenFrame: CGRect
+    let displayID: CGDirectDisplayID
+    let image: CGImage
+
+    nonisolated func croppedImage(in rect: CGRect) -> CGImage? {
+        guard let pixelRect = cropPixelRect(in: rect) else {
+            return nil
+        }
+
+        return image.cropping(to: pixelRect)
+    }
+
+    nonisolated func pngData(in rect: CGRect) throws -> Data {
+        guard let croppedImage = croppedImage(in: rect) else {
+            throw ScreenshotCaptureError.unavailable
+        }
+
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw ScreenshotCaptureError.pngEncodingFailed
+        }
+
+        CGImageDestinationAddImage(destination, croppedImage, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw ScreenshotCaptureError.pngEncodingFailed
+        }
+
+        return data as Data
+    }
+
+    nonisolated func cropPixelRect(in rect: CGRect) -> CGRect? {
+        let screenRect = rect.standardized.intersection(screenFrame)
+        guard !screenRect.isNull,
+              screenRect.width > 0,
+              screenRect.height > 0,
+              screenFrame.width > 0,
+              screenFrame.height > 0 else {
+            return nil
+        }
+
+        let sourceRect = ScreenCaptureCoordinateConverter.sourceRect(
+            for: ScreenCaptureRegion(
+                rect: screenRect,
+                screenFrame: screenFrame,
+                displayID: displayID
+            )
+        )
+        let scaleX = CGFloat(image.width) / screenFrame.width
+        let scaleY = CGFloat(image.height) / screenFrame.height
+        let minX = floor(sourceRect.minX * scaleX)
+        let minY = floor(sourceRect.minY * scaleY)
+        let maxX = ceil(sourceRect.maxX * scaleX)
+        let maxY = ceil(sourceRect.maxY * scaleY)
+        let pixelRect = CGRect(
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        )
+        .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+
+        guard !pixelRect.isNull,
+              pixelRect.width > 0,
+              pixelRect.height > 0 else {
+            return nil
+        }
+
+        return pixelRect
+    }
 }
 
 enum ScreenCaptureCoordinateConverter {
