@@ -6,6 +6,7 @@ struct ClipView: View {
 
     @State private var searchText = ""
     @State private var selectedItemID: ClipboardItem.ID?
+    @State private var showsClearHistoryConfirmation = false
 
     private var visibleItems: [ClipboardItem] {
         monitor.history.filteredItems(matching: searchText)
@@ -37,6 +38,19 @@ struct ClipView: View {
         .onAppear(perform: selectFirstVisibleItemIfNeeded)
         .onChange(of: visibleItems.map(\.id)) { _, _ in
             selectFirstVisibleItemIfNeeded()
+        }
+        .confirmationDialog(
+            "清空剪贴板历史？",
+            isPresented: $showsClearHistoryConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("清空历史", role: .destructive) {
+                clearHistory()
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这会删除全部剪贴板历史记录，无法撤销。")
         }
     }
 
@@ -115,7 +129,9 @@ struct ClipView: View {
 
             Spacer()
 
-            Button(role: .destructive, action: monitor.clearHistory) {
+            Button(role: .destructive) {
+                showsClearHistoryConfirmation = true
+            } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
@@ -256,6 +272,11 @@ struct ClipView: View {
 
     private func delete(_ item: ClipboardItem) {
         monitor.history.delete(item)
+        selectFirstVisibleItemIfNeeded()
+    }
+
+    private func clearHistory() {
+        monitor.clearHistory()
         selectFirstVisibleItemIfNeeded()
     }
 

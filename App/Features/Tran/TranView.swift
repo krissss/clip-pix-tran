@@ -3,6 +3,7 @@ import SwiftUI
 struct TranView: View {
     @Bindable var controller: TranslationController
     @State private var historySearchText = ""
+    @State private var showsClearHistoryConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,6 +13,19 @@ struct TranView: View {
         }
         .navigationTitle("Tran")
         .background(ControlPanelBackground())
+        .confirmationDialog(
+            "清空翻译历史？",
+            isPresented: $showsClearHistoryConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("清空历史", role: .destructive) {
+                controller.clearHistory()
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这会删除全部翻译历史记录，无法撤销。")
+        }
     }
 
     private var editor: some View {
@@ -337,7 +351,9 @@ struct TranView: View {
 
             Spacer()
 
-            Button(role: .destructive, action: controller.clearHistory) {
+            Button(role: .destructive) {
+                showsClearHistoryConfirmation = true
+            } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))

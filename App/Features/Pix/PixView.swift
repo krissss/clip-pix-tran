@@ -6,6 +6,7 @@ struct PixView: View {
 
     @State private var selectedItemID: ScreenshotItem.ID?
     @State private var searchText = ""
+    @State private var showsClearHistoryConfirmation = false
 
     private var visibleItems: [ScreenshotItem] {
         controller.history.items.filtered(matching: searchText)
@@ -37,6 +38,19 @@ struct PixView: View {
         .onAppear(perform: selectFirstVisibleItemIfNeeded)
         .onChange(of: visibleItems.map(\.id)) { _, _ in
             selectFirstVisibleItemIfNeeded()
+        }
+        .confirmationDialog(
+            "清空截图历史？",
+            isPresented: $showsClearHistoryConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("清空历史", role: .destructive) {
+                clearHistory()
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这会删除全部截图历史记录，无法撤销。")
         }
     }
 
@@ -125,7 +139,9 @@ struct PixView: View {
 
             Spacer()
 
-            Button(role: .destructive, action: clearHistory) {
+            Button(role: .destructive) {
+                showsClearHistoryConfirmation = true
+            } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
