@@ -65,18 +65,10 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        addHeader()
-        menu.addItem(.separator())
-
-        addPlainItem(
-            title: "打开主窗口",
+        addShortcutItem(
+            shortcut: .showMainWindow,
             systemImage: "macwindow",
             action: #selector(openMainWindowMenuItem)
-        )
-        addShortcutItem(
-            shortcut: .showClip,
-            systemImage: "doc.on.clipboard",
-            action: #selector(showClip)
         )
         addShortcutItem(
             shortcut: .showClipboardQuickPanel,
@@ -93,11 +85,6 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
             systemImage: "text.viewfinder",
             action: #selector(translateSelectedText)
         )
-        addShortcutItem(
-            shortcut: .translateClipboardText,
-            systemImage: "text.bubble",
-            action: #selector(translateClipboardText)
-        )
 
         menu.addItem(.separator())
         addPlainItem(
@@ -113,18 +100,6 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
             keyEquivalent: "q",
             action: #selector(quit)
         )
-    }
-
-    private func addHeader() {
-        let title = [
-            "Clip \(clipboardMonitor?.history.items.count ?? 0)",
-            "Pix \(screenshotController?.history.items.count ?? 0)",
-            "Tran \(translationController?.history.items.count ?? 0)"
-        ].joined(separator: "    ")
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.image = menuImage(systemName: "sparkles.rectangle.stack")
-        item.isEnabled = false
-        menu.addItem(item)
     }
 
     private func addShortcutItem(
@@ -161,10 +136,6 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         return image
     }
 
-    @objc private func showClip() {
-        shortcutController?.showClip()
-    }
-
     @objc private func showClipboardQuickPanel() {
         shortcutController?.showClipboardQuickPanel()
     }
@@ -177,12 +148,8 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         shortcutController?.translateSelectedText()
     }
 
-    @objc private func translateClipboardText() {
-        shortcutController?.translateClipboardText()
-    }
-
     @objc private func openMainWindowMenuItem() {
-        openMainWindow()
+        shortcutController?.showMainWindow()
     }
 
     @objc private func openSettings() {

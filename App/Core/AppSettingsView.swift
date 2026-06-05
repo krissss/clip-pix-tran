@@ -256,7 +256,7 @@ private struct PixSettingsSection: View {
                 historyLimitRow(
                     title: "截图历史上限",
                     value: $maximumItems,
-                    range: 5...50,
+                    range: 5...200,
                     step: 5
                 ) { newValue in
                     history.updateLimit(Int(newValue))

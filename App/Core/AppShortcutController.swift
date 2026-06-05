@@ -13,6 +13,7 @@ final class AppShortcutController {
     private var tasks: [Task<Void, Never>] = []
     private var captureShortcutEventTap: CaptureShortcutEventTap?
     var openSection: ((AppSection) -> Void)?
+    var openMainWindow: (() -> Void)?
 
     init(
         clipboardMonitor: ClipboardMonitor,
@@ -38,11 +39,10 @@ final class AppShortcutController {
         }
 
         tasks = [
-            Task { await observeShowClipShortcut() },
+            Task { await observeShowMainWindowShortcut() },
             Task { await observeClipboardQuickPanelShortcut() },
             Task { await observeCaptureSelectedRegionShortcut() },
-            Task { await observeTranslateSelectedTextShortcut() },
-            Task { await observeTranslateClipboardShortcut() }
+            Task { await observeTranslateSelectedTextShortcut() }
         ]
         installCaptureShortcutEventTap()
     }
@@ -53,8 +53,8 @@ final class AppShortcutController {
         captureShortcutEventTap = nil
     }
 
-    func showClip() {
-        openSection?(.clip)
+    func showMainWindow() {
+        openMainWindow?()
     }
 
     func showClipboardQuickPanel() {
@@ -73,15 +73,9 @@ final class AppShortcutController {
         }
     }
 
-    func translateClipboardText() {
-        Task {
-            await performTranslateClipboardText()
-        }
-    }
-
-    private func observeShowClipShortcut() async {
-        for await event in KeyboardShortcuts.events(for: .showClip) where event == .keyUp {
-            showClip()
+    private func observeShowMainWindowShortcut() async {
+        for await event in KeyboardShortcuts.events(for: .showMainWindow) where event == .keyUp {
+            showMainWindow()
         }
     }
 
@@ -111,12 +105,6 @@ final class AppShortcutController {
         }
     }
 
-    private func observeTranslateClipboardShortcut() async {
-        for await event in KeyboardShortcuts.events(for: .translateClipboardText) where event == .keyUp {
-            await performTranslateClipboardText()
-        }
-    }
-
     private func performTranslateSelectedText() async {
         translationController.prefillSourceText("")
 
@@ -134,16 +122,6 @@ final class AppShortcutController {
             controller: translationController,
             sourceText: text
         )
-        await translationController.translate()
-    }
-
-    private func performTranslateClipboardText() async {
-        guard let text = SystemClipboardService().readPlainText() else {
-            return
-        }
-
-        translationController.prefillSourceText(text)
-        openSection?(.tran)
         await translationController.translate()
     }
 }

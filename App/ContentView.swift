@@ -37,8 +37,7 @@ struct ContentView: View {
                 ForEach(AppSection.allCases) { section in
                     SidebarSectionButton(
                         section: section,
-                        isSelected: selectedSection == section,
-                        countText: sidebarCountText(for: section)
+                        isSelected: selectedSection == section
                     ) {
                         selectedSection = section
                     }
@@ -61,10 +60,11 @@ struct ContentView: View {
                         .font(.caption2)
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .padding(.vertical, 8)
             .help("打开设置")
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
@@ -106,23 +106,11 @@ struct ContentView: View {
         selectedSection = .tran
     }
 
-    private func sidebarCountText(for section: AppSection) -> String {
-        switch section {
-        case .clip:
-            "\(clipboardMonitor.history.items.count)"
-        case .pix:
-            "\(screenshotController.history.items.count)"
-        case .tran:
-            "\(translationController.history.items.count)"
-        }
-    }
-
 }
 
 private struct SidebarSectionButton: View {
     let section: AppSection
     let isSelected: Bool
-    let countText: String
     let action: () -> Void
 
     private var tint: Color {
@@ -145,11 +133,6 @@ private struct SidebarSectionButton: View {
                 Text(section.title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(isSelected ? .primary : .secondary)
-                    .lineLimit(1)
-
-                Text(countText)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)

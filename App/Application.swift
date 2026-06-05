@@ -92,6 +92,7 @@ struct Application: App {
         AppDockIconController.shared.configure(preference: dockIconPreference)
         clipboardMonitor.start()
         shortcutController.start()
+        shortcutController.openMainWindow = openMainWindow
         shortcutController.openSection = { section in
             selectedSection = section
             openMainWindow()

@@ -489,7 +489,7 @@ private struct ClipboardItemDetailPane: View {
         case .text:
             ClipboardTextPreview(item: item)
         case .image:
-            ClipboardImagePreview(item: item)
+            ClipboardImagePreview(item: item, previewAction: systemPreviewAction)
         case .file:
             ClipboardFilePreview(item: item)
         }
@@ -551,21 +551,27 @@ private struct ClipboardTextPreview: View {
 
 private struct ClipboardImagePreview: View {
     let item: ClipboardItem
+    let previewAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ControlPanelSectionLabel(title: "图片预览", systemImage: "photo")
 
             if let imageData = item.imageData {
-                ImageThumbnailView(
-                    data: imageData,
-                    size: CGSize(width: 320, height: 200),
-                    cornerRadius: ControlPanelDesign.cardRadius,
-                    maxPixelSize: 720
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(ControlPanelDesign.Layout.detailContentPadding)
-                .controlPanelTextSurface()
+                Button(action: previewAction) {
+                    ImageThumbnailView(
+                        data: imageData,
+                        size: CGSize(width: 320, height: 200),
+                        cornerRadius: ControlPanelDesign.cardRadius,
+                        maxPixelSize: 720
+                    )
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(ControlPanelDesign.Layout.detailContentPadding)
+                    .controlPanelTextSurface()
+                    .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("用系统预览.app打开图片")
             } else {
                 ContentUnavailableView("无法预览图片", systemImage: "photo")
                     .frame(minHeight: 220)
