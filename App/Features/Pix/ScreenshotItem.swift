@@ -7,10 +7,16 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         case recording
     }
 
+    enum CaptureSource: String, Codable {
+        case selectedRegion
+        case fullScreen
+    }
+
     let id: UUID
     let kind: Kind
     let data: Data
     let createdAt: Date
+    let captureSource: CaptureSource?
     let recordingFileName: String?
     let duration: TimeInterval?
     let pixelSize: CGSize?
@@ -19,12 +25,14 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
     init(
         id: UUID = UUID(),
         data: Data,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        captureSource: CaptureSource = .selectedRegion
     ) {
         self.id = id
         self.kind = .image
         self.data = data
         self.createdAt = createdAt
+        self.captureSource = captureSource
         self.recordingFileName = nil
         self.duration = nil
         self.pixelSize = nil
@@ -43,6 +51,7 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         self.kind = .recording
         self.data = Data()
         self.createdAt = createdAt
+        self.captureSource = nil
         self.recordingFileName = recordingFileName
         self.duration = duration
         self.pixelSize = pixelSize
@@ -90,6 +99,7 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         case kind
         case data
         case createdAt
+        case captureSource
         case recordingFileName
         case duration
         case pixelSize
@@ -102,6 +112,11 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         self.kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .image
         self.data = try container.decodeIfPresent(Data.self, forKey: .data) ?? Data()
         self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+        if let captureSource = try container.decodeIfPresent(CaptureSource.self, forKey: .captureSource) {
+            self.captureSource = captureSource
+        } else {
+            self.captureSource = kind == .image ? .selectedRegion : nil
+        }
         self.recordingFileName = try container.decodeIfPresent(String.self, forKey: .recordingFileName)
         self.duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
         self.pixelSize = try container.decodeIfPresent(CGSize.self, forKey: .pixelSize)

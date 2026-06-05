@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import QuartzCore
 import SwiftUI
 
@@ -96,7 +97,6 @@ struct PixView: View {
             }
 
             PixCaptureControls(
-                mode: $controller.captureMode,
                 isCapturing: controller.isCapturing,
                 isRecording: controller.isRecording,
                 isStoppingRecording: controller.isStoppingRecording,
@@ -303,18 +303,21 @@ struct PixView: View {
 
     private func captureSelectedRegion() {
         Task {
-            await controller.performPrimaryCapture()
+            controller.captureMode = .screenshot
+            await controller.captureSelectedRegion()
         }
     }
 
     private func captureMainDisplay() {
         Task {
+            controller.captureMode = .screenshot
             await controller.captureMainDisplay()
         }
     }
 
     private func startRecording() {
         Task {
+            controller.captureMode = .recording
             await controller.startSelectedRegionRecording()
         }
     }
@@ -353,7 +356,7 @@ private struct ScreenshotItemRow: View {
             historyThumbnail
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(item.createdAt.absoluteDisplayString)
+                Text(item.displayTitle)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
@@ -383,7 +386,45 @@ private struct ScreenshotItemRow: View {
                 item: item,
                 size: CGSize(width: 48, height: ControlPanelDesign.Layout.historyRowThumbnailSize),
                 maxPixelSize: 240
+            ) {
+                ScreenshotHistoryRecordingThumbnailOverlay(durationText: item.durationText)
+            }
+        }
+    }
+}
+
+private struct ScreenshotHistoryRecordingThumbnailOverlay: View {
+    let durationText: String
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.black.opacity(0.02), .black.opacity(0.50)],
+                startPoint: .top,
+                endPoint: .bottom
             )
+
+            Image(systemName: "play.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(.black.opacity(0.44), in: Circle())
+
+            VStack {
+                Spacer()
+
+                HStack {
+                    Spacer()
+
+                    Text(durationText)
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                }
+                .padding(4)
+            }
         }
     }
 }
@@ -475,10 +516,15 @@ private struct ScreenshotItemDetailPane: View {
             }
 
             if item.isImage {
-                ScreenshotFittedPreviewImage(data: item.data)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(ControlPanelDesign.Layout.detailContentPadding)
-                    .controlPanelTextSurface()
+                Button(action: previewAction) {
+                    ScreenshotFittedPreviewImage(data: item.data)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("用系统预览.app打开截图")
+                .padding(ControlPanelDesign.Layout.detailContentPadding)
+                .controlPanelTextSurface()
             } else {
                 ScreenRecordingPreviewCard(item: item, previewAction: previewAction)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -496,10 +542,8 @@ private struct ScreenshotItemDetailPane: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
                 ScreenshotMetadataRow(title: "类型", value: item.isImage ? "PNG 图片" : "MP4 录屏")
                 ScreenshotMetadataRow(title: "创建时间", value: item.createdAt.absoluteDisplayString)
-                ScreenshotMetadataRow(title: "大小", value: item.fileSizeText)
-                if item.isImage {
-                    ScreenshotMetadataRow(title: "数据", value: "\(item.data.count) bytes")
-                } else {
+                ScreenshotMetadataRow(title: "文件大小", value: item.fileSizeText)
+                if item.isRecording {
                     ScreenshotMetadataRow(title: "时长", value: item.durationText)
                     if let pixelSize = item.pixelSize {
                         ScreenshotMetadataRow(
@@ -850,8 +894,11 @@ private struct ScreenRecordingGIFExportSheet: View {
             HStack {
                 Spacer()
 
-                Button("取消", action: cancelAction)
-                    .keyboardShortcut(.cancelAction)
+                Button(action: cancelAction) {
+                    Label("取消", systemImage: "xmark")
+                }
+                .buttonStyle(ControlPanelButtonStyle())
+                .keyboardShortcut(.cancelAction)
 
                 Button {
                     exportAction(sanitizedOptions)
@@ -1419,7 +1466,6 @@ private extension TimeInterval {
 }
 
 private struct PixCaptureControls: View {
-    @Binding var mode: PixCaptureMode
     let isCapturing: Bool
     let isRecording: Bool
     let isStoppingRecording: Bool
@@ -1430,13 +1476,25 @@ private struct PixCaptureControls: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("捕获模式", selection: $mode) {
-                ForEach(PixCaptureMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+            HStack(spacing: 6) {
+                Button(action: captureSelectedRegionAction) {
+                    PixCaptureButtonLabel(title: "截图", systemImage: "selection.pin.in.out")
                 }
+                .buttonStyle(captureButtonStyle)
+                .help("拖拽选择屏幕区域截图")
+
+                Button(action: startRecordingAction) {
+                    PixCaptureButtonLabel(title: "录屏", systemImage: "record.circle")
+                }
+                .buttonStyle(captureButtonStyle)
+                .help("拖拽选择屏幕区域并开始录屏")
+
+                Button(action: captureMainDisplayAction) {
+                    PixCaptureButtonLabel(title: "全屏", systemImage: "display")
+                }
+                .buttonStyle(captureButtonStyle)
+                .help("捕获主屏幕画面")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             .disabled(isCapturing || isRecording)
 
             if isCapturing {
@@ -1455,34 +1513,35 @@ private struct PixCaptureControls: View {
                 .buttonStyle(ControlPanelButtonStyle(prominence: .destructive))
                 .disabled(isStoppingRecording)
                 .help("停止并保存当前录屏")
-            } else {
-                HStack(spacing: 10) {
-                    switch mode {
-                    case .screenshot:
-                        Button(action: captureSelectedRegionAction) {
-                            Label("选区截图", systemImage: "selection.pin.in.out")
-                        }
-                        .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
-                        .help("拖拽选择屏幕区域")
-
-                        Button(action: captureMainDisplayAction) {
-                            Image(systemName: "display")
-                        }
-                        .buttonStyle(ControlPanelIconButtonStyle())
-                        .help("捕获主屏幕画面")
-                    case .recording:
-                        Button(action: startRecordingAction) {
-                            Label("选区录屏", systemImage: "record.circle")
-                        }
-                        .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
-                        .help("拖拽选择屏幕区域并开始录屏")
-                    }
-                }
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .controlPanelRoundedSurface(background: ControlPanelDesign.embeddedPanelBackground)
+    }
+
+    private var captureButtonStyle: ControlPanelButtonStyle {
+        ControlPanelButtonStyle(
+            tint: ControlPanelDesign.tint(for: .pix),
+            prominence: .primary
+        )
+    }
+}
+
+private struct PixCaptureButtonLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: 18, height: 18)
+
+            Text(title)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -1550,11 +1609,70 @@ private extension ScreenshotItem {
         )
     }
 
+    var dimensionsText: String {
+        if let pixelSize {
+            return pixelSize.pixDimensionText
+        }
+
+        guard let imagePixelSize else {
+            return isImage ? "PNG 图片" : "MP4 录屏"
+        }
+
+        return imagePixelSize.pixDimensionText
+    }
+
+    var displayTitle: String {
+        if let dimensionText = optionalDimensionsText {
+            return "\(captureTypeText) \(dimensionText)"
+        }
+
+        return captureTypeText
+    }
+
+    private var captureTypeText: String {
+        if isRecording {
+            return "录屏"
+        }
+
+        switch captureSource {
+        case .fullScreen:
+            return "全屏"
+        case .selectedRegion, .none:
+            return "截图"
+        }
+    }
+
+    private var optionalDimensionsText: String? {
+        if let pixelSize {
+            return pixelSize.pixDimensionText
+        }
+
+        return imagePixelSize?.pixDimensionText
+    }
+
     var durationText: String {
         let totalSeconds = max(Int((duration ?? 0).rounded()), 0)
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    private var imagePixelSize: CGSize? {
+        guard isImage,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
+              let height = properties[kCGImagePropertyPixelHeight] as? CGFloat else {
+            return nil
+        }
+
+        return CGSize(width: width, height: height)
+    }
+}
+
+private extension CGSize {
+    var pixDimensionText: String {
+        "\(Int(width.rounded())) x \(Int(height.rounded()))"
     }
 }
 
@@ -1567,6 +1685,8 @@ private extension [ScreenshotItem] {
 
         return filter { item in
             item.createdAt.absoluteDisplayString.localizedCaseInsensitiveContains(trimmedSearchText)
+                || item.displayTitle.localizedCaseInsensitiveContains(trimmedSearchText)
+                || item.dimensionsText.localizedCaseInsensitiveContains(trimmedSearchText)
                 || item.fileSizeText.localizedCaseInsensitiveContains(trimmedSearchText)
                 || item.durationText.localizedCaseInsensitiveContains(trimmedSearchText)
         }

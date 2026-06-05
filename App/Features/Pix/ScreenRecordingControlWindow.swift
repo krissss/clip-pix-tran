@@ -57,6 +57,9 @@ final class ScreenRecordingControlWindow {
         panel.ignoresMouseEvents = false
         panel.isReleasedWhenClosed = false
         panel.isExcludedFromWindowsMenu = true
+        panel.stopHandler = { [weak self] in
+            self?.stopAction()
+        }
         panel.cancelHandler = { [weak self] in
             self?.cancelAction()
         }
@@ -119,6 +122,7 @@ final class ScreenRecordingControlWindow {
 }
 
 private final class ScreenRecordingPanel: NSPanel {
+    var stopHandler: (() -> Void)?
     var cancelHandler: (() -> Void)?
 
     override var canBecomeKey: Bool {
@@ -132,7 +136,7 @@ private final class ScreenRecordingPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
         case .keyDown where event.keyCode == 53:
-            cancelHandler?()
+            stopHandler?()
         case .rightMouseDown:
             cancelHandler?()
         default:

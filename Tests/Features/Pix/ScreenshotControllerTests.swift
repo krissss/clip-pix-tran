@@ -19,6 +19,7 @@ struct ScreenshotControllerTests {
         await controller.captureMainDisplay()
 
         #expect(controller.history.items.map(\.data) == [data])
+        #expect(controller.history.items.first?.captureSource == .fullScreen)
         #expect(controller.lastErrorMessage == nil)
         #expect(controller.lastCaptureError == nil)
     }
@@ -38,6 +39,7 @@ struct ScreenshotControllerTests {
         await controller.captureSelectedRegion()
 
         #expect(controller.history.items.map(\.data) == [data])
+        #expect(controller.history.items.first?.captureSource == .selectedRegion)
         #expect(pasteboard.copiedData == data)
         #expect(controller.lastErrorMessage == nil)
         #expect(controller.lastCaptureError == nil)
@@ -371,6 +373,10 @@ struct ScreenshotControllerTests {
             fileSaver: FakeScreenshotFileSaver(),
             recordingRegionOverlayFactory: overlayFactory.make
         )
+        var finishCallCount = 0
+        controller.recordingDidFinish = {
+            finishCallCount += 1
+        }
 
         await controller.startSelectedRegionRecording()
         let overlay = try #require(overlayFactory.overlays.first)
@@ -383,10 +389,12 @@ struct ScreenshotControllerTests {
             controller.isRecording == false
                 && controller.history.items.count == 1
                 && overlay.closeCallCount == 1
+                && finishCallCount == 1
         }
 
         let item = try #require(controller.history.items.first)
         #expect(session.stopCallCount == 1)
+        #expect(finishCallCount == 1)
         #expect(item.kind == .recording)
         #expect(item.recordingFileName == "recorded.mp4")
         #expect(item.createdAt == createdAt)
@@ -425,6 +433,10 @@ struct ScreenshotControllerTests {
             fileSaver: FakeScreenshotFileSaver(),
             recordingRegionOverlayFactory: overlayFactory.make
         )
+        var finishCallCount = 0
+        controller.recordingDidFinish = {
+            finishCallCount += 1
+        }
 
         await controller.startSelectedRegionRecording()
         let overlay = try #require(overlayFactory.overlays.first)
@@ -439,6 +451,7 @@ struct ScreenshotControllerTests {
         }
 
         #expect(controller.history.items.isEmpty)
+        #expect(finishCallCount == 0)
     }
 
     @Test func gifExportOptionsClampToSupportedRange() {

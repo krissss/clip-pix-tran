@@ -96,6 +96,10 @@ struct Application: App {
             selectedSection = section
             openMainWindow()
         }
+        screenshotController.recordingDidFinish = {
+            selectedSection = .pix
+            openMainWindow()
+        }
         AppStatusMenuController.shared.configure(
             clipboardMonitor: clipboardMonitor,
             screenshotController: screenshotController,

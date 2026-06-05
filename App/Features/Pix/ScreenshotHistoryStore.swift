@@ -67,13 +67,21 @@ final class ScreenshotHistoryStore {
         }
     }
 
-    func record(_ data: Data, at date: Date = Date()) {
+    func record(
+        _ data: Data,
+        at date: Date = Date(),
+        captureSource: ScreenshotItem.CaptureSource = .selectedRegion
+    ) {
         guard !data.isEmpty else {
             return
         }
 
         items.insert(
-            ScreenshotItem(data: data, createdAt: date),
+            ScreenshotItem(
+                data: data,
+                createdAt: date,
+                captureSource: captureSource
+            ),
             at: 0
         )
         trimToLimit()

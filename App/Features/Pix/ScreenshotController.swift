@@ -39,6 +39,7 @@ final class ScreenshotController {
     var recordingStartedAt: Date?
     var lastErrorMessage: String?
     var lastCaptureError: ScreenshotCaptureError?
+    var recordingDidFinish: (() -> Void)?
     var needsScreenRecordingPermission: Bool {
         lastCaptureError == .permissionDenied
     }
@@ -86,7 +87,7 @@ final class ScreenshotController {
 
     func captureMainDisplay() async {
         let screenshotService = screenshotService
-        await capture(usesTimeout: true) {
+        await capture(usesTimeout: true, captureSource: .fullScreen) {
             ScreenshotCaptureOutput(data: try await screenshotService.captureMainDisplay())
         }
     }
@@ -104,6 +105,7 @@ final class ScreenshotController {
 
     private func capture(
         usesTimeout: Bool,
+        captureSource: ScreenshotItem.CaptureSource = .selectedRegion,
         _ action: @Sendable @escaping () async throws -> ScreenshotCaptureOutput
     ) async {
         guard !isCapturing else {
@@ -153,21 +155,21 @@ final class ScreenshotController {
             switch output.completion {
             case .recordOnly:
                 captureMode = .screenshot
-                history.record(output.data)
+                history.record(output.data, captureSource: captureSource)
             case .copy:
                 captureMode = .screenshot
-                history.record(output.data)
+                history.record(output.data, captureSource: captureSource)
                 try pasteboard.writePNGData(output.data)
             case .save:
                 captureMode = .screenshot
-                history.record(output.data)
+                history.record(output.data, captureSource: captureSource)
                 try fileSaver.savePNGData(
                     output.data,
                     suggestedFileName: suggestedFileName(createdAt: Date())
                 )
             case .pinToScreen:
                 captureMode = .screenshot
-                history.record(output.data)
+                history.record(output.data, captureSource: captureSource)
                 try pinning.pinPNGData(output.data, sourceRect: output.sourceRect)
             case .startRecording:
                 guard let sourceRect = output.sourceRect else {
@@ -259,6 +261,8 @@ final class ScreenshotController {
         isStoppingRecording = true
         recordingControlWindow?.close()
         Task { @MainActor [weak self, session] in
+            var didFinishRecording = false
+
             do {
                 let output = try await session.stop()
                 guard self?.activeRecordingSession === session else {
@@ -267,6 +271,7 @@ final class ScreenshotController {
 
                 self?.history.record(output)
                 self?.clearLastError()
+                didFinishRecording = true
             } catch is CancellationError {
                 self?.clearLastError()
             } catch ScreenshotSaveError.cancelled {
@@ -276,6 +281,9 @@ final class ScreenshotController {
             }
 
             self?.releaseRecording(session)
+            if didFinishRecording {
+                self?.recordingDidFinish?()
+            }
         }
     }
 
@@ -343,7 +351,7 @@ final class ScreenshotController {
             }
 
             Task { @MainActor [weak self] in
-                self?.cancelRecording()
+                self?.stopRecording()
             }
             return nil
         }
