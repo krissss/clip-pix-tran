@@ -1,11 +1,30 @@
 import CoreGraphics
 import Foundation
 
+enum ScreenshotRegionCaptureMode: String, CaseIterable, Identifiable, Sendable {
+    case screenshot
+    case recording
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .screenshot:
+            "截图"
+        case .recording:
+            "录屏"
+        }
+    }
+}
+
 enum ScreenshotCaptureCompletion: Equatable, Sendable {
     case recordOnly
     case copy
     case save
     case pinToScreen
+    case startRecording
 }
 
 struct ScreenshotCaptureOutput: Equatable, Sendable {
@@ -27,5 +46,11 @@ struct ScreenshotCaptureOutput: Equatable, Sendable {
 
 protocol ScreenshotService: Sendable {
     nonisolated func captureMainDisplay() async throws -> Data
-    nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput
+    nonisolated func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput
+}
+
+extension ScreenshotService {
+    nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+        try await captureSelectedRegion(initialMode: .screenshot)
+    }
 }

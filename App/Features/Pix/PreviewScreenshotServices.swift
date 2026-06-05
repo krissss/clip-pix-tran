@@ -5,7 +5,7 @@ struct PreviewScreenshotService: ScreenshotService {
         Data([0x89, 0x50, 0x4E, 0x47])
     }
 
-    func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+    func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput {
         ScreenshotCaptureOutput(data: Data([0x89, 0x50, 0x4E, 0x47]), completion: .copy)
     }
 }

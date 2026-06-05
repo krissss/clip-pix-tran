@@ -18,6 +18,33 @@ struct ScreenshotHistoryStoreTests {
         #expect(store.items.first?.createdAt == secondDate)
     }
 
+    @Test func recordsRecordingAtTop() throws {
+        let fileStore = FakeRecordingFileStore()
+        let store = ScreenshotHistoryStore(recordingFileStore: fileStore)
+        let fileURL = ScreenRecordingFileStore.defaultDirectoryURL
+            .appending(path: "clip.mp4")
+        let createdAt = Date(timeIntervalSince1970: 30)
+
+        store.record(
+            ScreenRecordingOutput(
+                fileURL: fileURL,
+                createdAt: createdAt,
+                duration: 3.2,
+                pixelSize: CGSize(width: 640, height: 360),
+                fileSize: 1024
+            )
+        )
+
+        let item = try #require(store.items.first)
+        #expect(item.kind == .recording)
+        #expect(item.recordingFileName == "clip.mp4")
+        #expect(item.createdAt == createdAt)
+        #expect(item.duration == 3.2)
+        #expect(item.pixelSize == CGSize(width: 640, height: 360))
+        #expect(item.byteCount == 1024)
+        #expect(fileStore.deletedFileNames.isEmpty)
+    }
+
     @Test func ignoresEmptyData() {
         let store = ScreenshotHistoryStore()
 
@@ -63,6 +90,58 @@ struct ScreenshotHistoryStoreTests {
         #expect(store.items.isEmpty)
     }
 
+    @Test func deletingRecordingRemovesStoredFile() throws {
+        let fileStore = FakeRecordingFileStore()
+        let store = ScreenshotHistoryStore(recordingFileStore: fileStore)
+        let fileURL = ScreenRecordingFileStore.defaultDirectoryURL
+            .appending(path: "delete-me.mp4")
+        store.record(
+            ScreenRecordingOutput(
+                fileURL: fileURL,
+                createdAt: Date(),
+                duration: 1,
+                pixelSize: CGSize(width: 100, height: 100),
+                fileSize: 10
+            )
+        )
+        let item = try #require(store.items.first)
+
+        store.delete(item)
+
+        #expect(store.items.isEmpty)
+        #expect(fileStore.deletedFileNames == ["delete-me.mp4"])
+    }
+
+    @Test func clearingHistoryRemovesRecordingFiles() throws {
+        let fileStore = FakeRecordingFileStore()
+        let store = ScreenshotHistoryStore(recordingFileStore: fileStore)
+        let firstURL = ScreenRecordingFileStore.defaultDirectoryURL.appending(path: "first.mp4")
+        let secondURL = ScreenRecordingFileStore.defaultDirectoryURL.appending(path: "second.mp4")
+        store.record(
+            ScreenRecordingOutput(
+                fileURL: firstURL,
+                createdAt: Date(),
+                duration: 1,
+                pixelSize: CGSize(width: 100, height: 100),
+                fileSize: 10
+            )
+        )
+        store.record(
+            ScreenRecordingOutput(
+                fileURL: secondURL,
+                createdAt: Date(),
+                duration: 1,
+                pixelSize: CGSize(width: 100, height: 100),
+                fileSize: 10
+            )
+        )
+
+        store.clear()
+
+        #expect(store.items.isEmpty)
+        #expect(Set(fileStore.deletedFileNames) == Set(["first.mp4", "second.mp4"]))
+    }
+
     @Test func defaultsToPersistingHistory() {
         let store = ScreenshotHistoryStore()
 
@@ -91,6 +170,36 @@ struct ScreenshotHistoryStoreTests {
         #expect(reloadedStore.items.map(\.data) == [secondData, firstData])
         #expect(reloadedStore.limit == 5)
         #expect(reloadedStore.persistsHistory == true)
+    }
+
+    @Test func decodesLegacyImageItemsWithoutKind() throws {
+        let data = try #require("legacy".data(using: .utf8))
+        let itemID = UUID()
+        let createdAt = Date(timeIntervalSince1970: 42)
+        let encodedData = data.base64EncodedString()
+        let json = """
+        {
+          "items": [
+            {
+              "id": "\(itemID.uuidString)",
+              "data": "\(encodedData)",
+              "createdAt": \(createdAt.timeIntervalSinceReferenceDate)
+            }
+          ],
+          "maximumItems": 20,
+          "persistsHistory": true
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            ScreenshotHistorySnapshot.self,
+            from: try #require(json.data(using: .utf8))
+        )
+
+        let item = try #require(snapshot.items.first)
+        #expect(item.id == itemID)
+        #expect(item.kind == .image)
+        #expect(item.data == data)
+        #expect(item.createdAt == createdAt)
     }
 
     @Test func explicitPersistencePreferenceOverridesSnapshot() async throws {
@@ -165,5 +274,17 @@ struct ScreenshotHistoryStoreTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+private final class FakeRecordingFileStore: ScreenRecordingFileManaging, @unchecked Sendable {
+    private(set) var deletedFileNames: [String] = []
+
+    func makeRecordingURL(createdAt: Date) throws -> URL {
+        ScreenRecordingFileStore.defaultDirectoryURL.appending(path: "fake.mp4")
+    }
+
+    func deleteRecording(named fileName: String) {
+        deletedFileNames.append(fileName)
     }
 }

@@ -8,7 +8,7 @@ final class RegionSelectionOverlay {
 
     typealias CaptureProvider = (CGRect, Set<CGWindowID>) async throws -> Data
 
-    private var continuation: CheckedContinuation<ScreenshotCaptureOutput, Error>?
+    private var continuation: CheckedContinuation<RegionSelectionOverlayResult, Error>?
     private var windows: [NSWindow] = []
     private var selectionViews: [RegionSelectionView] = []
     private var keyMonitor: Any?
@@ -18,26 +18,67 @@ final class RegionSelectionOverlay {
     private var didFinish = false
     private var activeBaseCaptureID: UUID?
     private let captureProvider: CaptureProvider
+    private let initialMode: ScreenshotRegionCaptureMode
     private let initialSnapshots: [ScreenCaptureSnapshot]
     private let autoSelectionDetector: ScreenshotAutoSelectionDetecting
+    private let behavior: RegionSelectionBehavior
     private let annotationStore = ScreenshotAnnotationStore()
 
     static func capture(
+        initialMode: ScreenshotRegionCaptureMode = .screenshot,
         initialSnapshots: [ScreenCaptureSnapshot] = [],
         autoSelectionDetector: ScreenshotAutoSelectionDetecting? = nil,
         captureProvider: @escaping CaptureProvider
     ) async throws -> ScreenshotCaptureOutput {
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
+            let result = try await withCheckedThrowingContinuation { continuation in
                 let overlay = RegionSelectionOverlay(
                     continuation: continuation,
+                    initialMode: initialMode,
                     initialSnapshots: initialSnapshots,
                     autoSelectionDetector: autoSelectionDetector,
+                    behavior: .capture,
                     captureProvider: captureProvider
                 )
                 activeOverlay = overlay
                 overlay.show()
             }
+            guard case .capture(let output) = result else {
+                throw ScreenshotCaptureError.unavailable
+            }
+
+            return output
+        } onCancel: {
+            Task { @MainActor in
+                cancelActiveSelection()
+            }
+        }
+    }
+
+    static func selectRegion(
+        initialSnapshots: [ScreenCaptureSnapshot] = [],
+        autoSelectionDetector: ScreenshotAutoSelectionDetecting? = nil
+    ) async throws -> CGRect {
+        try await withTaskCancellationHandler {
+            let result = try await withCheckedThrowingContinuation { continuation in
+                let overlay = RegionSelectionOverlay(
+                    continuation: continuation,
+                    initialMode: .recording,
+                    initialSnapshots: initialSnapshots,
+                    autoSelectionDetector: autoSelectionDetector,
+                    behavior: .selectRegion,
+                    captureProvider: { _, _ in
+                        throw ScreenshotCaptureError.unavailable
+                    }
+                )
+                activeOverlay = overlay
+                overlay.show()
+            }
+            guard case .region(let rect) = result else {
+                throw ScreenshotCaptureError.unavailable
+            }
+
+            return rect
         } onCancel: {
             Task { @MainActor in
                 cancelActiveSelection()
@@ -50,14 +91,18 @@ final class RegionSelectionOverlay {
     }
 
     private init(
-        continuation: CheckedContinuation<ScreenshotCaptureOutput, Error>,
+        continuation: CheckedContinuation<RegionSelectionOverlayResult, Error>,
+        initialMode: ScreenshotRegionCaptureMode,
         initialSnapshots: [ScreenCaptureSnapshot],
         autoSelectionDetector: ScreenshotAutoSelectionDetecting?,
+        behavior: RegionSelectionBehavior,
         captureProvider: @escaping CaptureProvider
     ) {
         self.continuation = continuation
+        self.initialMode = initialMode
         self.initialSnapshots = initialSnapshots
         self.autoSelectionDetector = autoSelectionDetector ?? SystemScreenshotAutoSelectionDetector()
+        self.behavior = behavior
         self.captureProvider = captureProvider
     }
 
@@ -73,10 +118,15 @@ final class RegionSelectionOverlay {
                 screenFrame: screen.frame,
                 screenScale: screen.backingScaleFactor,
                 initialSnapshot: initialSnapshots.bestSnapshot(for: screen.frame),
+                initialMode: initialMode,
                 annotationStore: annotationStore,
+                behavior: behavior,
                 actions: RegionSelectionActions(
                     finish: { [weak self] completion in
                         self?.complete(completion: completion)
+                    },
+                    finishSelection: { [weak self] in
+                        self?.completeSelection()
                     },
                     cancel: { [weak self] in
                         self?.finish(.failure(ScreenshotCaptureError.cancelled))
@@ -158,7 +208,9 @@ final class RegionSelectionOverlay {
             }
 
             let command = event.modifierFlags.contains(.command)
-            if command, event.charactersIgnoringModifiers?.lowercased() == "z" {
+            if self.behavior == .capture,
+               command,
+               event.charactersIgnoringModifiers?.lowercased() == "z" {
                 Task { @MainActor [weak self] in
                     if event.modifierFlags.contains(.shift) {
                         self?.annotationStore.redo()
@@ -166,13 +218,6 @@ final class RegionSelectionOverlay {
                         self?.annotationStore.undo()
                     }
                     self?.setNeedsDisplayOnAllScreens()
-                }
-                return nil
-            }
-
-            if event.keyCode == 36 {
-                Task { @MainActor [weak self] in
-                    self?.complete(completion: .copy)
                 }
                 return nil
             }
@@ -230,6 +275,21 @@ final class RegionSelectionOverlay {
             return
         }
 
+        if completion == .startRecording {
+            finish(
+                .success(
+                    .capture(
+                        ScreenshotCaptureOutput(
+                            data: Data(),
+                            completion: completion,
+                            sourceRect: selection.rect
+                        )
+                    )
+                )
+            )
+            return
+        }
+
         activeBaseCaptureID = nil
         selectionViews.forEach { $0.prepareForCapture() }
         Task { [weak self] in
@@ -256,10 +316,12 @@ final class RegionSelectionOverlay {
                 )
                 finish(
                     .success(
-                        ScreenshotCaptureOutput(
-                            data: data,
-                            completion: completion,
-                            sourceRect: selection.rect
+                        .capture(
+                            ScreenshotCaptureOutput(
+                                data: data,
+                                completion: completion,
+                                sourceRect: selection.rect
+                            )
                         )
                     )
                 )
@@ -269,6 +331,15 @@ final class RegionSelectionOverlay {
                 finish(.failure(ScreenshotCaptureError.pngEncodingFailed))
             }
         }
+    }
+
+    private func completeSelection() {
+        guard let selection = activeSelection else {
+            finish(.failure(ScreenshotCaptureError.cancelled))
+            return
+        }
+
+        finish(.success(.region(selection.rect)))
     }
 
     private func captureBaseImage(for view: RegionSelectionView, screenRect: CGRect) {
@@ -346,7 +417,7 @@ final class RegionSelectionOverlay {
         return Set(selectionWindowIDs + toolbarWindowIDs)
     }
 
-    private func finish(_ result: Result<ScreenshotCaptureOutput, Error>) {
+    private func finish(_ result: Result<RegionSelectionOverlayResult, Error>) {
         guard !didFinish else {
             return
         }
@@ -379,8 +450,19 @@ final class RegionSelectionOverlay {
     }
 }
 
+private enum RegionSelectionOverlayResult {
+    case capture(ScreenshotCaptureOutput)
+    case region(CGRect)
+}
+
+private enum RegionSelectionBehavior {
+    case capture
+    case selectRegion
+}
+
 private struct RegionSelectionActions {
     let finish: (ScreenshotCaptureCompletion) -> Void
+    let finishSelection: () -> Void
     let cancel: () -> Void
     let requestBaseImageCapture: (RegionSelectionView, CGRect) -> Void
     let detectAutoSelectionRect: (CGPoint) -> CGRect?
@@ -579,6 +661,7 @@ private enum RegionAnnotationTool: CaseIterable {
 }
 
 private struct RegionToolbarState: Equatable {
+    var captureMode: ScreenshotRegionCaptureMode
     var activeTool: RegionAnnotationTool?
     var activeStyle: ScreenshotAnnotationStyle
     var canUndo: Bool
@@ -586,6 +669,7 @@ private struct RegionToolbarState: Equatable {
 }
 
 private struct RegionToolbarActions {
+    let setCaptureMode: (ScreenshotRegionCaptureMode) -> Void
     let setTool: (RegionAnnotationTool?) -> Void
     let setColor: (ScreenshotColorComponents) -> Void
     let setLineWidth: (CGFloat) -> Void
@@ -600,6 +684,7 @@ private struct RegionToolbarActions {
     let save: () -> Void
     let cancel: () -> Void
     let finish: () -> Void
+    let startRecording: () -> Void
 }
 
 private final class RegionSelectionView: NSView {
@@ -609,10 +694,12 @@ private final class RegionSelectionView: NSView {
     private let screenScale: CGFloat
     private let initialSnapshot: ScreenCaptureSnapshot?
     private let annotationStore: ScreenshotAnnotationStore
+    private let behavior: RegionSelectionBehavior
     private let actions: RegionSelectionActions
     private var selectionRect: CGRect?
     private var autoSelectionCandidateRect: CGRect?
     private var interaction: RegionSelectionInteraction = .idle
+    private var toolbarCaptureMode: ScreenshotRegionCaptureMode
     private var activeTool: RegionAnnotationTool?
     private var activeStyle = ScreenshotAnnotationStyle()
     private var toolbarWindow: NSWindow?
@@ -643,13 +730,17 @@ private final class RegionSelectionView: NSView {
         screenFrame: CGRect,
         screenScale: CGFloat,
         initialSnapshot: ScreenCaptureSnapshot?,
+        initialMode: ScreenshotRegionCaptureMode,
         annotationStore: ScreenshotAnnotationStore,
+        behavior: RegionSelectionBehavior,
         actions: RegionSelectionActions
     ) {
         self.screenFrame = screenFrame
         self.screenScale = max(screenScale, 1)
         self.initialSnapshot = initialSnapshot
+        self.toolbarCaptureMode = initialMode
         self.annotationStore = annotationStore
+        self.behavior = behavior
         self.actions = actions
         super.init(frame: CGRect(origin: .zero, size: screenFrame.size))
 
@@ -682,7 +773,12 @@ private final class RegionSelectionView: NSView {
         if event.keyCode == 53 {
             actions.cancel()
         } else if event.keyCode == 36 {
-            actions.finish(.copy)
+            switch behavior {
+            case .capture:
+                finishPrimaryToolbarAction()
+            case .selectRegion:
+                actions.finishSelection()
+            }
         } else {
             super.keyDown(with: event)
         }
@@ -710,7 +806,9 @@ private final class RegionSelectionView: NSView {
         }
 
         if let selectionRect {
-            if let annotation = annotation(at: point, in: selectionRect) {
+            if behavior == .capture,
+               toolbarCaptureMode == .screenshot,
+               let annotation = annotation(at: point, in: selectionRect) {
                 annotationStore.prepareUndoForMutation()
                 interaction = .movingAnnotation(
                     id: annotation.id,
@@ -722,7 +820,9 @@ private final class RegionSelectionView: NSView {
             }
 
             if let handle = ScreenshotSelectionGeometry.handle(at: point, in: selectionRect) {
-                if handle == .move, activeTool != nil {
+                if handle == .move,
+                   toolbarCaptureMode == .screenshot,
+                   activeTool != nil {
                     startAnnotation(at: point)
                 } else if handle == .move {
                     interaction = .moving(start: point, originalRect: selectionRect)
@@ -889,7 +989,10 @@ private final class RegionSelectionView: NSView {
 
             drawSelectionHandles(in: selectionRect)
             drawSizeBadge(for: selectionRect)
-            drawAnnotations(in: selectionRect)
+            if behavior == .capture,
+               toolbarCaptureMode == .screenshot {
+                drawAnnotations(in: selectionRect)
+            }
         } else if let autoSelectionCandidateRect {
             drawUndimmedBackground(in: autoSelectionCandidateRect)
             drawAutoSelectionCandidate(autoSelectionCandidateRect)
@@ -987,7 +1090,9 @@ private final class RegionSelectionView: NSView {
         }
 
         let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        if annotation(at: point, in: selectionRect) != nil {
+        if behavior == .capture,
+           toolbarCaptureMode == .screenshot,
+           annotation(at: point, in: selectionRect) != nil {
             return .openHand
         }
 
@@ -1010,6 +1115,11 @@ private final class RegionSelectionView: NSView {
     }
 
     private func startAnnotation(at point: CGPoint) {
+        guard behavior == .capture,
+              toolbarCaptureMode == .screenshot else {
+            return
+        }
+
         guard let activeTool else {
             return
         }
@@ -1155,6 +1265,11 @@ private final class RegionSelectionView: NSView {
     }
 
     private func requestBaseImageCaptureIfNeeded() {
+        guard behavior == .capture else {
+            clearBaseImage()
+            return
+        }
+
         guard let selectionRect,
               selectionRect.width > 0,
               selectionRect.height > 0 else {
@@ -1210,8 +1325,17 @@ private final class RegionSelectionView: NSView {
     }
 
     private var shouldDrawCapturedBaseImage: Bool {
-        annotationStore.annotations.contains { annotation in
-            annotation.kind == .mosaic
+        switch behavior {
+        case .capture:
+            guard toolbarCaptureMode == .screenshot else {
+                return false
+            }
+
+            return annotationStore.annotations.contains { annotation in
+                annotation.kind == .mosaic
+            }
+        case .selectRegion:
+            return false
         }
     }
 
@@ -1400,6 +1524,11 @@ private final class RegionSelectionView: NSView {
     }
 
     private func showToolbarIfNeeded() {
+        if behavior == .selectRegion {
+            showSelectionConfirmToolbarIfNeeded()
+            return
+        }
+
         guard let selectionRect,
               toolbarWindow == nil else {
             positionToolbar()
@@ -1441,7 +1570,54 @@ private final class RegionSelectionView: NSView {
         positionToolbar()
     }
 
+    private func showSelectionConfirmToolbarIfNeeded() {
+        guard let selectionRect,
+              toolbarWindow == nil else {
+            positionToolbar()
+            return
+        }
+
+        let toolbarView = RegionSelectionConfirmToolbarView(
+            startAction: actions.finishSelection,
+            cancelAction: actions.cancel
+        )
+        let hostingView = NSHostingView(rootView: toolbarView)
+        hostingView.frame = CGRect(x: 0, y: 0, width: 220, height: 44)
+        hostingView.layoutSubtreeIfNeeded()
+        let fittingSize = hostingView.fittingSize
+        hostingView.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: max(fittingSize.width, 1),
+            height: max(fittingSize.height, 1)
+        )
+
+        let toolbarWindow = NSWindow(
+            contentRect: hostingView.frame,
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        toolbarWindow.contentView = hostingView
+        toolbarWindow.backgroundColor = .clear
+        toolbarWindow.isOpaque = false
+        toolbarWindow.level = .screenSaver
+        toolbarWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        toolbarWindow.ignoresMouseEvents = false
+        toolbarWindow.isReleasedWhenClosed = false
+        toolbarWindow.orderFront(nil)
+        self.toolbarWindow = toolbarWindow
+
+        _ = selectionRect
+        positionToolbar()
+    }
+
     private func refreshToolbar() {
+        guard behavior == .capture else {
+            positionToolbar()
+            return
+        }
+
         guard let hostingView = toolbarWindow?.contentView as? NSHostingView<RegionSelectionToolbarView> else {
             return
         }
@@ -1463,6 +1639,7 @@ private final class RegionSelectionView: NSView {
 
     private var toolbarState: RegionToolbarState {
         RegionToolbarState(
+            captureMode: toolbarCaptureMode,
             activeTool: activeTool,
             activeStyle: activeStyle,
             canUndo: annotationStore.canUndo,
@@ -1472,8 +1649,12 @@ private final class RegionSelectionView: NSView {
 
     private var toolbarActions: RegionToolbarActions {
         RegionToolbarActions(
+            setCaptureMode: { [weak self] mode in
+                self?.setToolbarCaptureMode(mode)
+            },
             setTool: { [weak self] tool in
                 self?.commitTextEditor()
+                self?.toolbarCaptureMode = .screenshot
                 self?.activeTool = tool
                 self?.refreshToolbar()
                 guard let self else {
@@ -1534,10 +1715,36 @@ private final class RegionSelectionView: NSView {
                 self?.actions.cancel()
             },
             finish: { [weak self] in
+                self?.finishPrimaryToolbarAction()
+            },
+            startRecording: { [weak self] in
                 self?.commitTextEditor()
-                self?.actions.finish(.copy)
+                self?.actions.finish(.startRecording)
             }
         )
+    }
+
+    private func setToolbarCaptureMode(_ mode: ScreenshotRegionCaptureMode) {
+        commitTextEditor()
+        toolbarCaptureMode = mode
+        if mode == .recording {
+            activeTool = nil
+            clearBaseImage()
+        }
+        refreshToolbar()
+        needsDisplay = true
+        actions.setNeedsDisplayOnAllScreens()
+        window?.invalidateCursorRects(for: self)
+    }
+
+    private func finishPrimaryToolbarAction() {
+        commitTextEditor()
+        switch toolbarCaptureMode {
+        case .screenshot:
+            actions.finish(.copy)
+        case .recording:
+            actions.finish(.startRecording)
+        }
     }
 
     private func positionToolbar() {
@@ -1693,64 +1900,112 @@ private struct RegionSelectionToolbarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                toolButton(nil, symbolName: "hand.draw", title: "移动")
+            primaryToolbar
 
-                ForEach(RegionAnnotationTool.allCases, id: \.self) { tool in
-                    toolButton(tool, symbolName: tool.symbolName, title: tool.title)
-                }
-
-                Divider()
-                    .frame(height: 22)
-
-                Button(action: actions.undo) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .frame(width: 22, height: 22)
-                }
-                .disabled(!state.canUndo)
-                .help("撤销")
-
-                Button(action: actions.redo) {
-                    Image(systemName: "arrow.uturn.forward")
-                        .frame(width: 22, height: 22)
-                }
-                .disabled(!state.canRedo)
-                .help("重做")
-
-                Button(action: actions.pin) {
-                    Image(systemName: "pin")
-                        .frame(width: 22, height: 22)
-                }
-                .help("固定到屏幕")
-
-                Button(action: actions.save) {
-                    Image(systemName: "square.and.arrow.down")
-                        .frame(width: 22, height: 22)
-                }
-                .help("保存")
-
-                Button(action: actions.cancel) {
-                    Image(systemName: "xmark")
-                        .frame(width: 22, height: 22)
-                }
-                .help("取消")
-
-                Button(action: actions.finish) {
-                    Image(systemName: "checkmark")
-                        .frame(width: 22, height: 22)
-                }
-                .help("完成")
-                .keyboardShortcut(.return, modifiers: [])
+            if state.captureMode == .screenshot {
+                secondaryToolbar
+                    .buttonStyle(.borderless)
+                    .toolbarSurface()
+                    .transition(.opacity)
             }
-            .buttonStyle(.borderless)
-            .toolbarSurface()
-
-            secondaryToolbar
-                .buttonStyle(.borderless)
-                .toolbarSurface()
-                .transition(.opacity)
         }
         .fixedSize()
+    }
+
+    private var primaryToolbar: some View {
+        HStack(spacing: 6) {
+            Picker("捕获模式", selection: Binding(
+                get: { state.captureMode },
+                set: actions.setCaptureMode
+            )) {
+                ForEach(ScreenshotRegionCaptureMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 112)
+
+            Divider()
+                .frame(height: 22)
+
+            switch state.captureMode {
+            case .screenshot:
+                screenshotToolbarItems
+            case .recording:
+                recordingToolbarItems
+            }
+        }
+        .buttonStyle(.borderless)
+        .toolbarSurface()
+    }
+
+    private var screenshotToolbarItems: some View {
+        Group {
+            toolButton(nil, symbolName: "hand.draw", title: "移动")
+
+            ForEach(RegionAnnotationTool.allCases, id: \.self) { tool in
+                toolButton(tool, symbolName: tool.symbolName, title: tool.title)
+            }
+
+            Divider()
+                .frame(height: 22)
+
+            Button(action: actions.undo) {
+                Image(systemName: "arrow.uturn.backward")
+                    .frame(width: 22, height: 22)
+            }
+            .disabled(!state.canUndo)
+            .help("撤销")
+
+            Button(action: actions.redo) {
+                Image(systemName: "arrow.uturn.forward")
+                    .frame(width: 22, height: 22)
+            }
+            .disabled(!state.canRedo)
+            .help("重做")
+
+            Button(action: actions.pin) {
+                Image(systemName: "pin")
+                    .frame(width: 22, height: 22)
+            }
+            .help("固定到屏幕")
+
+            Button(action: actions.save) {
+                Image(systemName: "square.and.arrow.down")
+                    .frame(width: 22, height: 22)
+            }
+            .help("保存")
+
+            Button(action: actions.cancel) {
+                Image(systemName: "xmark")
+                    .frame(width: 22, height: 22)
+            }
+            .help("取消")
+
+            Button(action: actions.finish) {
+                Image(systemName: "checkmark")
+                    .frame(width: 22, height: 22)
+            }
+            .help("完成")
+            .keyboardShortcut(.return, modifiers: [])
+        }
+    }
+
+    private var recordingToolbarItems: some View {
+        Group {
+            Button(action: actions.cancel) {
+                Image(systemName: "xmark")
+                    .frame(width: 22, height: 22)
+            }
+            .help("取消")
+
+            Button(action: actions.startRecording) {
+                Label("开始录制", systemImage: "record.circle")
+            }
+            .help("开始录制")
+            .keyboardShortcut(.return, modifiers: [])
+        }
     }
 
     @ViewBuilder
@@ -1897,6 +2152,30 @@ private struct RegionSelectionToolbarView: View {
             RoundedRectangle(cornerRadius: 5)
                 .fill(tool == state.activeTool ? Color.accentColor.opacity(0.18) : .clear)
         )
+    }
+}
+
+private struct RegionSelectionConfirmToolbarView: View {
+    let startAction: () -> Void
+    let cancelAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: cancelAction) {
+                Image(systemName: "xmark")
+                    .frame(width: 22, height: 22)
+            }
+            .help("取消")
+
+            Button(action: startAction) {
+                Label("开始录制", systemImage: "record.circle")
+            }
+            .keyboardShortcut(.return, modifiers: [])
+            .help("开始录制")
+        }
+        .buttonStyle(.borderless)
+        .toolbarSurface()
+        .fixedSize()
     }
 }
 

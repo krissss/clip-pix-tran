@@ -8,6 +8,7 @@ final class ScreenshotHistoryStore {
 
     private let persistence: ScreenshotHistoryPersistence?
     private let persistencePreference: HistoryPersistencePreference
+    private let recordingFileStore: ScreenRecordingFileManaging
     private let shouldRestorePersistsHistoryFromSnapshot: Bool
     private var isLoading = false
     private var maximumItems: Int
@@ -23,11 +24,13 @@ final class ScreenshotHistoryStore {
         limit: Int = 20,
         persistsHistory: Bool? = nil,
         persistence: ScreenshotHistoryPersistence? = nil,
+        recordingFileStore: ScreenRecordingFileManaging = ScreenRecordingFileStore(),
         persistsHistoryDefaultsKey: String? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.maximumItems = max(1, limit)
         self.persistence = persistence
+        self.recordingFileStore = recordingFileStore
         self.persistencePreference = HistoryPersistencePreference(
             defaults: defaults,
             key: persistsHistoryDefaultsKey
@@ -77,12 +80,34 @@ final class ScreenshotHistoryStore {
         persistIfNeeded()
     }
 
+    func record(_ recording: ScreenRecordingOutput) {
+        let fileName = recording.fileURL.lastPathComponent
+        guard !fileName.isEmpty else {
+            return
+        }
+
+        items.insert(
+            ScreenshotItem(
+                recordingFileName: fileName,
+                createdAt: recording.createdAt,
+                duration: recording.duration,
+                pixelSize: recording.pixelSize,
+                fileSize: recording.fileSize
+            ),
+            at: 0
+        )
+        trimToLimit()
+        persistIfNeeded()
+    }
+
     func delete(_ item: ScreenshotItem) {
         items.removeAll { $0.id == item.id }
+        deleteRecordingFiles(for: [item])
         persistIfNeeded()
     }
 
     func clear() {
+        deleteRecordingFiles(for: items)
         items.removeAll()
         persistIfNeeded()
     }
@@ -93,7 +118,14 @@ final class ScreenshotHistoryStore {
 
     private func trimToLimit() {
         if items.count > maximumItems {
+            deleteRecordingFiles(for: Array(items[maximumItems...]))
             items.removeSubrange(maximumItems...)
+        }
+    }
+
+    private func deleteRecordingFiles(for items: [ScreenshotItem]) {
+        items.compactMap(\.recordingFileName).forEach { fileName in
+            recordingFileStore.deleteRecording(named: fileName)
         }
     }
 

@@ -150,7 +150,7 @@ struct ScreenshotControllerTests {
         let data = try #require("late-shot".data(using: .utf8))
         let controller = ScreenshotController(
             screenshotService: DelayedScreenshotService(
-                delayNanoseconds: 200_000_000,
+                delayNanoseconds: 5_000_000_000,
                 data: data
             ),
             pasteboard: FakeScreenshotPasteboardService(),
@@ -223,6 +223,273 @@ struct ScreenshotControllerTests {
         await captureTask.value
 
         #expect(controller.history.items.isEmpty)
+    }
+
+    @Test func primaryCaptureUsesRecordingMode() async throws {
+        let outputURL = ScreenRecordingFileStore.defaultDirectoryURL
+            .appending(path: "mode-recording.mp4")
+        let session = FakeScreenRecordingSession(
+            output: ScreenRecordingOutput(
+                fileURL: outputURL,
+                createdAt: Date(timeIntervalSince1970: 12),
+                duration: 2.5,
+                pixelSize: CGSize(width: 320, height: 240),
+                fileSize: 500
+            )
+        )
+        let recordingService = FakeScreenRecordingService(
+            session: session
+        )
+        let overlayFactory = FakeScreenRecordingRegionOverlayFactory()
+        let screenshotService = FakeScreenshotService(
+            mainDisplayResult: .success(Data()),
+            selectedRegionResult: .success(
+                ScreenshotCaptureOutput(
+                    data: Data(),
+                    completion: .startRecording,
+                    sourceRect: CGRect(x: 12, y: 20, width: 320, height: 240)
+                )
+            )
+        )
+        let controller = ScreenshotController(
+            screenshotService: screenshotService,
+            recordingService: recordingService,
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            recordingRegionOverlayFactory: overlayFactory.make
+        )
+        controller.captureMode = .recording
+
+        await controller.performPrimaryCapture()
+
+        let overlay = try #require(overlayFactory.overlays.first)
+        #expect(screenshotService.selectedRegionInitialModes == [.recording])
+        #expect(recordingService.startCallCount == 0)
+        #expect(recordingService.selectedRects == [CGRect(x: 12, y: 20, width: 320, height: 240)])
+        #expect(recordingService.excludedWindowIDs.count == 1)
+        #expect(recordingService.excludedWindowIDs.first?.contains(101) == true)
+        #expect(overlay.recordingRect == CGRect(x: 12, y: 20, width: 320, height: 240))
+        #expect(overlay.showCallCount == 1)
+        #expect(overlay.closeCallCount == 0)
+        #expect(controller.isRecording)
+        #expect(controller.history.items.isEmpty)
+
+        controller.cancelRecording()
+        try await waitUntil {
+            controller.isRecording == false
+                && session.cancelCallCount == 1
+                && overlay.closeCallCount == 1
+        }
+    }
+
+    @Test func selectedRegionStartRecordingUsesExistingSelection() async throws {
+        let selectedRect = CGRect(x: 10, y: 20, width: 300, height: 180)
+        let outputURL = ScreenRecordingFileStore.defaultDirectoryURL
+            .appending(path: "toolbar-recording.mp4")
+        let session = FakeScreenRecordingSession(
+            output: ScreenRecordingOutput(
+                fileURL: outputURL,
+                createdAt: Date(timeIntervalSince1970: 16),
+                duration: 1,
+                pixelSize: CGSize(width: 300, height: 180),
+                fileSize: 256
+            )
+        )
+        let recordingService = FakeScreenRecordingService(
+            session: session
+        )
+        let overlayFactory = FakeScreenRecordingRegionOverlayFactory()
+        let screenshotService = FakeScreenshotService(
+            mainDisplayResult: .success(Data()),
+            selectedRegionResult: .success(
+                ScreenshotCaptureOutput(
+                    data: Data(),
+                    completion: .startRecording,
+                    sourceRect: selectedRect
+                )
+            )
+        )
+        let controller = ScreenshotController(
+            screenshotService: screenshotService,
+            recordingService: recordingService,
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            recordingRegionOverlayFactory: overlayFactory.make
+        )
+
+        await controller.captureSelectedRegion()
+
+        let overlay = try #require(overlayFactory.overlays.first)
+        #expect(screenshotService.selectedRegionInitialModes == [.screenshot])
+        #expect(recordingService.startCallCount == 0)
+        #expect(recordingService.selectedRects == [selectedRect])
+        #expect(recordingService.excludedWindowIDs.count == 1)
+        #expect(recordingService.excludedWindowIDs.first?.contains(101) == true)
+        #expect(overlay.recordingRect == selectedRect)
+        #expect(overlay.showCallCount == 1)
+        #expect(overlay.closeCallCount == 0)
+        #expect(controller.isRecording)
+        #expect(controller.history.items.isEmpty)
+
+        controller.cancelRecording()
+        try await waitUntil {
+            controller.isRecording == false
+                && session.cancelCallCount == 1
+                && overlay.closeCallCount == 1
+        }
+    }
+
+    @Test func stoppingRecordingRecordsOutput() async throws {
+        let createdAt = Date(timeIntervalSince1970: 123)
+        let outputURL = ScreenRecordingFileStore.defaultDirectoryURL
+            .appending(path: "recorded.mp4")
+        let session = FakeScreenRecordingSession(
+            output: ScreenRecordingOutput(
+                fileURL: outputURL,
+                createdAt: createdAt,
+                duration: 4,
+                pixelSize: CGSize(width: 640, height: 360),
+                fileSize: 2048
+            )
+        )
+        let selectedRect = CGRect(x: 20, y: 30, width: 640, height: 360)
+        let overlayFactory = FakeScreenRecordingRegionOverlayFactory()
+        let screenshotService = FakeScreenshotService(
+            mainDisplayResult: .success(Data()),
+            selectedRegionResult: .success(
+                ScreenshotCaptureOutput(
+                    data: Data(),
+                    completion: .startRecording,
+                    sourceRect: selectedRect
+                )
+            )
+        )
+        let controller = ScreenshotController(
+            screenshotService: screenshotService,
+            recordingService: FakeScreenRecordingService(session: session),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            recordingRegionOverlayFactory: overlayFactory.make
+        )
+
+        await controller.startSelectedRegionRecording()
+        let overlay = try #require(overlayFactory.overlays.first)
+        #expect(overlay.recordingRect == selectedRect)
+        #expect(overlay.showCallCount == 1)
+        controller.stopRecording()
+
+        #expect(screenshotService.selectedRegionInitialModes == [.recording])
+        try await waitUntil {
+            controller.isRecording == false
+                && controller.history.items.count == 1
+                && overlay.closeCallCount == 1
+        }
+
+        let item = try #require(controller.history.items.first)
+        #expect(session.stopCallCount == 1)
+        #expect(item.kind == .recording)
+        #expect(item.recordingFileName == "recorded.mp4")
+        #expect(item.createdAt == createdAt)
+        #expect(item.duration == 4)
+        #expect(item.pixelSize == CGSize(width: 640, height: 360))
+        #expect(item.byteCount == 2048)
+        #expect(controller.lastErrorMessage == nil)
+        #expect(controller.lastCaptureError == nil)
+    }
+
+    @Test func cancellingRecordingDoesNotRecordOutput() async throws {
+        let selectedRect = CGRect(x: 30, y: 40, width: 300, height: 200)
+        let overlayFactory = FakeScreenRecordingRegionOverlayFactory()
+        let session = FakeScreenRecordingSession(
+            output: ScreenRecordingOutput(
+                fileURL: ScreenRecordingFileStore.defaultDirectoryURL.appending(path: "cancelled.mp4"),
+                createdAt: Date(),
+                duration: 1,
+                pixelSize: CGSize(width: 10, height: 10),
+                fileSize: 1
+            )
+        )
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(
+                    ScreenshotCaptureOutput(
+                        data: Data(),
+                        completion: .startRecording,
+                        sourceRect: selectedRect
+                    )
+                )
+            ),
+            recordingService: FakeScreenRecordingService(session: session),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            recordingRegionOverlayFactory: overlayFactory.make
+        )
+
+        await controller.startSelectedRegionRecording()
+        let overlay = try #require(overlayFactory.overlays.first)
+        #expect(overlay.recordingRect == selectedRect)
+        #expect(overlay.showCallCount == 1)
+        controller.cancelRecording()
+
+        try await waitUntil {
+            controller.isRecording == false
+                && session.cancelCallCount == 1
+                && overlay.closeCallCount == 1
+        }
+
+        #expect(controller.history.items.isEmpty)
+    }
+
+    @Test func gifExportOptionsClampToSupportedRange() {
+        let options = ScreenRecordingGIFExportOptions(
+            frameRate: 120,
+            playbackSpeed: 0.1,
+            maximumPixelSize: 4096,
+            maximumFrameCount: 6000
+        ).sanitized
+
+        #expect(options.frameRate == 120)
+        #expect(options.playbackSpeed == 0.25)
+        #expect(options.maximumPixelSize == 1920)
+        #expect(options.maximumFrameCount == 6000)
+    }
+
+    @Test func gifExportOptionsPreserveMinimumViableValues() {
+        let options = ScreenRecordingGIFExportOptions(
+            frameRate: .infinity,
+            playbackSpeed: 0,
+            maximumPixelSize: 0,
+            maximumFrameCount: 0
+        ).sanitized
+
+        #expect(options.frameRate == 10)
+        #expect(options.playbackSpeed == 0.25)
+        #expect(options.maximumPixelSize == 320)
+        #expect(options.maximumFrameCount == 1)
+    }
+
+    @Test func gifFramePlanDoesNotApplyPreviewFrameCap() throws {
+        let options = ScreenRecordingGIFExportOptions(
+            frameRate: 60,
+            playbackSpeed: 1,
+            maximumPixelSize: 960,
+            maximumFrameCount: 6000
+        )
+
+        let framePlan = try #require(
+            ScreenRecordingGIFFramePlan(
+                sourceDuration: 10.53,
+                options: options,
+                maximumFrameCount: options.maximumFrameCount
+            )
+        )
+
+        #expect(framePlan.requestedFrameCount == 632)
+        #expect(framePlan.exportFrameCount == 632)
+        #expect(framePlan.frameCount == 632)
+        #expect(framePlan.frameDelay < 0.02)
+        #expect(framePlan.isTruncated == false)
     }
 
     @Test func copyFailureSetsErrorMessage() throws {
@@ -422,7 +689,7 @@ private struct DelayedScreenshotService: ScreenshotService {
         try await delayedData()
     }
 
-    func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+    func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput {
         ScreenshotCaptureOutput(data: try await delayedData(), completion: .copy)
     }
 
@@ -432,16 +699,103 @@ private struct DelayedScreenshotService: ScreenshotService {
     }
 }
 
-private struct FakeScreenshotService: ScreenshotService {
+private final class FakeScreenshotService: ScreenshotService, @unchecked Sendable {
     let mainDisplayResult: Result<Data, Error>
     let selectedRegionResult: Result<ScreenshotCaptureOutput, Error>
+    private(set) var selectedRegionInitialModes: [ScreenshotRegionCaptureMode] = []
+
+    init(
+        mainDisplayResult: Result<Data, Error>,
+        selectedRegionResult: Result<ScreenshotCaptureOutput, Error>
+    ) {
+        self.mainDisplayResult = mainDisplayResult
+        self.selectedRegionResult = selectedRegionResult
+    }
 
     func captureMainDisplay() async throws -> Data {
         try mainDisplayResult.get()
     }
 
-    func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
-        try selectedRegionResult.get()
+    func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput {
+        selectedRegionInitialModes.append(initialMode)
+        return try selectedRegionResult.get()
+    }
+}
+
+private final class FakeScreenRecordingService: ScreenRecordingService, @unchecked Sendable {
+    private let session: ScreenRecordingSession
+    private(set) var startCallCount = 0
+    private(set) var selectedRects: [CGRect] = []
+    private(set) var excludedWindowIDs: [Set<CGWindowID>] = []
+
+    init(session: ScreenRecordingSession) {
+        self.session = session
+    }
+
+    func startSelectedRegionRecording() async throws -> ScreenRecordingSession {
+        startCallCount += 1
+        return session
+    }
+
+    func startRecording(
+        in selectedRect: CGRect,
+        excludingWindowIDs: Set<CGWindowID>
+    ) async throws -> ScreenRecordingSession {
+        selectedRects.append(selectedRect)
+        self.excludedWindowIDs.append(excludingWindowIDs)
+        return session
+    }
+}
+
+private final class FakeScreenRecordingSession: ScreenRecordingSession, @unchecked Sendable {
+    let startedAt: Date
+    private let output: ScreenRecordingOutput
+    private(set) var stopCallCount = 0
+    private(set) var cancelCallCount = 0
+
+    init(output: ScreenRecordingOutput) {
+        self.output = output
+        self.startedAt = output.createdAt
+    }
+
+    func stop() async throws -> ScreenRecordingOutput {
+        stopCallCount += 1
+        return output
+    }
+
+    func cancel() async {
+        cancelCallCount += 1
+    }
+}
+
+private final class FakeScreenRecordingRegionOverlayFactory {
+    private(set) var overlays: [FakeScreenRecordingRegionOverlay] = []
+
+    func make(_ recordingRect: CGRect) -> ScreenRecordingRegionOverlayPresenting {
+        let overlay = FakeScreenRecordingRegionOverlay(recordingRect: recordingRect)
+        overlays.append(overlay)
+        return overlay
+    }
+}
+
+private final class FakeScreenRecordingRegionOverlay: ScreenRecordingRegionOverlayPresenting {
+    let recordingRect: CGRect
+    private(set) var showCallCount = 0
+    private(set) var closeCallCount = 0
+    var excludedWindowIDs: Set<CGWindowID> {
+        showCallCount > 0 ? [101] : []
+    }
+
+    init(recordingRect: CGRect) {
+        self.recordingRect = recordingRect
+    }
+
+    func show() {
+        showCallCount += 1
+    }
+
+    func close() {
+        closeCallCount += 1
     }
 }
 

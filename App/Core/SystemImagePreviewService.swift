@@ -13,6 +13,12 @@ enum SystemImagePreviewService {
 
     @MainActor
     static func openInPreviewApp(item: ScreenshotItem) {
+        if item.isRecording,
+           let url = item.recordingURL {
+            NSWorkspace.shared.open(url)
+            return
+        }
+
         guard let url = imageURL(for: item) else {
             return
         }
@@ -36,7 +42,11 @@ enum SystemImagePreviewService {
     }
 
     static func imageURL(for item: ScreenshotItem) -> URL? {
-        writeTemporaryImageFile(data: item.data, id: item.id, prefix: "screenshot")
+        guard item.isImage else {
+            return nil
+        }
+
+        return writeTemporaryImageFile(data: item.data, id: item.id, prefix: "screenshot")
     }
 
     static func imageURL(for item: ClipboardItem) -> URL? {

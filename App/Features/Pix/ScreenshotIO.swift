@@ -76,9 +76,12 @@ struct SystemScreenshotService: ScreenshotService {
         return try await capturePNGData(in: screenFrame)
     }
 
-    nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
+    nonisolated func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput {
         let snapshots = await captureDisplaySnapshotsBestEffort()
-        return try await RegionSelectionOverlay.capture(initialSnapshots: snapshots) { rect, excludedWindowIDs in
+        return try await RegionSelectionOverlay.capture(
+            initialMode: initialMode,
+            initialSnapshots: snapshots
+        ) { rect, excludedWindowIDs in
             try Task.checkCancellation()
             return try await capturePNGData(
                 in: rect,
@@ -87,7 +90,7 @@ struct SystemScreenshotService: ScreenshotService {
         }
     }
 
-    nonisolated private func captureDisplaySnapshotsBestEffort() async -> [ScreenCaptureSnapshot] {
+    nonisolated func captureDisplaySnapshotsBestEffort() async -> [ScreenCaptureSnapshot] {
         do {
             return try await captureDisplaySnapshots()
         } catch {
@@ -297,7 +300,7 @@ struct SystemScreenshotService: ScreenshotService {
         }
     }
 
-    nonisolated private func ensureScreenCaptureAccess() async throws {
+    nonisolated func ensureScreenCaptureAccess() async throws {
         if CGPreflightScreenCaptureAccess() {
             return
         }
@@ -311,7 +314,7 @@ struct SystemScreenshotService: ScreenshotService {
         }
     }
 
-    nonisolated private func loadShareableContent() async throws -> SCShareableContent {
+    nonisolated func loadShareableContent() async throws -> SCShareableContent {
         try await withCheckedThrowingContinuation { continuation in
             SCShareableContent.getExcludingDesktopWindows(
                 false,
@@ -328,7 +331,7 @@ struct SystemScreenshotService: ScreenshotService {
         }
     }
 
-    nonisolated private func screenRegion(for rect: CGRect) async throws -> ScreenCaptureRegion {
+    nonisolated func screenRegion(for rect: CGRect) async throws -> ScreenCaptureRegion {
         try await MainActor.run {
             let normalizedRect = rect.standardized
             guard let screen = NSScreen.screens.max(by: { first, second in
@@ -352,11 +355,11 @@ struct SystemScreenshotService: ScreenshotService {
         }
     }
 
-    nonisolated private func sourceRect(for region: ScreenCaptureRegion) -> CGRect {
+    nonisolated func sourceRect(for region: ScreenCaptureRegion) -> CGRect {
         ScreenCaptureCoordinateConverter.sourceRect(for: region)
     }
 
-    nonisolated private func display(
+    nonisolated func display(
         matching displayID: CGDirectDisplayID,
         in displays: [SCDisplay]
     ) throws -> SCDisplay {
