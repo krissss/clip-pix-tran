@@ -197,13 +197,11 @@ private struct ImagePreviewDetailView: View {
     let onClose: () -> Void
 
     @State private var zoomScale = 1.0
+    @State private var nsImage: NSImage?
+    @State private var didLoadImage = false
 
     private let minZoomScale = 0.25
     private let maxZoomScale = 4.0
-
-    private var nsImage: NSImage? {
-        NSImage(data: data)
-    }
 
     private var zoomPercentText: String {
         "\(Int((zoomScale * 100).rounded()))%"
@@ -278,11 +276,14 @@ private struct ImagePreviewDetailView: View {
                         nsImage: nsImage,
                         zoomScale: zoomScale
                     )
-                } else {
+                } else if didLoadImage {
                     ContentUnavailableView(
                         "无法预览图片",
                         systemImage: "exclamationmark.triangle"
                     )
+                } else {
+                    ProgressView()
+                        .controlSize(.regular)
                 }
             }
             .frame(
@@ -293,6 +294,15 @@ private struct ImagePreviewDetailView: View {
                 idealHeight: 460,
                 maxHeight: .infinity
             )
+        }
+        .task(id: data) {
+            nsImage = nil
+            didLoadImage = false
+            let sourceData = data
+            nsImage = await Task.detached(priority: .utility) {
+                NSImage(data: sourceData)
+            }.value
+            didLoadImage = true
         }
     }
 

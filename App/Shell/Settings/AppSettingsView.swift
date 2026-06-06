@@ -101,29 +101,27 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
 private struct GeneralSettingsSection: View {
     @Bindable var preference: DockIconPreference
-    @State private var hidesDockIconWhenMainWindowClosed: Bool
-
-    init(preference: DockIconPreference) {
-        self.preference = preference
-        self._hidesDockIconWhenMainWindowClosed = State(
-            initialValue: preference.hidesDockIconWhenMainWindowClosed
-        )
-    }
 
     var body: some View {
         SettingsGroup(title: "Dock") {
             VStack(spacing: 0) {
                 toggleRow(
                     "关闭主窗口后隐藏 Dock 图标",
-                    isOn: $hidesDockIconWhenMainWindowClosed
-                ) { newValue in
-                    preference.updateHidesDockIconWhenMainWindowClosed(newValue)
-                }
+                    isOn: hidesDockIconWhenMainWindowClosed
+                )
             }
             .settingsRowGroup()
         }
 
         SettingsFootnote("开启后，关闭主窗口时应用会留在菜单栏；从菜单栏打开主窗口时会临时恢复 Dock 图标。")
+    }
+
+    private var hidesDockIconWhenMainWindowClosed: Binding<Bool> {
+        Binding {
+            preference.hidesDockIconWhenMainWindowClosed
+        } set: { newValue in
+            preference.updateHidesDockIconWhenMainWindowClosed(newValue)
+        }
     }
 }
 
@@ -205,92 +203,80 @@ private struct ShortcutsSettingsSection: View {
 
 private struct ClipSettingsSection: View {
     @Bindable var history: ClipboardHistoryStore
-    @State private var maximumNormalItems: Double
-    @State private var persistsHistory: Bool
-
-    init(history: ClipboardHistoryStore) {
-        self.history = history
-        self._maximumNormalItems = State(initialValue: Double(history.limit))
-        self._persistsHistory = State(initialValue: history.persistsHistory)
-    }
 
     var body: some View {
         SettingsGroup(title: "历史") {
             VStack(spacing: 0) {
-                toggleRow("重启后保留剪贴板历史", isOn: $persistsHistory) { newValue in
-                    history.updatePersistsHistory(newValue)
-                }
+                toggleRow("重启后保留剪贴板历史", isOn: persistsHistory)
                 historyLimitRow(
                     title: "普通历史上限",
-                    value: $maximumNormalItems,
+                    value: maximumNormalItems,
                     range: 10...200,
                     step: 10
-                ) { newValue in
-                    history.updateLimit(Int(newValue))
-                }
+                )
             }
             .settingsRowGroup()
         }
 
         SettingsFootnote("关闭保留历史后，已保存的剪贴板历史文件会被删除。")
     }
+
+    private var maximumNormalItems: Binding<Double> {
+        Binding {
+            Double(history.limit)
+        } set: { newValue in
+            history.updateLimit(Int(newValue))
+        }
+    }
+
+    private var persistsHistory: Binding<Bool> {
+        Binding {
+            history.persistsHistory
+        } set: { newValue in
+            history.updatePersistsHistory(newValue)
+        }
+    }
 }
 
 private struct PixSettingsSection: View {
     @Bindable var history: ScreenshotHistoryStore
-    @State private var maximumItems: Double
-    @State private var persistsHistory: Bool
-
-    init(history: ScreenshotHistoryStore) {
-        self.history = history
-        self._maximumItems = State(initialValue: Double(history.limit))
-        self._persistsHistory = State(initialValue: history.persistsHistory)
-    }
 
     var body: some View {
         SettingsGroup(title: "历史") {
             VStack(spacing: 0) {
-                toggleRow("重启后保留截图历史", isOn: $persistsHistory) { newValue in
-                    history.updatePersistsHistory(newValue)
-                }
+                toggleRow("重启后保留截图历史", isOn: persistsHistory)
                 historyLimitRow(
                     title: "截图历史上限",
-                    value: $maximumItems,
+                    value: maximumItems,
                     range: 5...200,
                     step: 5
-                ) { newValue in
-                    history.updateLimit(Int(newValue))
-                }
+                )
             }
             .settingsRowGroup()
         }
 
         SettingsFootnote("截图可能包含敏感信息；开启保留历史后，会把最近截图保存到本机应用支持目录。")
     }
+
+    private var maximumItems: Binding<Double> {
+        Binding {
+            Double(history.limit)
+        } set: { newValue in
+            history.updateLimit(Int(newValue))
+        }
+    }
+
+    private var persistsHistory: Binding<Bool> {
+        Binding {
+            history.persistsHistory
+        } set: { newValue in
+            history.updatePersistsHistory(newValue)
+        }
+    }
 }
 
 private struct TranSettingsSection: View {
     @Bindable var controller: TranslationController
-    @State private var maximumItems: Double
-    @State private var persistsHistory: Bool
-    @State private var openAIBaseURL: String
-    @State private var openAIAPIKey: String
-    @State private var openAIModel: String
-    @State private var openAITTSModel: String
-    @State private var openAITTSVoice: String
-
-    init(controller: TranslationController) {
-        self.controller = controller
-        self._maximumItems = State(initialValue: Double(controller.history.limit))
-        self._persistsHistory = State(initialValue: controller.history.persistsHistory)
-        let configuration = controller.preferences.openAICompatibleConfiguration
-        self._openAIBaseURL = State(initialValue: configuration.baseURL)
-        self._openAIAPIKey = State(initialValue: configuration.apiKey)
-        self._openAIModel = State(initialValue: configuration.model)
-        let ttsConfiguration = controller.preferences.openAITextToSpeechConfiguration
-        self._openAITTSModel = State(initialValue: ttsConfiguration.model)
-        self._openAITTSVoice = State(initialValue: ttsConfiguration.voice)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -352,58 +338,44 @@ private struct TranSettingsSection: View {
             SettingsGroup(title: "OpenAI Compatible") {
                 VStack(spacing: 0) {
                     SettingsFormRow(title: "Base URL") {
-                        TextField("https://api.openai.com/v1", text: $openAIBaseURL)
+                        TextField("https://api.openai.com/v1", text: openAIBaseURL)
                             .textFieldStyle(.roundedBorder)
-                            .onSubmit(saveOpenAICompatibleConfiguration)
                     }
 
                     SettingsFormRow(title: "API Key") {
-                        SecureField("sk-...", text: $openAIAPIKey)
+                        SecureField("sk-...", text: openAIAPIKey)
                             .textFieldStyle(.roundedBorder)
-                            .onSubmit(saveOpenAICompatibleConfiguration)
                     }
 
                     SettingsFormRow(title: "Translation Model") {
-                        TextField("gpt-4o-mini", text: $openAIModel)
+                        TextField("gpt-4o-mini", text: openAIModel)
                             .textFieldStyle(.roundedBorder)
-                            .onSubmit(saveOpenAICompatibleConfiguration)
                     }
 
                     SettingsFormRow(title: "TTS Model") {
-                        TextField(OpenAITextToSpeechConfiguration.defaultModel, text: $openAITTSModel)
+                        TextField(OpenAITextToSpeechConfiguration.defaultModel, text: openAITTSModel)
                             .textFieldStyle(.roundedBorder)
-                            .onSubmit(saveOpenAITextToSpeechConfiguration)
                     }
 
                     SettingsFormRow(title: "TTS Voice") {
-                        TextField(OpenAITextToSpeechConfiguration.defaultVoice, text: $openAITTSVoice)
+                        TextField(OpenAITextToSpeechConfiguration.defaultVoice, text: openAITTSVoice)
                             .textFieldStyle(.roundedBorder)
-                            .onSubmit(saveOpenAITextToSpeechConfiguration)
                     }
                 }
                 .settingsRowGroup()
 
                 SettingsFootnote("MiMo 发音：Base URL 可填到 host 或 /v1；TTS Voice 使用 mimo_default、Chloe 等，alloy 会自动按 mimo_default 处理。")
             }
-            .onChange(of: openAIBaseURL) { _, _ in saveOpenAICompatibleConfiguration() }
-            .onChange(of: openAIAPIKey) { _, _ in saveOpenAICompatibleConfiguration() }
-            .onChange(of: openAIModel) { _, _ in saveOpenAICompatibleConfiguration() }
-            .onChange(of: openAITTSModel) { _, _ in saveOpenAITextToSpeechConfiguration() }
-            .onChange(of: openAITTSVoice) { _, _ in saveOpenAITextToSpeechConfiguration() }
 
             SettingsGroup(title: "历史") {
                 VStack(spacing: 0) {
-                    toggleRow("重启后保留翻译历史", isOn: $persistsHistory) { newValue in
-                        controller.history.updatePersistsHistory(newValue)
-                    }
+                    toggleRow("重启后保留翻译历史", isOn: persistsHistory)
                     historyLimitRow(
                         title: "翻译历史上限",
-                        value: $maximumItems,
+                        value: maximumItems,
                         range: 10...200,
                         step: 10
-                    ) { newValue in
-                        controller.history.updateLimit(Int(newValue))
-                    }
+                    )
                 }
                 .settingsRowGroup()
             }
@@ -467,32 +439,91 @@ private struct TranSettingsSection: View {
         }
     }
 
-    private func saveOpenAICompatibleConfiguration() {
+    private var maximumItems: Binding<Double> {
+        Binding {
+            Double(controller.history.limit)
+        } set: { newValue in
+            controller.history.updateLimit(Int(newValue))
+        }
+    }
+
+    private var persistsHistory: Binding<Bool> {
+        Binding {
+            controller.history.persistsHistory
+        } set: { newValue in
+            controller.history.updatePersistsHistory(newValue)
+        }
+    }
+
+    private var openAIBaseURL: Binding<String> {
+        Binding {
+            controller.preferences.openAICompatibleConfiguration.baseURL
+        } set: { newValue in
+            updateOpenAICompatibleConfiguration(baseURL: newValue)
+        }
+    }
+
+    private var openAIAPIKey: Binding<String> {
+        Binding {
+            controller.preferences.openAICompatibleConfiguration.apiKey
+        } set: { newValue in
+            updateOpenAICompatibleConfiguration(apiKey: newValue)
+        }
+    }
+
+    private var openAIModel: Binding<String> {
+        Binding {
+            controller.preferences.openAICompatibleConfiguration.model
+        } set: { newValue in
+            updateOpenAICompatibleConfiguration(model: newValue)
+        }
+    }
+
+    private var openAITTSModel: Binding<String> {
+        Binding {
+            controller.preferences.openAITextToSpeechConfiguration.model
+        } set: { newValue in
+            updateOpenAITextToSpeechConfiguration(model: newValue)
+        }
+    }
+
+    private var openAITTSVoice: Binding<String> {
+        Binding {
+            controller.preferences.openAITextToSpeechConfiguration.voice
+        } set: { newValue in
+            updateOpenAITextToSpeechConfiguration(voice: newValue)
+        }
+    }
+
+    private func updateOpenAICompatibleConfiguration(
+        baseURL: String? = nil,
+        apiKey: String? = nil,
+        model: String? = nil
+    ) {
+        let configuration = controller.preferences.openAICompatibleConfiguration
         controller.preferences.updateOpenAICompatibleConfiguration(
             OpenAICompatibleTranslationConfiguration(
-                baseURL: openAIBaseURL,
-                apiKey: openAIAPIKey,
-                model: openAIModel
+                baseURL: baseURL ?? configuration.baseURL,
+                apiKey: apiKey ?? configuration.apiKey,
+                model: model ?? configuration.model
             )
         )
     }
 
-    private func saveOpenAITextToSpeechConfiguration() {
+    private func updateOpenAITextToSpeechConfiguration(
+        model: String? = nil,
+        voice: String? = nil
+    ) {
+        let configuration = controller.preferences.openAITextToSpeechConfiguration
+        let openAIConfiguration = controller.preferences.openAICompatibleConfiguration
         controller.preferences.updateOpenAITextToSpeechConfiguration(
             OpenAITextToSpeechConfiguration(
-                baseURL: openAIBaseURL,
-                apiKey: openAIAPIKey,
-                model: openAITTSModel,
-                voice: openAITTSVoice
+                baseURL: openAIConfiguration.baseURL,
+                apiKey: openAIConfiguration.apiKey,
+                model: model ?? configuration.model,
+                voice: voice ?? configuration.voice
             )
         )
-        let configuration = controller.preferences.openAITextToSpeechConfiguration
-        if openAITTSModel != configuration.model {
-            openAITTSModel = configuration.model
-        }
-        if openAITTSVoice != configuration.voice {
-            openAITTSVoice = configuration.voice
-        }
     }
 }
 
@@ -529,26 +560,26 @@ private struct AboutSettingsSection: View {
     }
 }
 
-private struct SettingsFormRow<Control: View>: View {
-    let titleContent: AnyView
-    @ViewBuilder var control: Control
+private struct SettingsFormRow<Title: View, Control: View>: View {
+    let title: Title
+    let control: Control
 
-    init(title: String, @ViewBuilder control: () -> Control) {
-        self.titleContent = AnyView(Text(title))
+    init(title: String, @ViewBuilder control: () -> Control) where Title == Text {
+        self.title = Text(title)
         self.control = control()
     }
 
-    init<Title: View>(
+    init(
         @ViewBuilder title: () -> Title,
         @ViewBuilder control: () -> Control
     ) {
-        self.titleContent = AnyView(title())
+        self.title = title()
         self.control = control()
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 18) {
-            titleContent
+            title
                 .font(.callout)
                 .lineLimit(2)
                 .frame(width: ControlPanelDesign.Layout.Settings.labelWidth, alignment: .leading)
@@ -593,16 +624,12 @@ private extension View {
 
 private func toggleRow(
     _ title: String,
-    isOn: Binding<Bool>,
-    onChange: @escaping (Bool) -> Void
+    isOn: Binding<Bool>
 ) -> some View {
     SettingsFormRow(title: title) {
         Toggle("", isOn: isOn)
             .labelsHidden()
             .toggleStyle(.switch)
-    }
-    .onChange(of: isOn.wrappedValue) { _, newValue in
-        onChange(newValue)
     }
 }
 
@@ -610,16 +637,12 @@ private func historyLimitRow(
     title: String,
     value: Binding<Double>,
     range: ClosedRange<Double>,
-    step: Double,
-    onChange: @escaping (Double) -> Void
+    step: Double
 ) -> some View {
     SettingsFormRow(title: title) {
         HStack(spacing: 10) {
             Slider(value: value, in: range, step: step)
                 .frame(width: ControlPanelDesign.Layout.Settings.sliderWidth)
-                .onChange(of: value.wrappedValue) { _, newValue in
-                    onChange(newValue)
-                }
 
             Text("\(Int(value.wrappedValue))")
                 .font(.callout.monospacedDigit())

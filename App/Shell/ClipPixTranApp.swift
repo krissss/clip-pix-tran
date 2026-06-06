@@ -12,6 +12,7 @@ struct ClipPixTranApp: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var clipboardMonitor: ClipboardMonitor
     @State private var screenshotController: ScreenshotController
@@ -19,6 +20,7 @@ struct ClipPixTranApp: App {
     @State private var shortcutController: AppShortcutController
     @State private var dockIconPreference: DockIconPreference
     @State private var selectedSection: AppSection = .clip
+    @State private var hasConfiguredRuntime = false
 
     init() {
         let clipboardMonitor = ClipboardMonitor(
@@ -60,8 +62,6 @@ struct ClipPixTranApp: App {
     }
 
     var body: some Scene {
-        let _ = configureAppRuntime()
-
         WindowGroup("ClipPixTran", id: "main") {
             AppShellView(
                 clipboardMonitor: clipboardMonitor,
@@ -77,6 +77,9 @@ struct ClipPixTranApp: App {
         }
         .defaultLaunchBehavior(.suppressed)
         .defaultSize(width: 1040, height: 680)
+        .onChange(of: scenePhase, initial: true) {
+            configureAppRuntime()
+        }
 
         Settings {
             AppSettingsView(
@@ -89,9 +92,6 @@ struct ClipPixTranApp: App {
     }
 
     private func configureAppRuntime() {
-        AppDockIconController.shared.configure(preference: dockIconPreference)
-        clipboardMonitor.start()
-        shortcutController.start()
         shortcutController.openMainWindow = openMainWindow
         shortcutController.openSection = { section in
             selectedSection = section
@@ -109,6 +109,15 @@ struct ClipPixTranApp: App {
             openMainWindowAction: openMainWindow,
             openSettingsAction: openSettings.callAsFunction
         )
+
+        guard !hasConfiguredRuntime else {
+            return
+        }
+
+        hasConfiguredRuntime = true
+        AppDockIconController.shared.configure(preference: dockIconPreference)
+        clipboardMonitor.start()
+        shortcutController.start()
     }
 
     private func openMainWindow() {
