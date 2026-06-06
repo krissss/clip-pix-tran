@@ -1,5 +1,5 @@
 //
-//  Application.swift
+//  ClipPixTranApp.swift
 //
 //  Created by kriss k on 2026/5/25.
 //
@@ -8,7 +8,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct Application: App {
+struct ClipPixTranApp: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -63,7 +63,7 @@ struct Application: App {
         let _ = configureAppRuntime()
 
         WindowGroup("ClipPixTran", id: "main") {
-            ContentView(
+            AppShellView(
                 clipboardMonitor: clipboardMonitor,
                 screenshotController: screenshotController,
                 translationController: translationController,

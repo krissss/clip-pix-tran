@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct TranView: View {
+struct TranslationView: View {
     @Bindable var controller: TranslationController
     @State private var historySearchText = ""
     @State private var showsClearHistoryConfirmation = false
@@ -593,7 +593,7 @@ private struct TranslationHistoryRow: View {
 }
 
 #Preview {
-    TranView(
+    TranslationView(
         controller: TranslationController(
             history: .preview,
             translationService: FallbackTranslationService(),

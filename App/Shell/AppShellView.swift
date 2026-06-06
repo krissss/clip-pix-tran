@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  AppShellView.swift
 //  ClipPixTran
 //
 //  Created by kriss k on 2026/5/25.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct AppShellView: View {
     @Environment(\.openSettings) private var openSettings
 
     @Bindable var clipboardMonitor: ClipboardMonitor
@@ -97,7 +97,7 @@ struct ContentView: View {
         case .pix:
             PixView(controller: screenshotController)
         case .tran:
-            TranView(controller: translationController)
+            TranslationView(controller: translationController)
         }
     }
 
@@ -146,7 +146,7 @@ private struct SidebarSectionButton: View {
 }
 
 #Preview {
-    ContentView(
+    AppShellView(
         clipboardMonitor: ClipboardMonitor(
             pasteboard: PreviewClipboardService(),
             history: ClipboardHistoryStore.preview
