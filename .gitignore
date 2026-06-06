@@ -39,3 +39,4 @@ Config/Signing.local.xcconfig
 
 # Local brainstorming companion sessions
 .superpowers/
+.gitnexus
