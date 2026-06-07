@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-07
+
+### Fixed
+
+- 显示版本并本地化更新提示
+
 ## [0.1.0] - 2026-06-07
 
 ### Added
@@ -28,5 +34,6 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/krissss/clip-pix-tran/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/krissss/clip-pix-tran/commits/v0.1.0
