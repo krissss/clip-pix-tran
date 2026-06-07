@@ -1,3 +1,2 @@
 // Shared signing settings. Keep personal Team IDs in Signing.local.xcconfig.
 #include? "Signing.local.xcconfig"
-

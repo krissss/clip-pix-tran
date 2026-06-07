@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A1B2C3D42FD1000000000001 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42FD1000000000002 /* KeyboardShortcuts */; };
+		A1B2C3D42FD2000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42FD2000000000002 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,6 +24,7 @@
 /* Begin PBXFileReference section */
 		2068739D2FC3FBAB004E0380 /* ClipPixTran.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipPixTran.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		206873AC2FC3FBAD004E0380 /* ClipPixTranTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipPixTranTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D42FD0000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D42FD0000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		A1B2C3D42FD0000000000002 /* Signing.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.example.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -46,6 +48,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D42FD1000000000001 /* KeyboardShortcuts in Frameworks */,
+				A1B2C3D42FD2000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,6 +84,7 @@
 		A1B2C3D42FD0000000000003 /* Config */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D42FD0000000000000 /* Info.plist */,
 				A1B2C3D42FD0000000000001 /* Signing.xcconfig */,
 				A1B2C3D42FD0000000000002 /* Signing.example.xcconfig */,
 			);
@@ -108,6 +112,7 @@
 			name = ClipPixTran;
 			packageProductDependencies = (
 				A1B2C3D42FD1000000000002 /* KeyboardShortcuts */,
+				A1B2C3D42FD2000000000002 /* Sparkle */,
 			);
 			productName = ClipPixTran;
 			productReference = 2068739D2FC3FBAB004E0380 /* ClipPixTran.app */;
@@ -166,6 +171,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A1B2C3D42FD1000000000003 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				A1B2C3D42FD2000000000003 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2068739E2FC3FBAB004E0380 /* Products */;
@@ -352,9 +358,8 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSAccessibilityUsageDescription = "ClipPixTran 需要辅助功能权限来读取选中文本，并在截图时识别窗口和控件位置。";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -383,9 +388,8 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSAccessibilityUsageDescription = "ClipPixTran 需要辅助功能权限来读取选中文本，并在截图时识别窗口和控件位置。";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -484,6 +488,14 @@
 				minimumVersion = 1.9.4;
 			};
 		};
+		A1B2C3D42FD2000000000003 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -491,6 +503,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D42FD1000000000003 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
 			productName = KeyboardShortcuts;
+		};
+		A1B2C3D42FD2000000000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42FD2000000000003 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

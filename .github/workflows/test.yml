@@ -1,0 +1,25 @@
+name: Test
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Xcode dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: xcode-${{ runner.os }}-${{ hashFiles('ClipPixTran.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            xcode-${{ runner.os }}-
+
+      - name: Run tests
+        run: make test

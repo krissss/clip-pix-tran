@@ -19,6 +19,7 @@ struct ClipPixTranApp: App {
     @State private var translationController: TranslationController
     @State private var shortcutController: AppShortcutController
     @State private var dockIconPreference: DockIconPreference
+    @State private var updateManager: AppUpdateManager
     @State private var selectedSection: AppSection = .clip
     @State private var hasConfiguredRuntime = false
 
@@ -59,6 +60,7 @@ struct ClipPixTranApp: App {
             )
         )
         self._dockIconPreference = State(initialValue: DockIconPreference())
+        self._updateManager = State(initialValue: AppUpdateManager())
     }
 
     var body: some Scene {
@@ -86,7 +88,8 @@ struct ClipPixTranApp: App {
                 clipboardHistory: clipboardMonitor.history,
                 screenshotHistory: screenshotController.history,
                 translationController: translationController,
-                dockIconPreference: dockIconPreference
+                dockIconPreference: dockIconPreference,
+                updateManager: updateManager
             )
         }
     }

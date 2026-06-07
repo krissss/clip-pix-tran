@@ -11,6 +11,10 @@ final class KeychainTranslationSecretStore: TranslationSecretStore {
     private let account = "openai-compatible-api-key"
 
     func openAICompatibleAPIKey() -> String {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            return ""
+        }
+
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne

@@ -1,0 +1,270 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
+  release:
+    needs: test
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache Xcode dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: xcode-${{ runner.os }}-${{ hashFiles('ClipPixTran.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            xcode-${{ runner.os }}-
+
+      - name: Validate Sparkle secrets
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          test -n "$SPARKLE_PRIVATE_KEY"
+
+      - name: Package app
+        run: make package TAG="${{ github.ref_name }}"
+
+      - name: Generate checksums
+        id: checksum
+        run: |
+          ZIP_SHA=$(shasum -a 256 "ClipPixTran-${{ github.ref_name }}.zip" | cut -d ' ' -f 1)
+          DMG_SHA=$(shasum -a 256 "ClipPixTran-${{ github.ref_name }}.dmg" | cut -d ' ' -f 1)
+          echo "zip_sha=$ZIP_SHA" >> "$GITHUB_OUTPUT"
+          echo "dmg_sha=$DMG_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Sign update with Sparkle
+        id: sparkle_sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          SIGN_UPDATE=$(make print-sparkle-sign-update)
+          SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" "ClipPixTran-${{ github.ref_name }}.zip" --ed-key-file - 2>&1)
+          ED_SIG=$(printf '%s\n' "$SIGNATURE" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+          test -n "$ED_SIG"
+          echo "ed_signature=$ED_SIG" >> "$GITHUB_OUTPUT"
+
+          SIZE=$(stat -f%z "ClipPixTran-${{ github.ref_name }}.zip")
+          echo "length=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+
+          {
+            echo "## ClipPixTran ${VERSION}"
+            echo
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "Changes since ${PREVIOUS_TAG}:"
+              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${TAG}"
+            else
+              echo "Changes:"
+              git log --pretty=format:'- %s (%h)' "${TAG}"
+            fi
+            echo
+            echo
+            echo "## Checksums"
+            echo
+            echo '```text'
+            echo "ClipPixTran-${TAG}.zip  ${{ steps.checksum.outputs.zip_sha }}"
+            echo "ClipPixTran-${TAG}.dmg  ${{ steps.checksum.outputs.dmg_sha }}"
+            echo '```'
+          } > /tmp/release_notes.md
+
+      - name: Generate appcast item
+        env:
+          TAG: ${{ github.ref_name }}
+          ED_SIG: ${{ steps.sparkle_sign.outputs.ed_signature }}
+          LENGTH: ${{ steps.sparkle_sign.outputs.length }}
+        run: |
+          export DATE="$(date -R)"
+          export VERSION="${TAG#v}"
+          export BUILD_NUMBER="$(git rev-list --count "${TAG}")"
+
+          python3 <<'PY'
+          import html
+          import os
+          import re
+
+          tag = os.environ["TAG"]
+          version = os.environ["VERSION"]
+          build_number = os.environ["BUILD_NUMBER"]
+          date = os.environ["DATE"]
+          ed_sig = os.environ["ED_SIG"]
+          length = os.environ["LENGTH"]
+
+          with open('/tmp/release_notes.md') as f:
+              notes = f.read().strip()
+
+          html_parts = []
+          in_list = False
+          for line in notes.split('\n'):
+              stripped = line.strip()
+              if not stripped:
+                  if in_list:
+                      html_parts.append('</ul>')
+                      in_list = False
+                  continue
+              m = re.match(r'^#{1,3}\s+(.*)', stripped)
+              if m:
+                  if in_list:
+                      html_parts.append('</ul>')
+                      in_list = False
+                  html_parts.append(f'<b>{html.escape(m.group(1))}</b>')
+              elif re.match(r'^[-*]\s+', stripped):
+                  if not in_list:
+                      html_parts.append('<ul>')
+                      in_list = True
+                  text = re.sub(r'^[-*]\s+', '', stripped)
+                  html_parts.append(f'<li>{html.escape(text)}</li>')
+              elif stripped.startswith('```'):
+                  continue
+              else:
+                  if in_list:
+                      html_parts.append('</ul>')
+                      in_list = False
+                  html_parts.append(html.escape(stripped))
+          if in_list:
+              html_parts.append('</ul>')
+
+          notes_html = '\n'.join(html_parts).replace(']]>', ']]]]><![CDATA[>')
+          item = '\n'.join([
+              '        <item>',
+              f'            <title>ClipPixTran {version}</title>',
+              f'            <sparkle:version>{build_number}</sparkle:version>',
+              f'            <sparkle:shortVersionString>{version}</sparkle:shortVersionString>',
+              '            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>',
+              f'            <pubDate>{date}</pubDate>',
+              f'            <description><![CDATA[{notes_html}]]></description>',
+              '            <enclosure',
+              f'                url="https://github.com/krissss/clip-pix-tran/releases/download/{tag}/ClipPixTran-{tag}.zip"',
+              f'                sparkle:edSignature="{ed_sig}"',
+              f'                length="{length}"',
+              '                type="application/octet-stream"',
+              '            />',
+              '        </item>',
+          ])
+
+          with open('/tmp/appcast_item.xml', 'w') as f:
+              f.write(item + '\n')
+          PY
+
+      - name: Commit updated appcast
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p docs
+
+          if [ ! -f docs/appcast.xml ]; then
+            cat > docs/appcast.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <channel>
+                  <title>ClipPixTran Update Feed</title>
+                  <link>https://krissss.github.io/clip-pix-tran/appcast.xml</link>
+                  <description>ClipPixTran release updates</description>
+                  <language>zh-CN</language>
+              </channel>
+          </rss>
+          XML
+          fi
+
+          python3 <<'PY'
+          import re
+
+          with open('/tmp/appcast_item.xml') as f:
+              item = f.read().rstrip()
+
+          with open('docs/appcast.xml') as f:
+              content = f.read()
+
+          url_match = re.search(r'url="([^"]+)"', item)
+          if url_match is None:
+              raise SystemExit('appcast item is missing enclosure URL')
+
+          if url_match.group(1) not in content:
+              content = re.sub(r'\s*</channel>', '\n' + item + '\n    </channel>', content, count=1)
+
+          with open('docs/appcast.xml', 'w') as f:
+              f.write(content)
+          PY
+
+          git add docs/appcast.xml
+          git diff --cached --quiet || git commit -m "chore: update appcast.xml for ${{ github.ref_name }}"
+          git push origin main
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/release_notes.md
+          files: |
+            ClipPixTran-${{ github.ref_name }}.zip
+            ClipPixTran-${{ github.ref_name }}.dmg
+
+      - name: Update Homebrew Tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          SHA256: ${{ steps.checksum.outputs.dmg_sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap update."
+            exit 0
+          fi
+
+          VER="${VERSION#v}"
+          cat > clip-pix-tran.rb <<'CASK'
+          cask "clip-pix-tran" do
+            version "_VER_"
+            sha256 "_SHA_"
+
+            url "https://github.com/krissss/clip-pix-tran/releases/download/_TAG_/ClipPixTran-_TAG_.dmg"
+            name "ClipPixTran"
+            desc "macOS clipboard, screenshot, and translation utility"
+            homepage "https://github.com/krissss/clip-pix-tran"
+
+            depends_on macos: ">= :tahoe"
+
+            app "ClipPixTran.app"
+
+            zap delete: [
+              "~/Library/Application Support/ClipPixTran",
+              "~/Library/Caches/com.kriss.ClipPixTran",
+              "~/Library/Preferences/com.kriss.ClipPixTran.plist",
+            ]
+          end
+          CASK
+
+          sed -i '' "s/_VER_/${VER}/g; s/_SHA_/${SHA256}/g; s/_TAG_/${VERSION}/g" clip-pix-tran.rb
+          ENCODED=$(base64 < clip-pix-tran.rb | tr -d '\n')
+          FILE_SHA=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/krissss/homebrew-tap/contents/Casks/clip-pix-tran.rb" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
+
+          BODY="{\"message\":\"Update clip-pix-tran to ${VER}\",\"content\":\"${ENCODED}\"}"
+          if [ -n "$FILE_SHA" ]; then
+            BODY="{\"message\":\"Update clip-pix-tran to ${VER}\",\"content\":\"${ENCODED}\",\"sha\":\"${FILE_SHA}\"}"
+          fi
+
+          curl -sf -X PUT \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/krissss/homebrew-tap/contents/Casks/clip-pix-tran.rb" \
+            -d "$BODY"

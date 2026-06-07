@@ -16,6 +16,7 @@ build/
 .build/
 .swiftpm/
 Package.resolved
+!ClipPixTran.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # CocoaPods / Carthage
 Pods/
@@ -28,6 +29,9 @@ fastlane/screenshots/**/*.png
 fastlane/test_output/
 
 # App archives and signing
+*.app
+*.zip
+*.dmg
 *.ipa
 *.dSYM.zip
 *.dSYM

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>ClipPixTran Update Feed</title>
+        <link>https://krissss.github.io/clip-pix-tran/appcast.xml</link>
+        <description>ClipPixTran release updates</description>
+        <language>zh-CN</language>
+    </channel>
+</rss>

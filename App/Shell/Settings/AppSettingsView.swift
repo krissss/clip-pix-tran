@@ -6,6 +6,7 @@ struct AppSettingsView: View {
     @Bindable var screenshotHistory: ScreenshotHistoryStore
     @Bindable var translationController: TranslationController
     @Bindable var dockIconPreference: DockIconPreference
+    @Bindable var updateManager: AppUpdateManager
     @State private var selectedPane: SettingsPane = .general
 
     var body: some View {
@@ -48,7 +49,7 @@ struct AppSettingsView: View {
         case .tran:
             TranSettingsSection(controller: translationController)
         case .about:
-            AboutSettingsSection()
+            AboutSettingsSection(updateManager: updateManager)
         }
     }
 }
@@ -544,19 +545,80 @@ private struct SettingsGroup<Content: View>: View {
 }
 
 private struct AboutSettingsSection: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            ControlPanelIconTile(
-                systemImage: "sparkles.rectangle.stack",
-                tint: Color.accentColor,
-                size: 58
-            )
+    @Bindable var updateManager: AppUpdateManager
 
-            Text("ClipPixTran")
-                .font(.title3.weight(.semibold))
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsGroup(title: "更新") {
+                VStack(spacing: 0) {
+                    toggleRow("自动检查更新", isOn: automaticallyChecksForUpdates)
+                    toggleRow("自动下载更新", isOn: automaticallyDownloadsUpdates)
+
+                    SettingsFormRow(title: "检查频率") {
+                        Picker("", selection: updateCheckInterval) {
+                            ForEach(UpdateCheckInterval.allCases) { interval in
+                                Text(interval.displayName).tag(interval)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    SettingsFormRow(title: "上次检查") {
+                        HStack(spacing: 10) {
+                            Text(lastUpdateCheckText)
+                                .font(.callout)
+
+                            Spacer(minLength: 0)
+
+                            Button {
+                                updateManager.checkForUpdates()
+                            } label: {
+                                Label("检查更新", systemImage: "arrow.clockwise")
+                            }
+                            .controlSize(.small)
+                            .disabled(!updateManager.canCheckForUpdates)
+                        }
+                    }
+                }
+                .settingsRowGroup()
+            }
+
+            SettingsFootnote(updateManager.isConfigured ? "自动更新通过 GitHub Release 和 Sparkle appcast 提供。" : "当前构建未配置 Sparkle appcast 或公钥。")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+    }
+
+    private var lastUpdateCheckText: String {
+        guard let date = updateManager.lastUpdateCheckDate else {
+            return "从未检查"
+        }
+
+        return date.formatted(date: .numeric, time: .shortened)
+    }
+
+    private var automaticallyChecksForUpdates: Binding<Bool> {
+        Binding {
+            updateManager.automaticallyChecksForUpdates
+        } set: { newValue in
+            updateManager.setAutomaticallyChecksForUpdates(newValue)
+        }
+    }
+
+    private var automaticallyDownloadsUpdates: Binding<Bool> {
+        Binding {
+            updateManager.automaticallyDownloadsUpdates
+        } set: { newValue in
+            updateManager.setAutomaticallyDownloadsUpdates(newValue)
+        }
+    }
+
+    private var updateCheckInterval: Binding<UpdateCheckInterval> {
+        Binding {
+            UpdateCheckInterval.from(seconds: updateManager.updateCheckInterval)
+        } set: { newValue in
+            updateManager.setUpdateCheckInterval(newValue)
+        }
     }
 }
 
@@ -661,6 +723,7 @@ private func historyLimitRow(
             translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
         ),
-        dockIconPreference: DockIconPreference()
+        dockIconPreference: DockIconPreference(),
+        updateManager: AppUpdateManager()
     )
 }
