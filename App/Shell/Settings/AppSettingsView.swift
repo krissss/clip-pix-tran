@@ -549,23 +549,19 @@ private struct AboutSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsGroup(title: "应用") {
-                VStack(spacing: 0) {
-                    SettingsFormRow(title: "名称") {
-                        Text(appName)
-                            .font(.callout)
-                    }
-
-                    SettingsFormRow(title: "当前版本") {
-                        Text(appVersionText)
-                            .font(.callout.monospacedDigit())
-                    }
-                }
-                .settingsRowGroup()
-            }
-
             SettingsGroup(title: "更新") {
                 VStack(spacing: 0) {
+                    SettingsFormRow(title: "当前版本") {
+                        HStack(spacing: 8) {
+                            Text(appVersionText)
+                                .font(.callout.monospacedDigit())
+
+                            #if DEBUG
+                            DebugSettingsBadge()
+                            #endif
+                        }
+                    }
+
                     toggleRow("自动检查更新", isOn: automaticallyChecksForUpdates)
                     toggleRow("自动下载更新", isOn: automaticallyDownloadsUpdates)
 
@@ -602,10 +598,6 @@ private struct AboutSettingsSection: View {
 
             SettingsFootnote(updateManager.isConfigured ? "自动更新通过 GitHub Release 和 Sparkle appcast 提供。" : "当前构建未配置 Sparkle appcast 或公钥。")
         }
-    }
-
-    private var appName: String {
-        bundleInfoValue("CFBundleName") ?? "ClipPixTran"
     }
 
     private var appVersionText: String {
@@ -660,6 +652,24 @@ private struct AboutSettingsSection: View {
         return value
     }
 }
+
+#if DEBUG
+private struct DebugSettingsBadge: View {
+    var body: some View {
+        Text("Debug")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Color(nsColor: .systemRed))
+            .lineLimit(1)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background {
+                RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
+                    .fill(Color(nsColor: .systemRed).opacity(0.12))
+            }
+            .accessibilityLabel("Debug 构建")
+    }
+}
+#endif
 
 private struct SettingsFormRow<Title: View, Control: View>: View {
     let title: Title

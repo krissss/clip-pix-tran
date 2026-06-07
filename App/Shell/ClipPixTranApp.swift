@@ -11,7 +11,6 @@ import SwiftUI
 struct ClipPixTranApp: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var clipboardMonitor: ClipboardMonitor
@@ -64,7 +63,7 @@ struct ClipPixTranApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("ClipPixTran", id: "main") {
+        WindowGroup(mainWindowTitle, id: "main") {
             AppShellView(
                 clipboardMonitor: clipboardMonitor,
                 screenshotController: screenshotController,
@@ -84,13 +83,7 @@ struct ClipPixTranApp: App {
         }
 
         Settings {
-            AppSettingsView(
-                clipboardHistory: clipboardMonitor.history,
-                screenshotHistory: screenshotController.history,
-                translationController: translationController,
-                dockIconPreference: dockIconPreference,
-                updateManager: updateManager
-            )
+            appSettingsView
         }
     }
 
@@ -110,7 +103,7 @@ struct ClipPixTranApp: App {
             translationController: translationController,
             shortcutController: shortcutController,
             openMainWindowAction: openMainWindow,
-            openSettingsAction: openSettings.callAsFunction
+            openSettingsAction: openSettingsWindow
         )
 
         guard !hasConfiguredRuntime else {
@@ -131,6 +124,38 @@ struct ClipPixTranApp: App {
             }
         }
     }
+
+    private func openSettingsWindow() {
+        DispatchQueue.main.async {
+            NSApplication.shared.setActivationPolicy(.regular)
+            AppSettingsWindowController.shared.show(content: AnyView(appSettingsView))
+
+            DispatchQueue.main.async {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+        }
+    }
+
+    private var appSettingsView: some View {
+        AppSettingsView(
+            clipboardHistory: clipboardMonitor.history,
+            screenshotHistory: screenshotController.history,
+            translationController: translationController,
+            dockIconPreference: dockIconPreference,
+            updateManager: updateManager
+        )
+        .onDisappear {
+            AppDockIconController.shared.updateActivationPolicy()
+        }
+    }
+
+    private var mainWindowTitle: String {
+        #if DEBUG
+        "ClipPixTran Debug"
+        #else
+        "ClipPixTran"
+        #endif
+    }
 }
 
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
@@ -142,5 +167,42 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
             AppWindowPresenter.bringMainWindowForward()
         }
         return true
+    }
+}
+
+@MainActor
+private final class AppSettingsWindowController: NSWindowController, NSWindowDelegate {
+    static let shared = AppSettingsWindowController()
+
+    func show(content: AnyView) {
+        if let hostingController = window?.contentViewController as? NSHostingController<AnyView> {
+            hostingController.rootView = content
+        } else {
+            window = makeWindow(content: content)
+        }
+
+        window?.center()
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func makeWindow(content: AnyView) -> NSWindow {
+        let hostingController = NSHostingController(rootView: content)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "设置"
+        window.identifier = NSUserInterfaceItemIdentifier("ClipPixTran.SettingsWindow")
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.setContentSize(
+            NSSize(
+                width: ControlPanelDesign.Layout.Settings.windowWidth,
+                height: ControlPanelDesign.Layout.Settings.windowHeight
+            )
+        )
+        return window
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        AppDockIconController.shared.updateActivationPolicy()
     }
 }

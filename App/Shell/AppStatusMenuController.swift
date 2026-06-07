@@ -49,9 +49,17 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = statusBarImage
         item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = "ClipPixTran"
+        item.button?.toolTip = statusItemToolTip
         item.menu = menu
         statusItem = item
+    }
+
+    private var statusItemToolTip: String {
+        #if DEBUG
+        "ClipPixTran Debug"
+        #else
+        "ClipPixTran"
+        #endif
     }
 
     private var statusBarImage: NSImage? {
@@ -64,6 +72,11 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.delegate = self
         menu.autoenablesItems = false
+
+        #if DEBUG
+        addDebugBuildItem()
+        menu.addItem(.separator())
+        #endif
 
         addShortcutItem(
             shortcut: .showMainWindow,
@@ -129,6 +142,22 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(item)
     }
+
+    #if DEBUG
+    private func addDebugBuildItem() {
+        let item = NSMenuItem(title: "Debug 构建 · ClipPixTran", action: nil, keyEquivalent: "")
+        item.image = menuImage(systemName: "hammer")
+        item.isEnabled = true
+        item.attributedTitle = NSAttributedString(
+            string: "Debug 构建 · ClipPixTran",
+            attributes: [
+                .foregroundColor: NSColor.systemRed,
+                .font: NSFont.menuFont(ofSize: 0)
+            ]
+        )
+        menu.addItem(item)
+    }
+    #endif
 
     private func menuImage(systemName: String) -> NSImage? {
         let image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)

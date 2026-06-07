@@ -73,17 +73,23 @@ struct AppShellView: View {
     }
 
     private var sidebarHeader: some View {
-        Image(systemName: "sparkles.rectangle.stack")
-            .font(.system(size: 19, weight: .semibold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(Color.accentColor)
-            .frame(width: 38, height: 38)
-            .controlPanelRoundedSurface(
-                background: Color.accentColor.opacity(0.13),
-                cornerRadius: ControlPanelDesign.cardRadius
-            )
-            .padding(.top, 16)
-            .padding(.bottom, 4)
+        VStack(spacing: 7) {
+            Image(systemName: "sparkles.rectangle.stack")
+                .font(.system(size: 19, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 38, height: 38)
+                .controlPanelRoundedSurface(
+                    background: Color.accentColor.opacity(0.13),
+                    cornerRadius: ControlPanelDesign.cardRadius
+                )
+
+            #if DEBUG
+            DebugBuildBadge()
+            #endif
+        }
+        .padding(.top, 16)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -107,6 +113,29 @@ struct AppShellView: View {
     }
 
 }
+
+#if DEBUG
+private struct DebugBuildBadge: View {
+    var body: some View {
+        Text("DEBUG")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(Color(nsColor: .systemRed))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background {
+                RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
+                    .fill(Color(nsColor: .systemRed).opacity(0.12))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
+                    .stroke(Color(nsColor: .systemRed).opacity(0.24), lineWidth: 1)
+            }
+            .help("Debug 构建")
+            .accessibilityLabel("Debug 构建")
+    }
+}
+#endif
 
 private struct SidebarSectionButton: View {
     let section: AppSection
