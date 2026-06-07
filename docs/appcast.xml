@@ -3,7 +3,7 @@
     <channel>
         <title>ClipPixTran Update Feed</title>
         <link>https://krissss.github.io/clip-pix-tran/appcast.xml</link>
-        <description>ClipPixTran release updates</description>
+        <description>ClipPixTran 版本更新</description>
         <language>zh-CN</language>
         <item>
             <title>ClipPixTran 0.1.0</title>
@@ -12,7 +12,7 @@
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <pubDate>Sun, 07 Jun 2026 15:03:25 +0000</pubDate>
             <description><![CDATA[<b>ClipPixTran 0.1.0</b>
-Changes:
+本次变更：
 <ul>
 <li>chore: release v0.1.0 (99ce8a9)</li>
 <li>test: 固定翻译控制器测试语言偏好 (f035aed)</li>
@@ -38,7 +38,7 @@ Changes:
 <li>feat: 完成 Clip、Pix、Tran MVP 功能 (388d6bc)</li>
 <li>chore: initialize Xcode project (a94f652)</li>
 </ul>
-<b>Checksums</b>
+<b>校验和</b>
 ClipPixTran-v0.1.0.zip  cab99c5263a34aa11f5fbbe6b5d2308c30103203d809bd04560e76c07f598b32
 ClipPixTran-v0.1.0.dmg  68cbbec681630b6ac06adc5c336b91597ee305b0523588160b27752c0ff277ea]]></description>
             <enclosure

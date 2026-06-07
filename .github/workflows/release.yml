@@ -70,15 +70,15 @@ jobs:
             echo "## ClipPixTran ${VERSION}"
             echo
             if [ -n "$PREVIOUS_TAG" ]; then
-              echo "Changes since ${PREVIOUS_TAG}:"
+              echo "自 ${PREVIOUS_TAG} 以来的变更："
               git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${TAG}"
             else
-              echo "Changes:"
+              echo "本次变更："
               git log --pretty=format:'- %s (%h)' "${TAG}"
             fi
             echo
             echo
-            echo "## Checksums"
+            echo "## 校验和"
             echo
             echo '```text'
             echo "ClipPixTran-${TAG}.zip  ${{ steps.checksum.outputs.zip_sha }}"
@@ -179,7 +179,7 @@ jobs:
               <channel>
                   <title>ClipPixTran Update Feed</title>
                   <link>https://krissss.github.io/clip-pix-tran/appcast.xml</link>
-                  <description>ClipPixTran release updates</description>
+                  <description>ClipPixTran 版本更新</description>
                   <language>zh-CN</language>
               </channel>
           </rss>

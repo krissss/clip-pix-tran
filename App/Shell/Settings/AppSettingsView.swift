@@ -549,6 +549,21 @@ private struct AboutSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            SettingsGroup(title: "应用") {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: "名称") {
+                        Text(appName)
+                            .font(.callout)
+                    }
+
+                    SettingsFormRow(title: "当前版本") {
+                        Text(appVersionText)
+                            .font(.callout.monospacedDigit())
+                    }
+                }
+                .settingsRowGroup()
+            }
+
             SettingsGroup(title: "更新") {
                 VStack(spacing: 0) {
                     toggleRow("自动检查更新", isOn: automaticallyChecksForUpdates)
@@ -589,6 +604,20 @@ private struct AboutSettingsSection: View {
         }
     }
 
+    private var appName: String {
+        bundleInfoValue("CFBundleName") ?? "ClipPixTran"
+    }
+
+    private var appVersionText: String {
+        let version = bundleInfoValue("CFBundleShortVersionString") ?? "未知"
+        guard let build = bundleInfoValue("CFBundleVersion"),
+              build != version else {
+            return version
+        }
+
+        return "\(version) (\(build))"
+    }
+
     private var lastUpdateCheckText: String {
         guard let date = updateManager.lastUpdateCheckDate else {
             return "从未检查"
@@ -619,6 +648,16 @@ private struct AboutSettingsSection: View {
         } set: { newValue in
             updateManager.setUpdateCheckInterval(newValue)
         }
+    }
+
+    private func bundleInfoValue(_ key: String) -> String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.isEmpty,
+              !value.contains("$(") else {
+            return nil
+        }
+
+        return value
     }
 }
 
