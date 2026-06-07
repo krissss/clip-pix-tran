@@ -48,5 +48,28 @@ ClipPixTran-v0.1.0.dmg  68cbbec681630b6ac06adc5c336b91597ee305b0523588160b27752c
                 type="application/octet-stream"
             />
         </item>
+        <item>
+            <title>ClipPixTran 0.1.1</title>
+            <sparkle:version>26</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <pubDate>Sun, 07 Jun 2026 15:43:02 +0000</pubDate>
+            <description><![CDATA[<b>ClipPixTran 0.1.1</b>
+自 v0.1.0 以来的变更：
+<ul>
+<li>chore: release v0.1.1 (5a90689)</li>
+<li>fix: 显示版本并本地化更新提示 (cd90a3c)</li>
+<li>chore: update appcast.xml for v0.1.0 (88282ff)</li>
+</ul>
+<b>校验和</b>
+ClipPixTran-v0.1.1.zip  078ec8cb73375e8656aa1d92179aef41b81b5558e3c9e8baf86f7c75b92779c6
+ClipPixTran-v0.1.1.dmg  fc593b86d00ea84b442d5d68456f3d9b56897b03767a72f015d0026290867d3e]]></description>
+            <enclosure
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.1.1/ClipPixTran-v0.1.1.zip"
+                sparkle:edSignature="B7kBWa5RkAJMelXrY9QJCWOfW6k5t4V+wo+MK9vw36/SxGONoOyLLJ3si25fTcZulwvHXXFMIAmBaASys4wmDw=="
+                length="2905444"
+                type="application/octet-stream"
+            />
+        </item>
     </channel>
 </rss>
