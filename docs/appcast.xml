@@ -5,5 +5,48 @@
         <link>https://krissss.github.io/clip-pix-tran/appcast.xml</link>
         <description>ClipPixTran release updates</description>
         <language>zh-CN</language>
+        <item>
+            <title>ClipPixTran 0.1.0</title>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <pubDate>Sun, 07 Jun 2026 15:03:25 +0000</pubDate>
+            <description><![CDATA[<b>ClipPixTran 0.1.0</b>
+Changes:
+<ul>
+<li>chore: release v0.1.0 (99ce8a9)</li>
+<li>test: 固定翻译控制器测试语言偏好 (f035aed)</li>
+<li>feat: 添加自动更新和发版流程 (6f6edc7)</li>
+<li>refactor: 拆分 SwiftUI 视图并优化状态流 (c253604)</li>
+<li>refactor: 整理项目目录结构 (15028c5)</li>
+<li>feat: 添加 AI skills (132daa2)</li>
+<li>feat: 优化控制面板快捷入口和预览交互 (e89f07c)</li>
+<li>feat: Pix 优化录屏和历史预览交互 (2e01edc)</li>
+<li>feat: Pix 支持录屏和 GIF 导出 (b7f272d)</li>
+<li>feat: 清空历史增加二次确认 (265ab01)</li>
+<li>fix: 修复 Pix 区域截图菜单栏面板保留问题 (a7bab3a)</li>
+<li>feat: 菜单栏支持启动静默和 Dock 偏好 (f2f184a)</li>
+<li>feat: Pix 支持自动识别截图区域 (0f5e076)</li>
+<li>feat: Pix 支持桌面贴图 (f7b3e8f)</li>
+<li>feat: 增强 Tran 发音 provider 体验 (f9aae6c)</li>
+<li>feat: 增强 Tran 多 provider 翻译体验 (518c24e)</li>
+<li>feat: 增强 Tran 划词翻译体验 (d7a2e4b)</li>
+<li>feat: 统一控制面板 UI 风格 (3f96caa)</li>
+<li>feat: 增强 Pix 区域截图标注体验 (ea0bc05)</li>
+<li>feat: 增强 Tran 划词翻译和多 provider 展示 (293d8dc)</li>
+<li>feat: 增强 Clip 剪贴板历史与快速面板 (2696c0f)</li>
+<li>feat: 完成 Clip、Pix、Tran MVP 功能 (388d6bc)</li>
+<li>chore: initialize Xcode project (a94f652)</li>
+</ul>
+<b>Checksums</b>
+ClipPixTran-v0.1.0.zip  cab99c5263a34aa11f5fbbe6b5d2308c30103203d809bd04560e76c07f598b32
+ClipPixTran-v0.1.0.dmg  68cbbec681630b6ac06adc5c336b91597ee305b0523588160b27752c0ff277ea]]></description>
+            <enclosure
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.1.0/ClipPixTran-v0.1.0.zip"
+                sparkle:edSignature="tCg5JqE/FRMVieDlT3JbDQDgxT1ZU2QALtwx4Qe5nGCjIfksMOHy30YN4MH2AMkesFBqmX9IguQ5WByZoarVAw=="
+                length="2900749"
+                type="application/octet-stream"
+            />
+        </item>
     </channel>
 </rss>
