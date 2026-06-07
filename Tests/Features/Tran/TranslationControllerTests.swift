@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct TranslationControllerTests {
     @Test func translateRecordsResult() async {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FallbackTranslationService(),
@@ -59,7 +59,7 @@ struct TranslationControllerTests {
             )
         )
         let controller = TranslationController(
-            preferences: TranslationPreferences(defaults: makeDefaults()),
+            preferences: makePreferences(),
             translationService: service,
             pasteboard: CapturingClipboardService(),
             languageDetector: StubTranslationLanguageDetector(languageCode: "en")
@@ -86,7 +86,7 @@ struct TranslationControllerTests {
             )
         )
         let controller = TranslationController(
-            preferences: TranslationPreferences(defaults: makeDefaults()),
+            preferences: makePreferences(),
             translationService: service,
             pasteboard: CapturingClipboardService(),
             languageDetector: detector
@@ -104,7 +104,7 @@ struct TranslationControllerTests {
     }
 
     @Test func unreliableAutoDetectionKeepsConfiguredTargetLanguage() async throws {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         preferences.updateDefaultTargetLanguage("ja")
         let service = CapturingTranslationService(
             result: TranslationResult(
@@ -131,7 +131,7 @@ struct TranslationControllerTests {
     }
 
     @Test func autoDetectionFlipsTargetWhenDetectedSourceMatchesTarget() async throws {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let service = CapturingTranslationService(
             result: TranslationResult(
                 translatedText: "Hello",
@@ -160,7 +160,7 @@ struct TranslationControllerTests {
 
     @Test func emptySourceShowsValidationError() async {
         let controller = TranslationController(
-            preferences: TranslationPreferences(defaults: makeDefaults()),
+            preferences: makePreferences(),
             translationService: FakeTranslationService(
                 result: .success(
                     TranslationResult(
@@ -339,7 +339,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingTargetLanguageUpdatesPreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -360,7 +360,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingMatchingTargetLanguageFlipsWhenSourceIsFixed() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -384,7 +384,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSessionTargetLanguageDoesNotUpdatePreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -406,7 +406,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSameTargetLanguageCanStillPersistDefault() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -429,7 +429,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingTargetLanguageClearsExistingResults() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -459,7 +459,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSourceLanguageUpdatesPreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -481,7 +481,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSessionSourceLanguageDoesNotUpdatePreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -503,7 +503,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSameSourceLanguageCanStillPersistDefault() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -526,7 +526,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingMatchingSourceLanguageFlipsTargetLanguage() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -549,7 +549,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSourceLanguageClearsExistingResults() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -572,7 +572,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingAutomaticSourceLanguageUpdatesPreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -595,7 +595,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingUnsupportedTargetLanguageDoesNotChangePreferences() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -648,7 +648,7 @@ struct TranslationControllerTests {
     }
 
     @Test func loadingAutoDetectedHistoryKeepsAutomaticSourceLanguage() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             translationService: FakeTranslationService(
@@ -707,7 +707,7 @@ struct TranslationControllerTests {
     }
 
     @Test func translatesWithEnabledProvidersAndRecordsFirstHistoryResultWithVariants() async {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         preferences.updateEnabledProvider(TranslationProviderDescriptor.google.id, isEnabled: true)
         let providers = [
             TranslationProvider(
@@ -756,7 +756,7 @@ struct TranslationControllerTests {
     }
 
     @Test func providerFailureDoesNotBlockOtherProviders() async {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         preferences.updateEnabledProvider(TranslationProviderDescriptor.google.id, isEnabled: true)
         let providers = [
             TranslationProvider(
@@ -791,7 +791,7 @@ struct TranslationControllerTests {
     }
 
     @Test func reenabledProviderReturnsToIdleState() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
             providers: [
@@ -838,7 +838,7 @@ struct TranslationControllerTests {
     }
 
     @Test func historyItemFromDisabledProviderStaysVisible() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         preferences.updateEnabledProvider(TranslationProviderDescriptor.google.id, isEnabled: false)
         let controller = TranslationController(
             preferences: preferences,
@@ -911,7 +911,7 @@ struct TranslationControllerTests {
     @Test func speaksSourceTextUsingSelectedSourceLanguage() {
         let speechService = CapturingTranslationSpeechService()
         let controller = TranslationController(
-            preferences: TranslationPreferences(defaults: makeDefaults()),
+            preferences: makePreferences(),
             translationService: FakeTranslationService(
                 result: .success(
                     TranslationResult(
@@ -938,7 +938,7 @@ struct TranslationControllerTests {
     @Test func speaksProviderTranslationUsingResultTargetLanguage() {
         let speechService = CapturingTranslationSpeechService()
         let controller = TranslationController(
-            preferences: TranslationPreferences(defaults: makeDefaults()),
+            preferences: makePreferences(),
             translationService: FakeTranslationService(
                 result: .success(
                     TranslationResult(
@@ -1061,7 +1061,7 @@ struct TranslationControllerTests {
     }
 
     @Test func speaksUsingConfiguredSpeechProvider() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         preferences.updateSpeechProvider(TranslationSpeechProviderDescriptor.google.id)
         let systemSpeechService = CapturingTranslationSpeechService()
         let googleSpeechService = CapturingTranslationSpeechService()
@@ -1100,7 +1100,7 @@ struct TranslationControllerTests {
     }
 
     @Test func selectingSpeechProviderStopsCurrentPlaybackAndPersistsChoice() {
-        let preferences = TranslationPreferences(defaults: makeDefaults())
+        let preferences = makePreferences()
         let systemSpeechService = CapturingTranslationSpeechService()
         let googleSpeechService = CapturingTranslationSpeechService()
         let controller = TranslationController(
@@ -1144,6 +1144,15 @@ private func makeDefaults() -> UserDefaults {
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
+}
+
+private func makePreferences(
+    preferredLanguages: [String] = ["zh-Hans-CN"]
+) -> TranslationPreferences {
+    TranslationPreferences(
+        defaults: makeDefaults(),
+        preferredLanguages: preferredLanguages
+    )
 }
 
 private struct FakeTranslationService: TranslationService {
