@@ -1757,7 +1757,7 @@ private final class RegionSelectionView: NSView {
         let screenRect = screenRect(fromLocalRect: selectionRect)
         let padding: CGFloat = 8
         var origin = CGPoint(
-            x: screenRect.minX,
+            x: screenRect.maxX - toolbarSize.width,
             y: screenRect.minY - toolbarSize.height - padding
         )
 
