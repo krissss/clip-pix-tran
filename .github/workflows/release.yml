@@ -38,14 +38,6 @@ jobs:
       - name: Package app
         run: make package TAG="${{ github.ref_name }}"
 
-      - name: Generate checksums
-        id: checksum
-        run: |
-          ZIP_SHA=$(shasum -a 256 "ClipPixTran-${{ github.ref_name }}.zip" | cut -d ' ' -f 1)
-          DMG_SHA=$(shasum -a 256 "ClipPixTran-${{ github.ref_name }}.dmg" | cut -d ' ' -f 1)
-          echo "zip_sha=$ZIP_SHA" >> "$GITHUB_OUTPUT"
-          echo "dmg_sha=$DMG_SHA" >> "$GITHUB_OUTPUT"
-
       - name: Sign update with Sparkle
         id: sparkle_sign
         env:
@@ -60,31 +52,9 @@ jobs:
           SIZE=$(stat -f%z "ClipPixTran-${{ github.ref_name }}.zip")
           echo "length=$SIZE" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes
+      - name: Fetch release notes
         run: |
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
-
-          {
-            echo "## ClipPixTran ${VERSION}"
-            echo
-            if [ -n "$PREVIOUS_TAG" ]; then
-              echo "自 ${PREVIOUS_TAG} 以来的变更："
-              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${TAG}"
-            else
-              echo "本次变更："
-              git log --pretty=format:'- %s (%h)' "${TAG}"
-            fi
-            echo
-            echo
-            echo "## 校验和"
-            echo
-            echo '```text'
-            echo "ClipPixTran-${TAG}.zip  ${{ steps.checksum.outputs.zip_sha }}"
-            echo "ClipPixTran-${TAG}.dmg  ${{ steps.checksum.outputs.dmg_sha }}"
-            echo '```'
-          } > /tmp/release_notes.md
+          gh release view "${{ github.ref_name }}" --json body -q .body > /tmp/release_notes.md
 
       - name: Generate appcast item
         env:
@@ -210,10 +180,9 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: update appcast.xml for ${{ github.ref_name }}"
           git push origin main
 
-      - name: Create Release
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          body_path: /tmp/release_notes.md
           files: |
             ClipPixTran-${{ github.ref_name }}.zip
             ClipPixTran-${{ github.ref_name }}.dmg
@@ -222,12 +191,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ github.ref_name }}
-          SHA256: ${{ steps.checksum.outputs.dmg_sha }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap update."
             exit 0
           fi
+
+          SHA256=$(shasum -a 256 "ClipPixTran-${VERSION}.dmg" | cut -d ' ' -f 1)
 
           VER="${VERSION#v}"
           cat > clip-pix-tran.rb <<'CASK'
