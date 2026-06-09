@@ -71,5 +71,31 @@ ClipPixTran-v0.1.1.dmg  fc593b86d00ea84b442d5d68456f3d9b56897b03767a72f015d00262
                 type="application/octet-stream"
             />
         </item>
+        <item>
+            <title>ClipPixTran 0.2.0</title>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <pubDate>Tue, 09 Jun 2026 09:49:03 +0000</pubDate>
+            <description><![CDATA[<b>What&#x27;s Changed</b>
+<b>Added</b>
+<ul>
+<li>支持菜单栏直接打开设置，添加debug标识</li>
+<li>添加首次启动引导</li>
+</ul>
+<b>Fixed</b>
+<ul>
+<li>截图操作栏右对齐</li>
+<li>修复截图无权限时缺少提示</li>
+<li>优化设置页表单对齐</li>
+</ul>
+**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...v0.2.0]]></description>
+            <enclosure
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.2.0/ClipPixTran-v0.2.0.zip"
+                sparkle:edSignature="z9RITc4KerfC9D4W7Oxh9cmdyHA8tMwq3ePx1HIg4pw6nESuD3QPoY4jz+w/Eo5kkuh6oH9ruKCrsjfJu0o8BA=="
+                length="2990471"
+                type="application/octet-stream"
+            />
+        </item>
     </channel>
 </rss>
