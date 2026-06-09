@@ -3,9 +3,18 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to package, for example v0.2.0'
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
   test:
@@ -20,6 +29,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Cache Xcode dependencies
         uses: actions/cache@v4
@@ -36,7 +46,7 @@ jobs:
           test -n "$SPARKLE_PRIVATE_KEY"
 
       - name: Package app
-        run: make package TAG="${{ github.ref_name }}"
+        run: make package TAG="${RELEASE_TAG}"
 
       - name: Sign update with Sparkle
         id: sparkle_sign
@@ -44,21 +54,26 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           SIGN_UPDATE=$(make print-sparkle-sign-update)
-          SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" "ClipPixTran-${{ github.ref_name }}.zip" --ed-key-file - 2>&1)
+          SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" "ClipPixTran-${RELEASE_TAG}.zip" --ed-key-file - 2>&1)
           ED_SIG=$(printf '%s\n' "$SIGNATURE" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
           test -n "$ED_SIG"
           echo "ed_signature=$ED_SIG" >> "$GITHUB_OUTPUT"
 
-          SIZE=$(stat -f%z "ClipPixTran-${{ github.ref_name }}.zip")
+          SIZE=$(stat -f%z "ClipPixTran-${RELEASE_TAG}.zip")
           echo "length=$SIZE" >> "$GITHUB_OUTPUT"
 
       - name: Fetch release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${{ github.ref_name }}" --json body -q .body > /tmp/release_notes.md
+          if ! gh release view "${RELEASE_TAG}" --json body -q .body > /tmp/release_notes.md; then
+            gh release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --generate-notes
+            gh release view "${RELEASE_TAG}" --json body -q .body > /tmp/release_notes.md
+          fi
 
       - name: Generate appcast item
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
           ED_SIG: ${{ steps.sparkle_sign.outputs.ed_signature }}
           LENGTH: ${{ steps.sparkle_sign.outputs.length }}
         run: |
@@ -177,20 +192,21 @@ jobs:
           PY
 
           git add docs/appcast.xml
-          git diff --cached --quiet || git commit -m "chore: update appcast.xml for ${{ github.ref_name }}"
+          git diff --cached --quiet || git commit -m "chore: update appcast.xml for ${RELEASE_TAG}"
           git push origin main
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            ClipPixTran-${{ github.ref_name }}.zip
-            ClipPixTran-${{ github.ref_name }}.dmg
+            ClipPixTran-${{ env.RELEASE_TAG }}.zip
+            ClipPixTran-${{ env.RELEASE_TAG }}.dmg
 
       - name: Update Homebrew Tap
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ env.RELEASE_TAG }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap update."
