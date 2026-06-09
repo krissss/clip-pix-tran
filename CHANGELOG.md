@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-09
+
+### Added
+
+- 支持菜单栏直接打开设置，添加debug标识
+- 添加首次启动引导
+
+### Fixed
+
+- 截图操作栏右对齐
+- 修复截图无权限时缺少提示
+- 优化设置页表单对齐
+
 ## [0.1.1] - 2026-06-07
 
 ### Fixed
@@ -34,6 +47,7 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/krissss/clip-pix-tran/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/krissss/clip-pix-tran/commits/v0.1.0
