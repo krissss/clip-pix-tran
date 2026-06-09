@@ -40,7 +40,7 @@ enum ControlPanelDesign {
         enum Settings {
             static let windowWidth: CGFloat = 660
             static let windowHeight: CGFloat = 480
-            static let labelWidth: CGFloat = 230
+            static let formMaxWidth: CGFloat = 500
             static let controlWidth: CGFloat = 210
             static let sliderWidth: CGFloat = 154
             static let rowHeight: CGFloat = 44

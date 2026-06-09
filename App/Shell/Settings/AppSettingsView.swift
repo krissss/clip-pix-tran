@@ -314,7 +314,6 @@ private struct TranSettingsSection: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity)
                     }
                     SettingsFormRow(title: "默认目标语言") {
                         Picker("", selection: targetLanguageSelection) {
@@ -324,7 +323,6 @@ private struct TranSettingsSection: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity)
                     }
                 }
                 .settingsRowGroup()
@@ -350,7 +348,6 @@ private struct TranSettingsSection: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity)
                     }
                 }
                 .settingsRowGroup()
@@ -561,6 +558,8 @@ private struct SettingsGroup<Content: View>: View {
 
             content
         }
+        .frame(maxWidth: ControlPanelDesign.Layout.Settings.formMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -593,7 +592,6 @@ private struct AboutSettingsSection: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity)
                     }
 
                     SettingsFormRow(title: "上次检查") {
@@ -713,9 +711,8 @@ private struct SettingsFormRow<Title: View, Control: View>: View {
             title
                 .font(.callout)
                 .lineLimit(2)
-                .frame(width: ControlPanelDesign.Layout.Settings.labelWidth, alignment: .leading)
-
-            Spacer(minLength: 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
             control
                 .controlSize(.regular)
@@ -740,10 +737,12 @@ private struct SettingsFootnote: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+            .frame(maxWidth: ControlPanelDesign.Layout.Settings.formMaxWidth, alignment: .leading)
             .controlPanelRoundedSurface(
                 background: ControlPanelDesign.quietFill,
                 cornerRadius: ControlPanelDesign.compactRadius
             )
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
