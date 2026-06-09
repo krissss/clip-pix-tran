@@ -45,11 +45,15 @@ struct ScreenshotCaptureOutput: Equatable, Sendable {
 }
 
 protocol ScreenshotService: Sendable {
+    nonisolated func ensureScreenCaptureAccess() async throws
     nonisolated func captureMainDisplay() async throws -> Data
     nonisolated func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async throws -> ScreenshotCaptureOutput
 }
 
 extension ScreenshotService {
+    nonisolated func ensureScreenCaptureAccess() async throws {
+    }
+
     nonisolated func captureSelectedRegion() async throws -> ScreenshotCaptureOutput {
         try await captureSelectedRegion(initialMode: .screenshot)
     }

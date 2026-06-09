@@ -18,6 +18,12 @@ enum PixCaptureMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum ScreenshotCaptureResult: Equatable {
+    case completed
+    case ignored
+    case needsScreenRecordingPermission
+}
+
 @MainActor
 @Observable
 final class ScreenshotController {
@@ -76,7 +82,8 @@ final class ScreenshotController {
         self.captureTimeoutNanoseconds = captureTimeoutNanoseconds
     }
 
-    func performPrimaryCapture() async {
+    @discardableResult
+    func performPrimaryCapture() async -> ScreenshotCaptureResult {
         switch captureMode {
         case .screenshot:
             await captureSelectedRegion(initialMode: .screenshot)
@@ -85,20 +92,36 @@ final class ScreenshotController {
         }
     }
 
-    func captureMainDisplay() async {
+    @discardableResult
+    func captureMainDisplay() async -> ScreenshotCaptureResult {
         let screenshotService = screenshotService
-        await capture(usesTimeout: true, captureSource: .fullScreen) {
+        return await capture(usesTimeout: true, captureSource: .fullScreen) {
             ScreenshotCaptureOutput(data: try await screenshotService.captureMainDisplay())
         }
     }
 
-    func captureSelectedRegion() async {
+    @discardableResult
+    func captureSelectedRegion() async -> ScreenshotCaptureResult {
         await captureSelectedRegion(initialMode: .screenshot)
     }
 
-    private func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async {
+    private func captureSelectedRegion(initialMode: ScreenshotRegionCaptureMode) async -> ScreenshotCaptureResult {
+        guard !isCapturing else {
+            return .ignored
+        }
+
         let screenshotService = screenshotService
-        await capture(usesTimeout: false) {
+        do {
+            try await screenshotService.ensureScreenCaptureAccess()
+        } catch let error as ScreenshotCaptureError {
+            setCaptureError(error)
+            return captureResult(for: error)
+        } catch {
+            setOperationError(error)
+            return .completed
+        }
+
+        return await capture(usesTimeout: false) {
             try await screenshotService.captureSelectedRegion(initialMode: initialMode)
         }
     }
@@ -107,9 +130,9 @@ final class ScreenshotController {
         usesTimeout: Bool,
         captureSource: ScreenshotItem.CaptureSource = .selectedRegion,
         _ action: @Sendable @escaping () async throws -> ScreenshotCaptureOutput
-    ) async {
+    ) async -> ScreenshotCaptureResult {
         guard !isCapturing else {
-            return
+            return .ignored
         }
 
         let captureID = UUID()
@@ -149,7 +172,7 @@ final class ScreenshotController {
         do {
             let output = try await captureTask.value
             guard activeCaptureID == captureID else {
-                return
+                return .ignored
             }
 
             switch output.completion {
@@ -180,30 +203,37 @@ final class ScreenshotController {
                 try await startRecording(in: sourceRect)
             }
             clearLastError()
+            return .completed
         } catch is CancellationError {
             if activeCaptureID == captureID {
                 clearLastError()
             }
+            return .completed
         } catch ScreenshotCaptureError.cancelled {
             if activeCaptureID == captureID {
                 clearLastError()
             }
+            return .completed
         } catch ScreenshotSaveError.cancelled {
             if activeCaptureID == captureID {
                 clearLastError()
             }
+            return .completed
         } catch let error as ScreenshotCaptureError {
             if activeCaptureID == captureID {
                 setCaptureError(error)
             }
+            return captureResult(for: error)
         } catch {
             if activeCaptureID == captureID {
                 setOperationError(error)
             }
+            return .completed
         }
     }
 
-    func startSelectedRegionRecording() async {
+    @discardableResult
+    func startSelectedRegionRecording() async -> ScreenshotCaptureResult {
         await captureSelectedRegion(initialMode: .recording)
     }
 
@@ -547,5 +577,9 @@ final class ScreenshotController {
     private func setOperationError(_ error: Error) {
         lastErrorMessage = error.localizedDescription
         lastCaptureError = nil
+    }
+
+    private func captureResult(for error: ScreenshotCaptureError) -> ScreenshotCaptureResult {
+        error == .permissionDenied ? .needsScreenRecordingPermission : .completed
     }
 }

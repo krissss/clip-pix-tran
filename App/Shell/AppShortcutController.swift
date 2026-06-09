@@ -63,7 +63,7 @@ final class AppShortcutController {
 
     func captureSelectedRegion() {
         Task {
-            await screenshotController.performPrimaryCapture()
+            await performCaptureSelectedRegion()
         }
     }
 
@@ -87,15 +87,22 @@ final class AppShortcutController {
 
     private func observeCaptureSelectedRegionShortcut() async {
         for await _ in KeyboardShortcuts.events(.keyDown, for: .captureSelectedRegion) {
-            await screenshotController.performPrimaryCapture()
+            await performCaptureSelectedRegion()
         }
     }
 
     private func installCaptureShortcutEventTap() {
         captureShortcutEventTap = CaptureShortcutEventTap(shortcutName: .captureSelectedRegion) { [weak self] in
             Task { @MainActor [weak self] in
-                await self?.screenshotController.performPrimaryCapture()
+                await self?.performCaptureSelectedRegion()
             }
+        }
+    }
+
+    private func performCaptureSelectedRegion() async {
+        let result = await screenshotController.performPrimaryCapture()
+        if result == .needsScreenRecordingPermission {
+            openSection?(.pix)
         }
     }
 

@@ -148,6 +148,74 @@ struct ScreenshotControllerTests {
         #expect(controller.lastCaptureError == nil)
     }
 
+    @Test func selectedRegionPermissionFailureDoesNotOpenSelection() async {
+        let screenshotService = FakeScreenshotService(
+            mainDisplayResult: .success(Data()),
+            selectedRegionResult: .success(ScreenshotCaptureOutput(data: Data())),
+            permissionResult: .failure(ScreenshotCaptureError.permissionDenied)
+        )
+        let controller = ScreenshotController(
+            screenshotService: screenshotService,
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver()
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(screenshotService.ensurePermissionCallCount == 1)
+        #expect(screenshotService.selectedRegionInitialModes.isEmpty)
+        #expect(controller.history.items.isEmpty)
+        #expect(controller.isCapturing == false)
+        #expect(controller.lastErrorMessage == ScreenshotCaptureError.permissionDenied.localizedDescription)
+        #expect(controller.lastCaptureError == .permissionDenied)
+        #expect(controller.needsScreenRecordingPermission)
+    }
+
+    @Test func recordingPermissionFailureDoesNotOpenSelection() async {
+        let screenshotService = FakeScreenshotService(
+            mainDisplayResult: .success(Data()),
+            selectedRegionResult: .success(
+                ScreenshotCaptureOutput(
+                    data: Data(),
+                    completion: .startRecording,
+                    sourceRect: CGRect(x: 10, y: 20, width: 100, height: 80)
+                )
+            ),
+            permissionResult: .failure(ScreenshotCaptureError.permissionDenied)
+        )
+        let recordingService = FakeScreenRecordingService(
+            session: FakeScreenRecordingSession(
+                output: ScreenRecordingOutput(
+                    fileURL: ScreenRecordingFileStore.defaultDirectoryURL.appending(path: "blocked.mp4"),
+                    createdAt: Date(),
+                    duration: 1,
+                    pixelSize: CGSize(width: 100, height: 80),
+                    fileSize: 1
+                )
+            )
+        )
+        let overlayFactory = FakeScreenRecordingRegionOverlayFactory()
+        let controller = ScreenshotController(
+            screenshotService: screenshotService,
+            recordingService: recordingService,
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver(),
+            recordingRegionOverlayFactory: overlayFactory.make
+        )
+        controller.captureMode = .recording
+
+        await controller.performPrimaryCapture()
+
+        #expect(screenshotService.ensurePermissionCallCount == 1)
+        #expect(screenshotService.selectedRegionInitialModes.isEmpty)
+        #expect(recordingService.selectedRects.isEmpty)
+        #expect(overlayFactory.overlays.isEmpty)
+        #expect(controller.isCapturing == false)
+        #expect(controller.isRecording == false)
+        #expect(controller.lastErrorMessage == ScreenshotCaptureError.permissionDenied.localizedDescription)
+        #expect(controller.lastCaptureError == .permissionDenied)
+    }
+
     @Test func mainDisplayCaptureTimeoutReleasesCapturingStateBeforeServiceReturns() async throws {
         let data = try #require("late-shot".data(using: .utf8))
         let controller = ScreenshotController(
@@ -715,14 +783,23 @@ private struct DelayedScreenshotService: ScreenshotService {
 private final class FakeScreenshotService: ScreenshotService, @unchecked Sendable {
     let mainDisplayResult: Result<Data, Error>
     let selectedRegionResult: Result<ScreenshotCaptureOutput, Error>
+    let permissionResult: Result<Void, Error>
+    private(set) var ensurePermissionCallCount = 0
     private(set) var selectedRegionInitialModes: [ScreenshotRegionCaptureMode] = []
 
     init(
         mainDisplayResult: Result<Data, Error>,
-        selectedRegionResult: Result<ScreenshotCaptureOutput, Error>
+        selectedRegionResult: Result<ScreenshotCaptureOutput, Error>,
+        permissionResult: Result<Void, Error> = .success(())
     ) {
         self.mainDisplayResult = mainDisplayResult
         self.selectedRegionResult = selectedRegionResult
+        self.permissionResult = permissionResult
+    }
+
+    func ensureScreenCaptureAccess() async throws {
+        ensurePermissionCallCount += 1
+        try permissionResult.get()
     }
 
     func captureMainDisplay() async throws -> Data {
