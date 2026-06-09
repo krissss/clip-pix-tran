@@ -13,6 +13,7 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
     private weak var shortcutController: AppShortcutController?
     private var openMainWindowAction: (() -> Void)?
     private var openSettingsAction: (() -> Void)?
+    private var openOnboardingAction: (() -> Void)?
 
     func configure(
         clipboardMonitor: ClipboardMonitor,
@@ -20,7 +21,8 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         translationController: TranslationController,
         shortcutController: AppShortcutController,
         openMainWindowAction: @escaping () -> Void,
-        openSettingsAction: @escaping () -> Void
+        openSettingsAction: @escaping () -> Void,
+        openOnboardingAction: @escaping () -> Void
     ) {
         self.clipboardMonitor = clipboardMonitor
         self.screenshotController = screenshotController
@@ -28,6 +30,7 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
         self.shortcutController = shortcutController
         self.openMainWindowAction = openMainWindowAction
         self.openSettingsAction = openSettingsAction
+        self.openOnboardingAction = openOnboardingAction
 
         installStatusItemIfNeeded()
         rebuildMenu()
@@ -106,6 +109,11 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
             keyEquivalent: ",",
             action: #selector(openSettings)
         )
+        addPlainItem(
+            title: "重新打开引导",
+            systemImage: "sparkles.rectangle.stack",
+            action: #selector(openOnboarding)
+        )
 
         menu.addItem(.separator())
         addPlainItem(
@@ -183,6 +191,10 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         openSettingsAction?()
+    }
+
+    @objc private func openOnboarding() {
+        openOnboardingAction?()
     }
 
     @objc private func quit() {

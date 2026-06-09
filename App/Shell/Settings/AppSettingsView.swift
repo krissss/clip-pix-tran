@@ -7,6 +7,7 @@ struct AppSettingsView: View {
     @Bindable var translationController: TranslationController
     @Bindable var dockIconPreference: DockIconPreference
     @Bindable var updateManager: AppUpdateManager
+    let openOnboardingAction: () -> Void
     @State private var selectedPane: SettingsPane = .general
 
     var body: some View {
@@ -39,7 +40,10 @@ struct AppSettingsView: View {
     private var selectedPaneView: some View {
         switch selectedPane {
         case .general:
-            GeneralSettingsSection(preference: dockIconPreference)
+            GeneralSettingsSection(
+                preference: dockIconPreference,
+                openOnboardingAction: openOnboardingAction
+            )
         case .shortcuts:
             ShortcutsSettingsSection()
         case .clip:
@@ -102,19 +106,35 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
 private struct GeneralSettingsSection: View {
     @Bindable var preference: DockIconPreference
+    let openOnboardingAction: () -> Void
 
     var body: some View {
-        SettingsGroup(title: "Dock") {
-            VStack(spacing: 0) {
-                toggleRow(
-                    "关闭主窗口后隐藏 Dock 图标",
-                    isOn: hidesDockIconWhenMainWindowClosed
-                )
+        VStack(alignment: .leading, spacing: 14) {
+            SettingsGroup(title: "Dock") {
+                VStack(spacing: 0) {
+                    toggleRow(
+                        "关闭主窗口后隐藏 Dock 图标",
+                        isOn: hidesDockIconWhenMainWindowClosed
+                    )
+                }
+                .settingsRowGroup()
             }
-            .settingsRowGroup()
-        }
 
-        SettingsFootnote("开启后，关闭主窗口时应用会留在菜单栏；从菜单栏打开主窗口时会临时恢复 Dock 图标。")
+            SettingsGroup(title: "引导") {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: "首次启动引导") {
+                        Button {
+                            openOnboardingAction()
+                        } label: {
+                            Label("重新打开", systemImage: "sparkles.rectangle.stack")
+                        }
+                    }
+                }
+                .settingsRowGroup()
+            }
+
+            SettingsFootnote("开启 Dock 隐藏后，关闭主窗口时应用会留在菜单栏；首次引导可随时重新打开。")
+        }
     }
 
     private var hidesDockIconWhenMainWindowClosed: Binding<Bool> {
@@ -773,6 +793,7 @@ private func historyLimitRow(
             pasteboard: PreviewClipboardService()
         ),
         dockIconPreference: DockIconPreference(),
-        updateManager: AppUpdateManager()
+        updateManager: AppUpdateManager(),
+        openOnboardingAction: {}
     )
 }

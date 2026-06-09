@@ -18,6 +18,7 @@ struct ClipPixTranApp: App {
     @State private var translationController: TranslationController
     @State private var shortcutController: AppShortcutController
     @State private var dockIconPreference: DockIconPreference
+    @State private var onboardingPreference: FirstLaunchOnboardingPreference
     @State private var updateManager: AppUpdateManager
     @State private var selectedSection: AppSection = .clip
     @State private var hasConfiguredRuntime = false
@@ -59,6 +60,7 @@ struct ClipPixTranApp: App {
             )
         )
         self._dockIconPreference = State(initialValue: DockIconPreference())
+        self._onboardingPreference = State(initialValue: FirstLaunchOnboardingPreference())
         self._updateManager = State(initialValue: AppUpdateManager())
     }
 
@@ -103,7 +105,8 @@ struct ClipPixTranApp: App {
             translationController: translationController,
             shortcutController: shortcutController,
             openMainWindowAction: openMainWindow,
-            openSettingsAction: openSettingsWindow
+            openSettingsAction: openSettingsWindow,
+            openOnboardingAction: openOnboardingWindow
         )
 
         guard !hasConfiguredRuntime else {
@@ -114,6 +117,10 @@ struct ClipPixTranApp: App {
         AppDockIconController.shared.configure(preference: dockIconPreference)
         clipboardMonitor.start()
         shortcutController.start()
+        FirstLaunchOnboardingPresenter.shared.configure(preference: onboardingPreference)
+        DispatchQueue.main.async {
+            FirstLaunchOnboardingPresenter.shared.showIfNeeded()
+        }
     }
 
     private func openMainWindow() {
@@ -136,13 +143,21 @@ struct ClipPixTranApp: App {
         }
     }
 
+    private func openOnboardingWindow() {
+        DispatchQueue.main.async {
+            FirstLaunchOnboardingPresenter.shared.configure(preference: onboardingPreference)
+            FirstLaunchOnboardingPresenter.shared.show()
+        }
+    }
+
     private var appSettingsView: some View {
         AppSettingsView(
             clipboardHistory: clipboardMonitor.history,
             screenshotHistory: screenshotController.history,
             translationController: translationController,
             dockIconPreference: dockIconPreference,
-            updateManager: updateManager
+            updateManager: updateManager,
+            openOnboardingAction: openOnboardingWindow
         )
         .onDisappear {
             AppDockIconController.shared.updateActivationPolicy()
@@ -155,6 +170,29 @@ struct ClipPixTranApp: App {
         #else
         "ClipPixTran"
         #endif
+    }
+}
+
+@MainActor
+private final class FirstLaunchOnboardingPresenter {
+    static let shared = FirstLaunchOnboardingPresenter()
+
+    private var controller: FirstLaunchOnboardingWindowController?
+
+    func configure(preference: FirstLaunchOnboardingPreference) {
+        guard controller == nil else {
+            return
+        }
+
+        controller = FirstLaunchOnboardingWindowController(preference: preference)
+    }
+
+    func showIfNeeded() {
+        controller?.showIfNeeded()
+    }
+
+    func show() {
+        controller?.show()
     }
 }
 
