@@ -18,9 +18,10 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
     @ObservationIgnored private static let isRunningTests =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
         ProcessInfo.processInfo.processName == "xctest"
-    @ObservationIgnored private static let sparkleIsConfigured: Bool = {
-        guard !isRunningTests,
-              let bundleID = Bundle.main.bundleIdentifier,
+    @ObservationIgnored private static let runsDebugBuild =
+        isDebugBuildChannel(Bundle.main.object(forInfoDictionaryKey: "ClipPixTranBuildChannel") as? String)
+    @ObservationIgnored private static let sparkleConfigurationIsValid: Bool = {
+        guard let bundleID = Bundle.main.bundleIdentifier,
               !bundleID.isEmpty,
               let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
               !feedURL.isEmpty,
@@ -33,6 +34,8 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
         return true
     }()
+    @ObservationIgnored private static let canUseSparkleUpdater =
+        !isRunningTests && !runsDebugBuild && sparkleConfigurationIsValid
 
     @ObservationIgnored private lazy var userDriver = SparkleUpdateUserDriver()
     @ObservationIgnored private(set) lazy var updater = SPUUpdater(
@@ -42,14 +45,26 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
         delegate: self
     )
 
-    var isConfigured: Bool {
-        Self.sparkleIsConfigured
+    var updateCheckingIsAvailable: Bool {
+        Self.canUseSparkleUpdater
+    }
+
+    var statusMessage: String {
+        if Self.runsDebugBuild {
+            return "Debug 构建不会检查更新；请使用 Release 构建测试 Sparkle 更新。"
+        }
+
+        if Self.sparkleConfigurationIsValid {
+            return "自动更新通过 GitHub Release 和 Sparkle appcast 提供。"
+        }
+
+        return "当前构建未配置 Sparkle appcast 或公钥。"
     }
 
     override init() {
         super.init()
-        guard Self.sparkleIsConfigured else {
-            canCheckForUpdates = !Self.isRunningTests
+        guard Self.canUseSparkleUpdater else {
+            canCheckForUpdates = !Self.isRunningTests && !Self.runsDebugBuild
             return
         }
 
@@ -63,7 +78,11 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
     }
 
     func checkForUpdates() {
-        guard Self.sparkleIsConfigured else {
+        guard !Self.isRunningTests, !Self.runsDebugBuild else {
+            return
+        }
+
+        guard Self.sparkleConfigurationIsValid else {
             let alert = NSAlert()
             alert.messageText = "自动更新未配置"
             alert.informativeText = "Release 构建需要在发布流程中使用 SPARKLE_PRIVATE_KEY 签名更新包。"
@@ -76,33 +95,39 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
     }
 
     func setAutomaticallyChecksForUpdates(_ newValue: Bool) {
-        automaticallyChecksForUpdates = newValue
-        guard Self.sparkleIsConfigured else {
+        guard Self.canUseSparkleUpdater else {
             return
         }
 
+        automaticallyChecksForUpdates = newValue
         startUpdaterIfNeeded()
         updater.automaticallyChecksForUpdates = newValue
     }
 
     func setAutomaticallyDownloadsUpdates(_ newValue: Bool) {
-        automaticallyDownloadsUpdates = newValue
-        guard Self.sparkleIsConfigured else {
+        guard Self.canUseSparkleUpdater else {
             return
         }
 
+        automaticallyDownloadsUpdates = newValue
         startUpdaterIfNeeded()
         updater.automaticallyDownloadsUpdates = newValue
     }
 
     func setUpdateCheckInterval(_ interval: UpdateCheckInterval) {
-        updateCheckInterval = interval.seconds
-        guard Self.sparkleIsConfigured else {
+        guard Self.canUseSparkleUpdater else {
             return
         }
 
+        updateCheckInterval = interval.seconds
         startUpdaterIfNeeded()
         updater.updateCheckInterval = interval.seconds
+    }
+
+    nonisolated static func isDebugBuildChannel(_ buildChannel: String?) -> Bool {
+        buildChannel?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare("Debug") == .orderedSame
     }
 
     private func configureCancellables() {

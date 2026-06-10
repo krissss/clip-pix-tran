@@ -582,7 +582,9 @@ private struct AboutSettingsSection: View {
                     }
 
                     toggleRow("自动检查更新", isOn: automaticallyChecksForUpdates)
+                        .disabled(!updateManager.updateCheckingIsAvailable)
                     toggleRow("自动下载更新", isOn: automaticallyDownloadsUpdates)
+                        .disabled(!updateManager.updateCheckingIsAvailable)
 
                     SettingsFormRow(title: "检查频率") {
                         Picker("", selection: updateCheckInterval) {
@@ -592,6 +594,7 @@ private struct AboutSettingsSection: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
+                        .disabled(!updateManager.updateCheckingIsAvailable)
                     }
 
                     SettingsFormRow(title: "上次检查") {
@@ -614,7 +617,7 @@ private struct AboutSettingsSection: View {
                 .settingsRowGroup()
             }
 
-            SettingsFootnote(updateManager.isConfigured ? "自动更新通过 GitHub Release 和 Sparkle appcast 提供。" : "当前构建未配置 Sparkle appcast 或公钥。")
+            SettingsFootnote(updateManager.statusMessage)
         }
     }
 
