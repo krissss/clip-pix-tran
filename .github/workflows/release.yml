@@ -15,6 +15,7 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  SIGNED_DERIVED_DATA: .build/xcode-signed
 
 jobs:
   test:
@@ -25,6 +26,7 @@ jobs:
   release:
     needs: test
     runs-on: macos-26
+    environment: Prod
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,21 +41,51 @@ jobs:
           restore-keys: |
             xcode-${{ runner.os }}-
 
-      - name: Validate Sparkle secrets
+      - name: Validate release secrets
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
           test -n "$SPARKLE_PRIVATE_KEY"
+          test -n "$SIGNING_CERTIFICATE_P12"
+          test -n "$SIGNING_CERTIFICATE_PASSWORD"
+          test -n "$SIGNING_IDENTITY"
+          test -n "$DEVELOPMENT_TEAM"
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+
+      - name: Write signing config
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+        run: |
+          cat > Config/Signing.local.xcconfig << EOF
+          DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
+          EOF
 
       - name: Package app
-        run: make package TAG="${RELEASE_TAG}"
+        env:
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+        run: |
+          make package-signed \
+            TAG="${RELEASE_TAG}" \
+            SIGNED_DERIVED_DATA="${SIGNED_DERIVED_DATA}" \
+            SIGNED_CODE_SIGN_IDENTITY="${SIGNING_IDENTITY}" \
+            SIGNED_DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM}"
 
       - name: Sign update with Sparkle
         id: sparkle_sign
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          SIGN_UPDATE=$(make print-sparkle-sign-update)
+          SIGN_UPDATE=$(make print-sparkle-sign-update DERIVED_DATA="${SIGNED_DERIVED_DATA}")
           SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" "ClipPixTran-${RELEASE_TAG}.zip" --ed-key-file - 2>&1)
           ED_SIG=$(printf '%s\n' "$SIGNATURE" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
           test -n "$ED_SIG"
