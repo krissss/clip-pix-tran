@@ -55,8 +55,59 @@ jobs:
           test -n "$SIGNING_IDENTITY"
           test -n "$DEVELOPMENT_TEAM"
 
+      - name: Validate signing certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          CERT_PATH="$RUNNER_TEMP/signing_certificate.p12"
+          CERT_PEM="$RUNNER_TEMP/signing_certificate.pem"
+          KEY_PEM="$RUNNER_TEMP/signing_private_key.pem"
+          trap 'rm -f "$CERT_PATH" "$CERT_PEM" "$KEY_PEM"' EXIT
+
+          if ! python3 - <<'PY' > "$CERT_PATH"; then
+          import base64
+          import binascii
+          import os
+          import sys
+
+          try:
+              encoded = "".join(os.environ["SIGNING_CERTIFICATE_P12"].split())
+              sys.stdout.buffer.write(base64.b64decode(encoded, validate=True))
+          except binascii.Error as error:
+              print(f"invalid base64: {error}", file=sys.stderr)
+              raise SystemExit(1)
+          PY
+            echo "::error::SIGNING_CERTIFICATE_P12 is not valid base64."
+            exit 1
+          fi
+
+          if [ ! -s "$CERT_PATH" ]; then
+            echo "::error::SIGNING_CERTIFICATE_P12 decoded to an empty file."
+            exit 1
+          fi
+
+          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nokeys -clcerts -out "$CERT_PEM" >/dev/null 2>&1; then
+            echo "::error::SIGNING_CERTIFICATE_P12 is not a readable .p12 file, or SIGNING_CERTIFICATE_PASSWORD is incorrect."
+            exit 1
+          fi
+
+          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nocerts -nodes -out "$KEY_PEM" >/dev/null 2>&1; then
+            echo "::error::Could not read the private key from SIGNING_CERTIFICATE_P12."
+            exit 1
+          fi
+
+          if ! grep -q 'BEGIN .*PRIVATE KEY' "$KEY_PEM"; then
+            echo "::error::SIGNING_CERTIFICATE_P12 does not contain a private key. Export the Apple Development identity as a .p12 from Keychain Access, not just the certificate."
+            exit 1
+          fi
+
+          openssl x509 -in "$CERT_PEM" -noout -subject
+
       - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
+        uses: apple-actions/import-codesign-certs@v7.0.0
         with:
           p12-file-base64: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
           p12-password: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}

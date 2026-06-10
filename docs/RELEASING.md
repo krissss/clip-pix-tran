@@ -17,6 +17,17 @@ bundle identifier 和同一 TeamIdentifier 下，macOS TCC 对辅助功能、屏
 | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA 私钥，用于签名更新包 |
 | `HOMEBREW_TAP_TOKEN` | 可选，用于更新 Homebrew tap |
 
+`SIGNING_CERTIFICATE_P12` 必须包含证书和对应私钥。推荐在 Keychain Access 中选中
+`Apple Development: ...` identity（左侧分类选择 My Certificates / 我的证书），导出为
+`.p12` 后再 base64 编码：
+
+```bash
+base64 -i signing-certificate.p12 | tr -d '\n' | pbcopy
+```
+
+如果 workflow 报 `.p12` 不包含私钥，通常是只导出了证书本身，而不是 My Certificates 中
+带展开私钥的 identity。
+
 ## 触发发版
 
 推送 tag 会构建并发布正式 Release：
