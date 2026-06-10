@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-10
+
+### Added
+
+- 支持跨版本更新日志展示
+
+### Fixed
+
+- 修复 release workflow 认证
+- 优先响应 Debug 版全局快捷键
+- 统一更新提示 UI 风格
+- 禁用 Debug 构建更新检查
+
 ## [0.2.0] - 2026-06-09
 
 ### Added
@@ -47,7 +60,8 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/krissss/clip-pix-tran/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/krissss/clip-pix-tran/commits/v0.1.0
