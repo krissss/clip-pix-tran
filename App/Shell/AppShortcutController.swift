@@ -75,24 +75,43 @@ final class AppShortcutController {
 
     private func observeShowMainWindowShortcut() async {
         for await event in KeyboardShortcuts.events(for: .showMainWindow) where event == .keyUp {
+            guard shouldHandleGlobalShortcutEvent else {
+                continue
+            }
+
             showMainWindow()
         }
     }
 
     private func observeClipboardQuickPanelShortcut() async {
         for await event in KeyboardShortcuts.events(for: .showClipboardQuickPanel) where event == .keyUp {
+            guard shouldHandleGlobalShortcutEvent else {
+                continue
+            }
+
             showClipboardQuickPanel()
         }
     }
 
     private func observeCaptureSelectedRegionShortcut() async {
         for await _ in KeyboardShortcuts.events(.keyDown, for: .captureSelectedRegion) {
+            guard shouldHandleGlobalShortcutEvent else {
+                continue
+            }
+
             await performCaptureSelectedRegion()
         }
     }
 
     private func installCaptureShortcutEventTap() {
-        captureShortcutEventTap = CaptureShortcutEventTap(shortcutName: .captureSelectedRegion) { [weak self] in
+        guard shouldHandleGlobalShortcutEvent else {
+            return
+        }
+
+        captureShortcutEventTap = CaptureShortcutEventTap(
+            shortcutName: .captureSelectedRegion,
+            shouldHandleShortcut: Self.shouldHandleGlobalShortcutEvent
+        ) { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.performCaptureSelectedRegion()
             }
@@ -108,6 +127,10 @@ final class AppShortcutController {
 
     private func observeTranslateSelectedTextShortcut() async {
         for await event in KeyboardShortcuts.events(for: .translateSelectedText) where event == .keyUp {
+            guard shouldHandleGlobalShortcutEvent else {
+                continue
+            }
+
             await performTranslateSelectedText()
         }
     }
@@ -131,10 +154,50 @@ final class AppShortcutController {
         )
         await translationController.translate()
     }
+
+    private var shouldHandleGlobalShortcutEvent: Bool {
+        Self.shouldHandleGlobalShortcutEvent()
+    }
+
+    private nonisolated static func shouldHandleGlobalShortcutEvent() -> Bool {
+        #if DEBUG
+        true
+        #else
+        !Self.isDebugBuildRunning
+        #endif
+    }
+
+    #if !DEBUG
+    private nonisolated static var isDebugBuildRunning: Bool {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            return false
+        }
+
+        return NSWorkspace.shared.runningApplications.contains { application in
+            guard application.bundleIdentifier == bundleIdentifier,
+                  application.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+                return false
+            }
+
+            return buildChannel(for: application) == "Debug"
+        }
+    }
+
+    private nonisolated static func buildChannel(for application: NSRunningApplication) -> String? {
+        guard let infoPlistURL = application.bundleURL?.appendingPathComponent("Contents/Info.plist"),
+              let data = try? Data(contentsOf: infoPlistURL),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            return nil
+        }
+
+        return info["ClipPixTranBuildChannel"] as? String
+    }
+    #endif
 }
 
 private final class CaptureShortcutEventTap {
     private let shortcutName: KeyboardShortcuts.Name
+    private let shouldHandleShortcut: () -> Bool
     private let action: @MainActor () -> Void
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -143,9 +206,11 @@ private final class CaptureShortcutEventTap {
 
     init(
         shortcutName: KeyboardShortcuts.Name,
+        shouldHandleShortcut: @escaping () -> Bool = { true },
         action: @escaping @MainActor () -> Void
     ) {
         self.shortcutName = shortcutName
+        self.shouldHandleShortcut = shouldHandleShortcut
         self.action = action
         install()
         shortcutChangeObserver = NotificationCenter.default.addObserver(
@@ -235,6 +300,13 @@ private final class CaptureShortcutEventTap {
         }
 
         guard matchesCaptureShortcut(event) else {
+            if type == .keyUp {
+                handledKeyDown = false
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        guard shouldHandleShortcut() else {
             if type == .keyUp {
                 handledKeyDown = false
             }
