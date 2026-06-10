@@ -219,8 +219,8 @@ jobs:
           if url_match is None:
               raise SystemExit('appcast item is missing enclosure URL')
 
-          if url_match.group(1) not in content:
-              content = re.sub(r'\s*</channel>', '\n' + item + '\n    </channel>', content, count=1)
+          content = re.sub(r'\s*<item>.*?</item>', '', content, flags=re.DOTALL)
+          content = re.sub(r'\s*</channel>', '\n' + item + '\n    </channel>', content, count=1)
 
           with open('docs/appcast.xml', 'w') as f:
               f.write(content)
