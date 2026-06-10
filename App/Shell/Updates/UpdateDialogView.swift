@@ -8,96 +8,50 @@ struct UpdateDialogView: View {
         VStack(spacing: 0) {
             header
 
-            Divider()
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     statusContent
                     releaseNotesContent
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 18)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(minHeight: 260)
-
-            Divider()
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             footer
         }
-        .frame(width: 560, height: 520)
-        .background(updateBackground)
+        .frame(width: 620, height: 500)
+        .background(ControlPanelBackground())
     }
 
     private var accentColor: Color {
-        Color(nsColor: .systemBlue)
-    }
-
-    private var updateBackground: some View {
-        ZStack(alignment: .topLeading) {
-            Color(nsColor: .windowBackgroundColor)
-
-            LinearGradient(
-                colors: [
-                    accentColor.opacity(0.08),
-                    accentColor.opacity(0.03),
-                    .clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Rectangle()
-                .fill(accentColor.opacity(0.18))
-                .frame(width: 2)
-        }
-        .ignoresSafeArea()
+        phaseAppearance.tint
     }
 
     private var header: some View {
-        HStack(spacing: 13) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 44, height: 44)
-                .clipShape(.rect(cornerRadius: 10, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(.white.opacity(0.24), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.10), radius: 5, y: 2)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
-
-                subtitleView
+        ControlPanelPageHeader(
+            title: title,
+            subtitle: subtitle,
+            systemImage: phaseAppearance.systemImage,
+            tint: accentColor
+        ) {
+            if showsVersionBadge {
+                Text(versionBadgeTitle)
+                    .font(.caption.monospacedDigit().weight(.medium))
+                    .foregroundStyle(accentColor)
+                    .lineLimit(1)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .controlPanelRoundedSurface(
+                        background: accentColor.opacity(0.11),
+                        cornerRadius: ControlPanelDesign.compactRadius
+                    )
             }
-
-            Spacer(minLength: 16)
         }
-        .padding(20)
-    }
-
-    @ViewBuilder
-    private var subtitleView: some View {
-        if state.currentVersion.isEmpty || state.latestVersion.isEmpty {
-            Text("ClipPixTran")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        } else {
-            Text(subtitle)
-                .font(.caption.monospacedDigit().weight(.medium))
-                .foregroundStyle(accentColor)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background {
-                    RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
-                        .fill(accentColor.opacity(0.10))
-                }
-        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
     @ViewBuilder
@@ -150,20 +104,31 @@ struct UpdateDialogView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionHeader
 
-                ForEach(state.changelogEntries) { entry in
-                    changelogEntryPanel(entry)
+                VStack(spacing: 0) {
+                    ForEach(Array(state.changelogEntries.enumerated()), id: \.element.id) { index, entry in
+                        changelogEntryPanel(entry)
+
+                        if index < state.changelogEntries.count - 1 {
+                            ControlPanelHairline(.horizontal)
+                                .padding(.leading, 12)
+                        }
+                    }
                 }
+                .controlPanelSettingsRowGroup()
             }
         } else if let fallbackNotes = state.fallbackNotes, !fallbackNotes.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 sectionHeader
 
-                UpdateInsetPanel(spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
                     UpdateMarkdownText(markdown: fallbackNotes)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .controlPanelSettingsRowGroup()
             }
         }
     }
@@ -176,7 +141,7 @@ struct UpdateDialogView: View {
                 } label: {
                     Label("跳过此版本", systemImage: "forward.end.fill")
                 }
-                .controlSize(.large)
+                .buttonStyle(ControlPanelButtonStyle())
             }
 
             Spacer()
@@ -187,7 +152,7 @@ struct UpdateDialogView: View {
                 } label: {
                     Label("取消", systemImage: "xmark.circle.fill")
                 }
-                .controlSize(.large)
+                .buttonStyle(ControlPanelButtonStyle())
             }
 
             if let dismissAction = state.dismissAction, showsLaterButton {
@@ -196,7 +161,7 @@ struct UpdateDialogView: View {
                 } label: {
                     Label("稍后", systemImage: "clock.fill")
                 }
-                .controlSize(.large)
+                .buttonStyle(ControlPanelButtonStyle())
             }
 
             if let acknowledgeAction = state.acknowledgeAction, state.isTerminal {
@@ -206,7 +171,7 @@ struct UpdateDialogView: View {
                     Label("好", systemImage: "checkmark.circle.fill")
                 }
                 .keyboardShortcut(.defaultAction)
-                .controlSize(.large)
+                .buttonStyle(ControlPanelButtonStyle(tint: accentColor, prominence: .primary))
             }
 
             if let installAction = state.installAction, showsInstallButton {
@@ -216,49 +181,39 @@ struct UpdateDialogView: View {
                     Label(installButtonTitle, systemImage: "arrow.down.circle.fill")
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(ControlPanelButtonStyle(tint: accentColor, prominence: .primary))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(.secondary.opacity(0.035))
+        .controlPanelActionBar(showsBottomBoundary: false)
+        .overlay(alignment: .top) {
+            ControlPanelHairline(.horizontal)
+        }
     }
 
     private var sectionHeader: some View {
-        HStack(spacing: 10) {
-            ControlPanelIconTile(
-                systemImage: "list.bullet.rectangle.fill",
-                tint: accentColor,
-                size: 26
-            )
-
-            Text("更新内容")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 0)
-        }
+        ControlPanelCompactSectionHeader(
+            title: "更新内容",
+            systemImage: "list.bullet.rectangle"
+        )
     }
 
     private func changelogEntryPanel(_ entry: UpdateChangelogEntry) -> some View {
-        UpdateInsetPanel(spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
                 Text(entry.displayTitle)
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .font(.callout.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.primary)
 
                 Spacer(minLength: 8)
             }
-
-            Divider()
-                .opacity(0.45)
 
             UpdateMarkdownText(markdown: entry.body)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func statusPanel<Content: View>(
@@ -267,20 +222,13 @@ struct UpdateDialogView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            ControlPanelIconTile(systemImage: systemImage, tint: color, size: 28)
+            ControlPanelIconTile(systemImage: systemImage, tint: color, size: 30)
 
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous)
-                .fill(color.opacity(0.055))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous)
-                .stroke(color.opacity(0.10), lineWidth: 1)
-        }
+        .controlPanelCard(background: ControlPanelDesign.raisedCardBackground)
     }
 
     private func statusText(_ text: String, color: Color = .secondary) -> some View {
@@ -297,11 +245,34 @@ struct UpdateDialogView: View {
                 .foregroundStyle(.primary)
             if let progress {
                 ProgressView(value: min(max(progress, 0), 1))
-                    .tint(.blue)
+                    .tint(accentColor)
             } else {
                 ProgressView()
                     .controlSize(.small)
             }
+        }
+    }
+
+    private var phaseAppearance: PhaseAppearance {
+        switch state.phase {
+        case .checking:
+            PhaseAppearance(systemImage: "arrow.triangle.2.circlepath", tint: Color(nsColor: .systemBlue))
+        case .updateFound:
+            PhaseAppearance(systemImage: "arrow.down.circle", tint: Color(nsColor: .systemBlue))
+        case .downloading:
+            PhaseAppearance(systemImage: "arrow.down.circle", tint: Color(nsColor: .systemBlue))
+        case .extracting:
+            PhaseAppearance(systemImage: "shippingbox", tint: Color(nsColor: .systemOrange))
+        case .readyToInstall:
+            PhaseAppearance(systemImage: "checkmark.seal", tint: Color(nsColor: .systemGreen))
+        case .installing:
+            PhaseAppearance(systemImage: "arrow.triangle.2.circlepath.circle", tint: Color(nsColor: .systemBlue))
+        case .installed:
+            PhaseAppearance(systemImage: "checkmark.circle", tint: Color(nsColor: .systemGreen))
+        case .notFound:
+            PhaseAppearance(systemImage: "checkmark.circle", tint: Color(nsColor: .systemGreen))
+        case .error:
+            PhaseAppearance(systemImage: "exclamationmark.triangle", tint: ControlPanelDesign.destructiveTint)
         }
     }
 
@@ -327,7 +298,19 @@ struct UpdateDialogView: View {
     }
 
     private var subtitle: String {
-        "当前 \(state.currentVersion) -> 最新 \(state.latestVersion)"
+        if state.currentVersion.isEmpty || state.latestVersion.isEmpty {
+            return "ClipPixTran"
+        }
+
+        return "当前 \(state.currentVersion) -> 最新 \(state.latestVersion)"
+    }
+
+    private var showsVersionBadge: Bool {
+        !state.latestVersion.isEmpty
+    }
+
+    private var versionBadgeTitle: String {
+        "v\(state.latestVersion)"
     }
 
     private var showsInstallButton: Bool {
@@ -372,31 +355,10 @@ struct UpdateDialogView: View {
 
         return "安装更新"
     }
-}
 
-private struct UpdateInsetPanel<Content: View>: View {
-    let spacing: CGFloat
-    let content: Content
-
-    init(spacing: CGFloat, @ViewBuilder content: () -> Content) {
-        self.spacing = spacing
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: spacing) {
-            content
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous)
-                .fill(ControlPanelDesign.raisedCardBackground)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous)
-                .stroke(ControlPanelDesign.structuralLine, lineWidth: 1)
-        }
+    private struct PhaseAppearance {
+        let systemImage: String
+        let tint: Color
     }
 }
 
