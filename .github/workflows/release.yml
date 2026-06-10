@@ -94,6 +94,11 @@ jobs:
             exit 1
           fi
 
+          if ! grep -q 'BEGIN CERTIFICATE' "$CERT_PEM"; then
+            echo "::error::SIGNING_CERTIFICATE_P12 does not contain a certificate. Export the full Apple Development identity from Keychain Access, not only the private key."
+            exit 1
+          fi
+
           if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nocerts -nodes -out "$KEY_PEM" >/dev/null 2>&1; then
             echo "::error::Could not read the private key from SIGNING_CERTIFICATE_P12."
             exit 1

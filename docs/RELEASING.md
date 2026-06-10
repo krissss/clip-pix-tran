@@ -25,8 +25,8 @@ bundle identifier 和同一 TeamIdentifier 下，macOS TCC 对辅助功能、屏
 base64 -i signing-certificate.p12 | tr -d '\n' | pbcopy
 ```
 
-如果 workflow 报 `.p12` 不包含私钥，通常是只导出了证书本身，而不是 My Certificates 中
-带展开私钥的 identity。
+如果 workflow 报 `.p12` 不包含证书或私钥，通常是只导出了证书本身、只导出了私钥，或
+没有从 My Certificates 中带展开私钥的 identity 导出。
 
 ## 触发发版
 
