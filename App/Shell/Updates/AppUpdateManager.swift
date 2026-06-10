@@ -6,7 +6,7 @@ import Sparkle
 
 @MainActor
 @Observable
-final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDelegate {
+final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
     var canCheckForUpdates = false
     var lastUpdateCheckDate: Date?
     var automaticallyChecksForUpdates = false
@@ -34,10 +34,12 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         return true
     }()
 
-    @ObservationIgnored private(set) lazy var updaterController = SPUStandardUpdaterController(
-        startingUpdater: false,
-        updaterDelegate: self,
-        userDriverDelegate: self
+    @ObservationIgnored private lazy var userDriver = SparkleUpdateUserDriver()
+    @ObservationIgnored private(set) lazy var updater = SPUUpdater(
+        hostBundle: Bundle.main,
+        applicationBundle: Bundle.main,
+        userDriver: userDriver,
+        delegate: self
     )
 
     var isConfigured: Bool {
@@ -51,9 +53,12 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
             return
         }
 
-        _ = updaterController
+        _ = updater
         configureCancellables()
         startUpdaterIfNeeded()
+        if updater.automaticallyChecksForUpdates {
+            updater.checkForUpdatesInBackground()
+        }
         syncFromSparkle()
     }
 
@@ -67,7 +72,7 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         }
 
         startUpdaterIfNeeded()
-        updaterController.updater.checkForUpdates()
+        updater.checkForUpdates()
     }
 
     func setAutomaticallyChecksForUpdates(_ newValue: Bool) {
@@ -77,7 +82,7 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         }
 
         startUpdaterIfNeeded()
-        updaterController.updater.automaticallyChecksForUpdates = newValue
+        updater.automaticallyChecksForUpdates = newValue
     }
 
     func setAutomaticallyDownloadsUpdates(_ newValue: Bool) {
@@ -87,7 +92,7 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         }
 
         startUpdaterIfNeeded()
-        updaterController.updater.automaticallyDownloadsUpdates = newValue
+        updater.automaticallyDownloadsUpdates = newValue
     }
 
     func setUpdateCheckInterval(_ interval: UpdateCheckInterval) {
@@ -97,31 +102,31 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         }
 
         startUpdaterIfNeeded()
-        updaterController.updater.updateCheckInterval = interval.seconds
+        updater.updateCheckInterval = interval.seconds
     }
 
     private func configureCancellables() {
-        updaterController.updater.publisher(for: \.canCheckForUpdates)
+        updater.publisher(for: \.canCheckForUpdates)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] value in self?.canCheckForUpdates = value }
             .store(in: &cancellables)
 
-        updaterController.updater.publisher(for: \.lastUpdateCheckDate)
+        updater.publisher(for: \.lastUpdateCheckDate)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] value in self?.lastUpdateCheckDate = value }
             .store(in: &cancellables)
 
-        updaterController.updater.publisher(for: \.automaticallyChecksForUpdates)
+        updater.publisher(for: \.automaticallyChecksForUpdates)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] value in self?.automaticallyChecksForUpdates = value }
             .store(in: &cancellables)
 
-        updaterController.updater.publisher(for: \.automaticallyDownloadsUpdates)
+        updater.publisher(for: \.automaticallyDownloadsUpdates)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] value in self?.automaticallyDownloadsUpdates = value }
             .store(in: &cancellables)
 
-        updaterController.updater.publisher(for: \.updateCheckInterval)
+        updater.publisher(for: \.updateCheckInterval)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] value in self?.updateCheckInterval = value }
             .store(in: &cancellables)
@@ -132,12 +137,15 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
             return
         }
 
-        updaterStarted = true
-        updaterController.startUpdater()
+        do {
+            try updater.start()
+            updaterStarted = true
+        } catch {
+            print("[Sparkle] failed to start updater: \(error)")
+        }
     }
 
     private func syncFromSparkle() {
-        let updater = updaterController.updater
         canCheckForUpdates = updater.canCheckForUpdates
         lastUpdateCheckDate = updater.lastUpdateCheckDate
         automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
@@ -155,14 +163,12 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate, SPUStandardUserDrive
         }
     }
 
-    nonisolated var supportsGentleScheduledUpdateReminders: Bool {
-        false
+    nonisolated func updater(_: SPUUpdater, didAbortWithError error: Error) {
+        print("[Sparkle] didAbortWithError: \(error)")
     }
 
-    nonisolated func standardUserDriverWillShowModalAlert() {
-        DispatchQueue.main.async {
-            NSApp.activate()
-        }
+    nonisolated var supportsGentleScheduledUpdateReminders: Bool {
+        false
     }
 }
 

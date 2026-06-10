@@ -166,6 +166,7 @@ jobs:
               f'            <sparkle:version>{build_number}</sparkle:version>',
               f'            <sparkle:shortVersionString>{version}</sparkle:shortVersionString>',
               '            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>',
+              '            <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>',
               f'            <pubDate>{date}</pubDate>',
               f'            <description><![CDATA[{notes_html}]]></description>',
               '            <enclosure',
@@ -185,9 +186,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp CHANGELOG.md /tmp/CHANGELOG.md
           git fetch origin main
           git checkout -B main origin/main
           mkdir -p docs
+          cp /tmp/CHANGELOG.md docs/CHANGELOG.md
 
           if [ ! -f docs/appcast.xml ]; then
             cat > docs/appcast.xml <<'XML'
@@ -223,7 +226,7 @@ jobs:
               f.write(content)
           PY
 
-          git add docs/appcast.xml
+          git add docs/appcast.xml docs/CHANGELOG.md
           git diff --cached --quiet || git commit -m "chore: update appcast.xml for ${RELEASE_TAG}"
           git push origin main
 

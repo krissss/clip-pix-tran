@@ -10,6 +10,7 @@
             <sparkle:version>23</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <pubDate>Sun, 07 Jun 2026 15:03:25 +0000</pubDate>
             <description><![CDATA[<b>ClipPixTran 0.1.0</b>
 本次变更：
@@ -53,6 +54,7 @@ ClipPixTran-v0.1.0.dmg  68cbbec681630b6ac06adc5c336b91597ee305b0523588160b27752c
             <sparkle:version>26</sparkle:version>
             <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <pubDate>Sun, 07 Jun 2026 15:43:02 +0000</pubDate>
             <description><![CDATA[<b>ClipPixTran 0.1.1</b>
 自 v0.1.0 以来的变更：
@@ -76,6 +78,7 @@ ClipPixTran-v0.1.1.dmg  fc593b86d00ea84b442d5d68456f3d9b56897b03767a72f015d00262
             <sparkle:version>34</sparkle:version>
             <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
             <pubDate>Tue, 09 Jun 2026 09:49:03 +0000</pubDate>
             <description><![CDATA[<b>What&#x27;s Changed</b>
 <b>Added</b>
