@@ -89,7 +89,8 @@ jobs:
             exit 1
           fi
 
-          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nokeys -clcerts -out "$CERT_PEM" >/dev/null 2>&1; then
+          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nokeys -clcerts -out "$CERT_PEM" >/dev/null 2>&1 &&
+             ! openssl pkcs12 -legacy -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nokeys -clcerts -out "$CERT_PEM" >/dev/null 2>&1; then
             echo "::error::SIGNING_CERTIFICATE_P12 is not a readable .p12 file, or SIGNING_CERTIFICATE_PASSWORD is incorrect."
             exit 1
           fi
@@ -99,7 +100,8 @@ jobs:
             exit 1
           fi
 
-          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nocerts -nodes -out "$KEY_PEM" >/dev/null 2>&1; then
+          if ! openssl pkcs12 -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nocerts -nodes -out "$KEY_PEM" >/dev/null 2>&1 &&
+             ! openssl pkcs12 -legacy -in "$CERT_PATH" -passin pass:"$SIGNING_CERTIFICATE_PASSWORD" -nocerts -nodes -out "$KEY_PEM" >/dev/null 2>&1; then
             echo "::error::Could not read the private key from SIGNING_CERTIFICATE_P12."
             exit 1
           fi
