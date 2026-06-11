@@ -3,26 +3,37 @@ import Testing
 
 @MainActor
 struct TextSelectionServiceTests {
-    @Test func returnsTrimmedAccessibilitySelection() async {
+    @Test func prefersClipboardSelectionToPreserveFormatting() async {
         let service = SystemTextSelectionService(
-            accessibilityGrabber: { "  hello  " },
-            clipboardGrabber: { "fallback" }
+            accessibilityGrabber: { "Providers: OpenAI Google Apple" },
+            clipboardGrabber: {
+                "\n  Providers\n\n- OpenAI\n- Google\n- Apple\n\n"
+            }
         )
 
         let text = await service.selectedText()
 
-        #expect(text == "hello")
+        #expect(
+            text ==
+                """
+                Providers
+
+                - OpenAI
+                - Google
+                - Apple
+                """
+        )
     }
 
-    @Test func fallsBackToClipboardWhenAccessibilityIsEmpty() async {
+    @Test func fallsBackToAccessibilityWhenClipboardIsEmpty() async {
         let service = SystemTextSelectionService(
-            accessibilityGrabber: { "   " },
-            clipboardGrabber: { "  clipboard text\n" }
+            accessibilityGrabber: { "  accessibility text\n" },
+            clipboardGrabber: { "   " }
         )
 
         let text = await service.selectedText()
 
-        #expect(text == "clipboard text")
+        #expect(text == "accessibility text")
     }
 
     @Test func returnsNilWhenNoGrabberFindsText() async {

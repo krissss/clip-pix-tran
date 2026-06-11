@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ClipboardItemDetailPane: View {
@@ -26,14 +27,16 @@ struct ClipboardItemDetailPane: View {
         VStack(spacing: 0) {
             actionBar
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    previewSection
-                    metadataSection
-                }
-                .padding(ControlPanelDesign.Layout.detailContentPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                previewSection
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                metadataSection
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                    .layoutPriority(1)
             }
+            .padding(ControlPanelDesign.Layout.detailContentPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .controlPanelContentSurface()
     }
@@ -154,9 +157,10 @@ private struct ClipboardTextPreview: View {
                 text: item.text,
                 richTextData: item.richTextPreviewData
             )
-            .frame(minHeight: 240, maxHeight: 420)
+            .frame(minHeight: 240, maxHeight: .infinity)
             .controlPanelTextSurface()
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
     }
 }
@@ -171,19 +175,15 @@ private struct ClipboardImagePreview: View {
 
             if let imageData = item.imageData {
                 Button(action: previewAction) {
-                    ImageThumbnailView(
-                        data: imageData,
-                        size: CGSize(width: 320, height: 200),
-                        cornerRadius: ControlPanelDesign.cardRadius,
-                        maxPixelSize: 720
-                    )
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(ControlPanelDesign.Layout.detailContentPadding)
-                    .controlPanelTextSurface()
-                    .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous))
+                    ClipboardFittedPreviewImage(data: imageData)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(L10n.pixOpenInPreview)
+                .padding(ControlPanelDesign.Layout.detailContentPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .controlPanelTextSurface()
             } else {
                 ContentUnavailableView(L10n.commonCannotPreviewImage, systemImage: "photo")
                     .frame(minHeight: 220)
@@ -193,7 +193,103 @@ private struct ClipboardImagePreview: View {
                 ClipboardPathList(paths: item.filePaths)
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
+    }
+}
+
+private struct ClipboardFittedPreviewImage: View {
+    let data: Data
+
+    @State private var thumbnailData: Data?
+    @State private var didLoadThumbnail = false
+
+    private let cornerRadius: CGFloat = ControlPanelDesign.compactRadius
+
+    private var nsImage: NSImage? {
+        guard let thumbnailData else {
+            return nil
+        }
+
+        return NSImage(data: thumbnailData)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let availableSize = CGSize(
+                width: max(1, proxy.size.width),
+                height: max(1, proxy.size.height)
+            )
+
+            ZStack {
+                if let nsImage {
+                    let displaySize = fittedImageSize(
+                        imageSize: nsImage.size,
+                        availableSize: availableSize
+                    )
+
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: displaySize.width, height: displaySize.height)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                } else {
+                    placeholder
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: data) {
+            thumbnailData = nil
+            didLoadThumbnail = false
+            let sourceData = data
+            thumbnailData = await Task.detached(priority: .utility) {
+                ImageThumbnailRenderer.pngData(
+                    from: sourceData,
+                    maxPixelSize: 1400
+                )
+            }.value
+            didLoadThumbnail = true
+        }
+    }
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.quaternary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                if didLoadThumbnail {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+    }
+
+    private func fittedImageSize(
+        imageSize: CGSize,
+        availableSize: CGSize
+    ) -> CGSize {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              availableSize.width > 0,
+              availableSize.height > 0 else {
+            return .zero
+        }
+
+        let ratio = min(
+            availableSize.width / imageSize.width,
+            availableSize.height / imageSize.height
+        )
+
+        return CGSize(
+            width: imageSize.width * ratio,
+            height: imageSize.height * ratio
+        )
     }
 }
 

@@ -4,6 +4,7 @@ struct TranslationProviderCard: View {
     let provider: TranslationProviderDescriptor
     let status: TranslationProviderStatus
     let translatedText: String
+    var sourceText: String? = nil
     let canCopy: Bool
     let canSpeak: Bool
     let isPreparingSpeech: Bool
@@ -14,6 +15,7 @@ struct TranslationProviderCard: View {
     let onRetry: () -> Void
     var contentMinHeight: CGFloat = 70
     var isCompact = false
+    var showsHeader = true
 
     private var horizontalPadding: CGFloat {
         isCompact ? 8 : 10
@@ -31,18 +33,30 @@ struct TranslationProviderCard: View {
         isCompact ? 7 : 9
     }
 
+    private var bodyTopPadding: CGFloat {
+        showsHeader ? 0 : (isCompact ? 7 : 9)
+    }
+
     private var contentSpacing: CGFloat {
         isCompact ? 5 : 8
     }
 
+    private var surfaceBackground: Color {
+        showsHeader
+            ? ControlPanelDesign.historyRowBackground
+            : ControlPanelDesign.textSurfaceBackground
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            header
+            if showsHeader {
+                header
+            }
 
             bodyContent
         }
         .controlPanelRoundedSurface(
-            background: ControlPanelDesign.historyRowBackground,
+            background: surfaceBackground,
             cornerRadius: ControlPanelDesign.compactRadius
         )
     }
@@ -113,6 +127,7 @@ struct TranslationProviderCard: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: min(contentMinHeight, 34), alignment: .topLeading)
+                .padding(.top, bodyTopPadding)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.bottom, bodyBottomPadding)
         case .loading(let message):
@@ -125,16 +140,20 @@ struct TranslationProviderCard: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: min(contentMinHeight, 34), alignment: .topLeading)
+            .padding(.top, bodyTopPadding)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bodyBottomPadding)
         case .success:
             CompactTranslationText(
                 text: translatedText,
+                referenceText: sourceText,
                 font: isCompact ? .callout : .body,
                 lineSpacing: isCompact ? 1 : 2,
-                enableSelection: true
+                enableSelection: true,
+                preservesParagraphFormatting: true
             )
                 .layoutPriority(1)
+                .padding(.top, bodyTopPadding)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.bottom, bodyBottomPadding)
         case .failed(let message):
@@ -153,6 +172,7 @@ struct TranslationProviderCard: View {
                     .help(L10n.tranRetry)
                 }
             }
+            .padding(.top, bodyTopPadding)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, bodyBottomPadding)
         }

@@ -1,6 +1,38 @@
 import AppKit
 import SwiftUI
 
+private enum TranslationQuickPanelSizing {
+    static let longTextCharacterThreshold = 500
+    static let longTextLineThreshold = 8
+
+    static func panelSize(isExpanded: Bool) -> CGSize {
+        if isExpanded {
+            return CGSize(
+                width: ControlPanelDesign.Layout.QuickPanel.translationExpandedWidth,
+                height: ControlPanelDesign.Layout.QuickPanel.translationExpandedHeight
+            )
+        }
+
+        return CGSize(
+            width: ControlPanelDesign.Layout.QuickPanel.translationWidth,
+            height: ControlPanelDesign.Layout.QuickPanel.translationHeight
+        )
+    }
+
+    static func prefersExpanded(_ text: String?) -> Bool {
+        guard let text else {
+            return false
+        }
+
+        return isLongSourceText(text)
+    }
+
+    static func isLongSourceText(_ text: String) -> Bool {
+        text.count >= longTextCharacterThreshold
+            || text.components(separatedBy: .newlines).count >= longTextLineThreshold
+    }
+}
+
 @MainActor
 final class TranslationQuickPanelPresenter {
     private var panel: TranslationQuickPanelWindow?
@@ -11,6 +43,7 @@ final class TranslationQuickPanelPresenter {
     private var currentSourceText: String?
     private var currentErrorMessage: String?
     private var isPinned = false
+    private var isExpanded = false
     var openFullTranslationAction: (() -> Void)?
 
     func show(
@@ -18,9 +51,13 @@ final class TranslationQuickPanelPresenter {
         sourceText: String?,
         errorMessage: String? = nil
     ) {
+        let sourceTextChanged = sourceText != currentSourceText
         translationController = controller
         currentSourceText = sourceText
         currentErrorMessage = errorMessage
+        if sourceTextChanged {
+            isExpanded = TranslationQuickPanelSizing.prefersExpanded(sourceText)
+        }
 
         let shouldPositionPanel = panel == nil || panel?.isVisible != true
         if panel == nil {
@@ -36,6 +73,7 @@ final class TranslationQuickPanelPresenter {
             sourceText: sourceText,
             errorMessage: errorMessage,
             isPinned: isPinned,
+            isExpanded: isExpanded,
             onCopySource: { [weak self] in
                 self?.translationController?.copySourceToPasteboard()
             },
@@ -48,6 +86,9 @@ final class TranslationQuickPanelPresenter {
             onTogglePinned: { [weak self] in
                 self?.togglePinned()
             },
+            onToggleExpanded: { [weak self] in
+                self?.toggleExpanded()
+            },
             onOpenFullTranslation: { [weak self] in
                 self?.openFullTranslation()
             },
@@ -57,9 +98,11 @@ final class TranslationQuickPanelPresenter {
         )
 
         panel.contentView = NSHostingView(rootView: rootView)
-        if shouldPositionPanel {
-            panel.setFrameOrigin(panelOrigin(for: panel.frame.size))
-        }
+        resize(
+            panel,
+            to: TranslationQuickPanelSizing.panelSize(isExpanded: isExpanded),
+            positionsNearPointer: shouldPositionPanel
+        )
         panel.deminiaturize(nil)
         panel.orderFrontRegardless()
         panel.makeKey()
@@ -91,13 +134,26 @@ final class TranslationQuickPanelPresenter {
         }
     }
 
+    private func toggleExpanded() {
+        isExpanded.toggle()
+
+        if let controller = translationController {
+            show(
+                controller: controller,
+                sourceText: currentSourceText,
+                errorMessage: currentErrorMessage
+            )
+        }
+    }
+
     private func makePanel() -> TranslationQuickPanelWindow {
+        let panelSize = TranslationQuickPanelSizing.panelSize(isExpanded: isExpanded)
         let panel = TranslationQuickPanelWindow(
             contentRect: NSRect(
                 x: 0,
                 y: 0,
-                width: ControlPanelDesign.Layout.QuickPanel.translationWidth,
-                height: ControlPanelDesign.Layout.QuickPanel.translationHeight
+                width: panelSize.width,
+                height: panelSize.height
             ),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
@@ -115,6 +171,43 @@ final class TranslationQuickPanelPresenter {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         return panel
+    }
+
+    private func resize(
+        _ panel: NSPanel,
+        to contentSize: CGSize,
+        positionsNearPointer: Bool
+    ) {
+        let oldFrame = panel.frame
+        panel.setContentSize(contentSize)
+
+        if positionsNearPointer {
+            panel.setFrameOrigin(panelOrigin(for: panel.frame.size))
+            return
+        }
+
+        let origin = CGPoint(
+            x: oldFrame.minX,
+            y: oldFrame.maxY - panel.frame.height
+        )
+        panel.setFrameOrigin(clampedPanelOrigin(origin, for: panel.frame.size))
+    }
+
+    private func clampedPanelOrigin(_ origin: CGPoint, for size: CGSize) -> CGPoint {
+        let proposedFrame = CGRect(origin: origin, size: size)
+        guard let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(proposedFrame) })
+            ?? NSScreen.main else {
+            return origin
+        }
+
+        let visibleFrame = screen.visibleFrame
+        let maxX = max(visibleFrame.minX, visibleFrame.maxX - size.width)
+        let maxY = max(visibleFrame.minY, visibleFrame.maxY - size.height)
+
+        return CGPoint(
+            x: min(max(origin.x, visibleFrame.minX), maxX),
+            y: min(max(origin.y, visibleFrame.minY), maxY)
+        )
     }
 
     private func installAutoDismissObservers(for panel: NSPanel) {
@@ -222,12 +315,18 @@ private struct TranslationQuickPanelView: View {
     let sourceText: String?
     let errorMessage: String?
     let isPinned: Bool
+    let isExpanded: Bool
     let onCopySource: () -> Void
     let onCopyBestTranslation: () -> Void
     let onCopyProviderTranslation: (String) -> Void
     let onTogglePinned: () -> Void
+    let onToggleExpanded: () -> Void
     let onOpenFullTranslation: () -> Void
     let onClose: () -> Void
+
+    private var panelSize: CGSize {
+        TranslationQuickPanelSizing.panelSize(isExpanded: isExpanded)
+    }
 
     private var visibleErrorMessage: String? {
         if !controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -286,6 +385,18 @@ private struct TranslationQuickPanelView: View {
         return L10n.tranReadingSelection
     }
 
+    private var sourceEditorHeight: CGFloat {
+        if isExpanded {
+            return ControlPanelDesign.Layout.QuickPanel.sourceExpandedHeight
+        }
+
+        if TranslationQuickPanelSizing.isLongSourceText(controller.sourceText) {
+            return ControlPanelDesign.Layout.QuickPanel.sourceLongHeight
+        }
+
+        return ControlPanelDesign.Layout.QuickPanel.sourceMinHeight
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -295,8 +406,8 @@ private struct TranslationQuickPanelView: View {
             content
         }
         .frame(
-            width: ControlPanelDesign.Layout.QuickPanel.translationWidth,
-            height: ControlPanelDesign.Layout.QuickPanel.translationHeight
+            width: panelSize.width,
+            height: panelSize.height
         )
         .controlPanelPanelChrome(cornerRadius: ControlPanelDesign.Layout.QuickPanel.cornerRadius)
         .background(TranslationQuickPanelKeyboardBridge { event in
@@ -330,6 +441,16 @@ private struct TranslationQuickPanelView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: isPinned ? .selected : .normal, tint: tint))
             .help(isPinned ? L10n.commonUnpinWindow : L10n.commonPinWindow)
+
+            Button(action: onToggleExpanded) {
+                Image(
+                    systemName: isExpanded
+                        ? "arrow.down.right.and.arrow.up.left"
+                        : "arrow.up.left.and.arrow.down.right"
+                )
+            }
+            .buttonStyle(ControlPanelIconButtonStyle())
+            .help(isExpanded ? L10n.tranCollapseQuickPanel : L10n.tranExpandQuickPanel)
 
             Button(action: onOpenFullTranslation) {
                 Image(systemName: "arrow.up.forward.app")
@@ -485,8 +606,8 @@ private struct TranslationQuickPanelView: View {
             }
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: ControlPanelDesign.Layout.QuickPanel.sourceMinHeight,
-                    maxHeight: ControlPanelDesign.Layout.QuickPanel.sourceMinHeight,
+                    minHeight: sourceEditorHeight,
+                    maxHeight: sourceEditorHeight,
                     alignment: .topLeading
                 )
                 .controlPanelTextSurface(cornerRadius: ControlPanelDesign.compactRadius)
@@ -527,6 +648,7 @@ private struct TranslationQuickPanelView: View {
                 provider: provider.provider,
                 status: providerStatus(for: provider),
                 translatedText: providerTranslatedText(for: provider),
+                sourceText: controller.sourceText,
                 canCopy: providerCanCopy(for: provider),
                 canSpeak: providerCanCopy(for: provider),
                 isPreparingSpeech: controller.isPreparingSpeechResult(providerID: provider.provider.id),
@@ -683,6 +805,7 @@ private struct TranslationQuickPanelSourceEditor: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
 
         let textView = ReturnHandlingTextView()
         textView.delegate = context.coordinator

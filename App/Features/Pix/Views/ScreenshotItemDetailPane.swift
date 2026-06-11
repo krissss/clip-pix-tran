@@ -15,14 +15,16 @@ struct ScreenshotItemDetailPane: View {
         VStack(spacing: 0) {
             actionBar
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    previewSection
-                    metadataSection
-                }
-                .padding(ControlPanelDesign.Layout.detailContentPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                previewSection
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                metadataSection
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                    .layoutPriority(1)
             }
+            .padding(ControlPanelDesign.Layout.detailContentPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .controlPanelContentSurface()
     }
@@ -90,20 +92,23 @@ struct ScreenshotItemDetailPane: View {
             if item.isImage {
                 Button(action: previewAction) {
                     ScreenshotFittedPreviewImage(data: item.data)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(L10n.pixOpenInPreview)
                 .padding(ControlPanelDesign.Layout.detailContentPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .controlPanelTextSurface()
             } else {
                 ScreenRecordingPreviewCard(item: item, previewAction: previewAction)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(ControlPanelDesign.Layout.detailContentPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .controlPanelTextSurface()
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
     }
 
@@ -135,48 +140,66 @@ private struct ScreenRecordingPreviewCard: View {
     let previewAction: () -> Void
 
     var body: some View {
-        Button(action: previewAction) {
-            ScreenRecordingThumbnailView(
-                item: item,
-                size: CGSize(width: 520, height: 292),
-                cornerRadius: ControlPanelDesign.compactRadius,
-                maxPixelSize: 1100
-            ) {
-                ZStack {
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.58)],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
+        GeometryReader { proxy in
+            let thumbnailSize = fittedThumbnailSize(in: proxy.size)
 
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 54, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white)
+            Button(action: previewAction) {
+                ScreenRecordingThumbnailView(
+                    item: item,
+                    size: thumbnailSize,
+                    cornerRadius: ControlPanelDesign.compactRadius,
+                    maxPixelSize: 1100
+                ) {
+                    ZStack {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.58)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
 
-                    VStack {
-                        Spacer()
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 54, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.white)
 
-                        HStack(alignment: .bottom) {
-                            Text(item.durationText)
-                                .font(.title3.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(.white)
-
+                        VStack {
                             Spacer()
 
-                            Text(item.fileSizeText)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.82))
+                            HStack(alignment: .bottom) {
+                                Text(item.durationText)
+                                    .font(.title3.monospacedDigit().weight(.semibold))
+                                    .foregroundStyle(.white)
+
+                                Spacer()
+
+                                Text(item.fileSizeText)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.82))
+                            }
+                            .padding(14)
                         }
-                        .padding(14)
                     }
                 }
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, minHeight: 220)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .help(L10n.pixOpenRecording)
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .buttonStyle(.plain)
-        .help(L10n.pixOpenRecording)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func fittedThumbnailSize(in availableSize: CGSize) -> CGSize {
+        let width = max(1, availableSize.width)
+        let height = max(1, availableSize.height)
+        let aspectRatio = 16.0 / 9.0
+
+        let heightFromWidth = width / aspectRatio
+        if heightFromWidth <= height {
+            return CGSize(width: width, height: heightFromWidth)
+        }
+
+        return CGSize(width: height * aspectRatio, height: height)
     }
 }
 
@@ -186,7 +209,6 @@ private struct ScreenshotFittedPreviewImage: View {
     @State private var thumbnailData: Data?
     @State private var didLoadThumbnail = false
 
-    private let previewHeight: CGFloat = 320
     private let cornerRadius: CGFloat = ControlPanelDesign.compactRadius
 
     private var nsImage: NSImage? {
@@ -201,7 +223,7 @@ private struct ScreenshotFittedPreviewImage: View {
         GeometryReader { proxy in
             let availableSize = CGSize(
                 width: max(1, proxy.size.width),
-                height: previewHeight
+                height: max(1, proxy.size.height)
             )
 
             ZStack {
@@ -221,10 +243,9 @@ private struct ScreenshotFittedPreviewImage: View {
                     placeholder
                 }
             }
-            .frame(width: proxy.size.width, height: previewHeight)
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .frame(height: previewHeight)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: data) {
             thumbnailData = nil
             didLoadThumbnail = false

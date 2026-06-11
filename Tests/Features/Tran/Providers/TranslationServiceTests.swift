@@ -74,7 +74,8 @@ struct TranslationServiceTests {
     @Test func hybridUsesFallbackWhenPrimaryFails() async throws {
         let service = HybridTranslationService(
             primary: FailingTranslationService(),
-            fallback: FallbackTranslationService()
+            fallback: FallbackTranslationService(),
+            primaryRetryDelayNanoseconds: 0
         )
 
         let result = try await service.translate(
@@ -86,6 +87,28 @@ struct TranslationServiceTests {
         )
 
         #expect(result.translatedText == "你好")
+    }
+
+    @Test func hybridRetriesPrimaryBeforeFallback() async throws {
+        let primary = FlakyTranslationService()
+        let fallback = UnexpectedFallbackTranslationService()
+        let service = HybridTranslationService(
+            primary: primary,
+            fallback: fallback,
+            primaryRetryDelayNanoseconds: 0
+        )
+
+        let result = try await service.translate(
+            TranslationRequest(
+                sourceText: "result",
+                targetLanguageCode: "zh-Hans",
+                sourceLanguageCode: "en"
+            )
+        )
+
+        #expect(result.translatedText == "重试成功")
+        #expect(primary.callCount == 2)
+        #expect(fallback.callCount == 0)
     }
 
     @Test func systemUsesInstalledLanguagePairForDetectedSource() async throws {
@@ -435,6 +458,32 @@ struct TranslationServiceTests {
 private struct FailingTranslationService: TranslationService {
     func translate(_ request: TranslationRequest) async throws -> TranslationResult {
         throw TranslationProviderError.unavailable
+    }
+}
+
+private final class FlakyTranslationService: TranslationService {
+    private(set) var callCount = 0
+
+    func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+        callCount += 1
+        if callCount == 1 {
+            throw TranslationProviderError.unavailable
+        }
+
+        return TranslationResult(
+            translatedText: "重试成功",
+            sourceLanguageCode: request.sourceLanguageCode,
+            targetLanguageCode: request.targetLanguageCode
+        )
+    }
+}
+
+private final class UnexpectedFallbackTranslationService: TranslationService {
+    private(set) var callCount = 0
+
+    func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+        callCount += 1
+        throw UnexpectedTranslationCallError()
     }
 }
 

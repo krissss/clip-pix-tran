@@ -1,9 +1,15 @@
 import SwiftUI
 
+private enum TranslationPaneLayout {
+    static let headerHeight: CGFloat = 26
+    static let contentMinHeight: CGFloat = 220
+}
+
 struct TranslationView: View {
     @Bindable var controller: TranslationController
     @State private var historySearchText = ""
     @State private var showsClearHistoryConfirmation = false
+    @State private var selectedResultProviderID: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,7 +48,7 @@ struct TranslationView: View {
                 resultPane
                     .frame(minWidth: 300, maxWidth: .infinity)
             }
-            .frame(minHeight: 260)
+            .frame(minHeight: 260, maxHeight: .infinity, alignment: .top)
 
             if let speechErrorMessage = controller.speechErrorMessage {
                 speechErrorBanner(speechErrorMessage)
@@ -91,10 +97,12 @@ struct TranslationView: View {
             ShortcutTextEditor(text: $controller.sourceText) {
                 translate()
             }
-            .frame(maxWidth: .infinity, minHeight: 220)
             .padding(1)
+            .frame(minHeight: TranslationPaneLayout.contentMinHeight, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
             .controlPanelTextSurface()
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
     }
 
@@ -118,38 +126,45 @@ struct TranslationView: View {
                 action: controller.speakSourceText
             )
         }
-        .frame(height: 26)
+        .frame(height: TranslationPaneLayout.headerHeight)
     }
 
     private var resultPane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            paneHeader(
-                title: L10n.tranResult,
-                systemImage: "rectangle.stack",
-                accessory: L10n.tranProviderCount(visibleProviders.count)
-            )
+            resultPaneHeader
 
             providerDeck
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
     }
 
-    private func paneHeader(
-        title: String,
-        systemImage: String,
-        accessory: String
-    ) -> some View {
+    private var resultPaneHeader: some View {
         HStack(spacing: 8) {
-            Label(title, systemImage: systemImage)
+            Label(L10n.tranResult, systemImage: "rectangle.stack")
                 .font(.headline)
+
+            if !visibleProviders.isEmpty {
+                TranslationProviderTabStrip(
+                    providers: visibleProviders,
+                    selectedProviderID: selectedResultProvider?.provider.id,
+                    onSelect: { providerID in
+                        selectedResultProviderID = providerID
+                    }
+                )
+            }
 
             Spacer()
 
-            Text(accessory)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            if let selectedResultProvider {
+                resultActions(for: selectedResultProvider)
+            } else {
+                Text(L10n.tranProviderCount(visibleProviders.count))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .frame(height: 26)
+        .frame(height: TranslationPaneLayout.headerHeight)
     }
 
     private func speechErrorBanner(_ message: String) -> some View {
@@ -203,42 +218,87 @@ struct TranslationView: View {
     }
 
     private var providerDeck: some View {
-        ScrollView {
-            LazyVStack(spacing: 8) {
-                providerCards
+        GeometryReader { proxy in
+            let availableHeight = max(TranslationPaneLayout.contentMinHeight, proxy.size.height)
+
+            Group {
+                if let selectedResultProvider {
+                    ScrollView {
+                        TranslationProviderCard(
+                            provider: selectedResultProvider.provider,
+                            status: selectedResultProvider.status,
+                            translatedText: selectedResultProvider.translatedText,
+                            sourceText: controller.sourceText,
+                            canCopy: hasTranslatedText(for: selectedResultProvider),
+                            canSpeak: hasTranslatedText(for: selectedResultProvider),
+                            isPreparingSpeech: controller.isPreparingSpeechResult(
+                                providerID: selectedResultProvider.provider.id
+                            ),
+                            isSpeaking: controller.isSpeakingResult(providerID: selectedResultProvider.provider.id),
+                            speechProviderName: controller.currentSpeechProviderName,
+                            onCopy: {
+                                controller.copyResultToPasteboard(providerID: selectedResultProvider.provider.id)
+                            },
+                            onSpeak: {
+                                controller.speakResult(providerID: selectedResultProvider.provider.id)
+                            },
+                            onRetry: translate,
+                            contentMinHeight: availableHeight,
+                            showsHeader: false
+                        )
+                        .frame(minHeight: availableHeight, alignment: .top)
+                    }
+                } else {
+                    ControlPanelNoResultsState(
+                        title: L10n.tranNoProviders,
+                        systemImage: "text.badge.xmark"
+                    )
+                    .frame(height: availableHeight)
+                    .frame(maxWidth: .infinity)
+                }
             }
-            .padding(.vertical, 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 300)
+        .frame(minHeight: TranslationPaneLayout.contentMinHeight, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .scrollContentBackground(.hidden)
     }
 
-    @ViewBuilder
-    private var providerCards: some View {
-        ForEach(visibleProviders) { provider in
-            TranslationProviderCard(
-                provider: provider.provider,
-                status: provider.status,
-                translatedText: provider.translatedText,
-                canCopy: hasTranslatedText(for: provider),
-                canSpeak: hasTranslatedText(for: provider),
-                isPreparingSpeech: controller.isPreparingSpeechResult(providerID: provider.provider.id),
+    private func resultActions(for provider: TranslationProviderState) -> some View {
+        HStack(spacing: 6) {
+            TranslationSpeechButton(
+                isPreparing: controller.isPreparingSpeechResult(providerID: provider.provider.id),
                 isSpeaking: controller.isSpeakingResult(providerID: provider.provider.id),
+                canSpeak: hasTranslatedText(for: provider),
+                idleHelp: L10n.tranSpeakTranslation,
                 speechProviderName: controller.currentSpeechProviderName,
-                onCopy: {
-                    controller.copyResultToPasteboard(providerID: provider.provider.id)
-                },
-                onSpeak: {
+                action: {
                     controller.speakResult(providerID: provider.provider.id)
-                },
-                onRetry: translate,
-                contentMinHeight: 34
+                }
             )
+
+            Button {
+                controller.copyResultToPasteboard(providerID: provider.provider.id)
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(ControlPanelIconButtonStyle())
+            .disabled(!hasTranslatedText(for: provider))
+            .help(L10n.tranCopyTranslation)
         }
     }
 
     private var visibleProviders: [TranslationProviderState] {
         controller.activeProviderStates
+    }
+
+    private var selectedResultProvider: TranslationProviderState? {
+        if let selectedResultProviderID,
+           let provider = visibleProviders.first(where: { $0.provider.id == selectedResultProviderID }) {
+            return provider
+        }
+
+        return visibleProviders.first
     }
 
     private var sourceLanguageName: String {
@@ -400,6 +460,91 @@ struct TranslationView: View {
     }
 }
 
+private struct TranslationProviderTabStrip: View {
+    let providers: [TranslationProviderState]
+    let selectedProviderID: String?
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                ForEach(providers) { provider in
+                    TranslationProviderTabButton(
+                        provider: provider,
+                        isSelected: provider.provider.id == selectedProviderID,
+                        onSelect: {
+                            onSelect(provider.provider.id)
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: 24, alignment: .leading)
+    }
+}
+
+private struct TranslationProviderTabButton: View {
+    let provider: TranslationProviderState
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    private var tint: Color {
+        ControlPanelDesign.tint(for: .tran)
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 5) {
+                Image(systemName: provider.provider.systemImage)
+                    .font(.caption2.weight(.semibold))
+
+                Text(provider.provider.name)
+                    .lineLimit(1)
+
+                if provider.provider.isLocal {
+                    Image(systemName: "lock")
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityLabel(L10n.tranLocalProvider)
+                }
+
+                statusIcon
+            }
+            .font(.caption2.weight(isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? .primary : .secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .controlPanelRoundedSurface(
+                background: isSelected
+                    ? tint.opacity(0.12)
+                    : ControlPanelDesign.quietFill,
+                cornerRadius: ControlPanelDesign.compactRadius
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSelected)
+        .help(L10n.tranSwitchProvider(provider.provider.name))
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch provider.status {
+        case .idle:
+            EmptyView()
+        case .loading:
+            ProgressView()
+                .controlSize(.small)
+        case .success:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+        }
+    }
+}
+
 private struct ShortcutTextEditor: NSViewRepresentable {
     @Binding var text: String
     let onCommandReturn: () -> Void
@@ -413,6 +558,7 @@ private struct ShortcutTextEditor: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
 
         let textView = CommandReturnTextView()
         textView.delegate = context.coordinator

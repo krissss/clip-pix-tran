@@ -320,6 +320,8 @@ enum L10n {
             "tran.selectionTranslation": "Selection Translation",
             "tran.copySource": "Copy Source",
             "tran.openFull": "Open Full Translation",
+            "tran.expandQuickPanel": "Expand Panel",
+            "tran.collapseQuickPanel": "Collapse Panel",
             "tran.changeSourceLanguage": "Change Source Language",
             "tran.changeTargetLanguage": "Change Target Language",
             "tran.characterCount": "%d chars",
@@ -646,6 +648,8 @@ enum L10n {
             "tran.selectionTranslation": "划词翻译",
             "tran.copySource": "复制原文",
             "tran.openFull": "打开完整翻译",
+            "tran.expandQuickPanel": "展开小窗",
+            "tran.collapseQuickPanel": "收起小窗",
             "tran.changeSourceLanguage": "切换原文语言",
             "tran.changeTargetLanguage": "切换目标语言",
             "tran.characterCount": "%d 字",
@@ -990,6 +994,8 @@ extension L10n {
     static var tranSelectionTranslation: String { tr("tran.selectionTranslation", "划词翻译") }
     static var tranCopySource: String { tr("tran.copySource", "复制原文") }
     static var tranOpenFull: String { tr("tran.openFull", "打开完整翻译") }
+    static var tranExpandQuickPanel: String { tr("tran.expandQuickPanel", "展开小窗") }
+    static var tranCollapseQuickPanel: String { tr("tran.collapseQuickPanel", "收起小窗") }
     static var tranChangeSourceLanguage: String { tr("tran.changeSourceLanguage", "切换原文语言") }
     static var tranChangeTargetLanguage: String { tr("tran.changeTargetLanguage", "切换目标语言") }
     static func tranCharacterCount(_ count: Int) -> String {

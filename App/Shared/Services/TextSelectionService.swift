@@ -24,11 +24,11 @@ struct SystemTextSelectionService: TextSelectionService {
 
     @MainActor
     func selectedText() async -> String? {
-        if let text = cleanText(accessibilityGrabber()) {
+        if let text = await cleanText(clipboardGrabber()) {
             return text
         }
 
-        return await cleanText(clipboardGrabber())
+        return cleanText(accessibilityGrabber())
     }
 
     private func cleanText(_ text: String?) -> String? {
