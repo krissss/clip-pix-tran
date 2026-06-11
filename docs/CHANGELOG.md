@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-11
+
+### Added
+
+- 支持开机启动设置
+- 支持应用内语言切换
+
+### Fixed
+
+- validate release signing certificate
+- clarify release certificate validation
+- support legacy release certificates
+- 精简界面冗余文案
+- 优化翻译面板与预览布局
+
 ## [0.3.0] - 2026-06-10
 
 ### Added
@@ -60,7 +75,8 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/krissss/clip-pix-tran/compare/v0.1.0...v0.1.1
