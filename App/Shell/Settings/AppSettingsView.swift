@@ -6,6 +6,7 @@ struct AppSettingsView: View {
     @Bindable var screenshotHistory: ScreenshotHistoryStore
     @Bindable var translationController: TranslationController
     @Bindable var dockIconPreference: DockIconPreference
+    @Bindable var launchAtLoginPreference: LaunchAtLoginPreference
     @Bindable var updateManager: AppUpdateManager
     let openOnboardingAction: () -> Void
     @State private var selectedPane: SettingsPane = .general
@@ -42,6 +43,7 @@ struct AppSettingsView: View {
         case .general:
             GeneralSettingsSection(
                 preference: dockIconPreference,
+                launchAtLoginPreference: launchAtLoginPreference,
                 openOnboardingAction: openOnboardingAction
             )
         case .shortcuts:
@@ -106,10 +108,24 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 
 private struct GeneralSettingsSection: View {
     @Bindable var preference: DockIconPreference
+    @Bindable var launchAtLoginPreference: LaunchAtLoginPreference
     let openOnboardingAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            SettingsGroup(title: "启动") {
+                VStack(spacing: 0) {
+                    toggleRow(
+                        "开机时启动 ClipPixTran",
+                        isOn: launchesAtLogin
+                    )
+                    .disabled(launchAtLoginPreference.isToggleDisabled)
+                }
+                .settingsRowGroup()
+            }
+
+            SettingsFootnote(launchAtLoginPreference.statusMessage)
+
             SettingsGroup(title: "Dock") {
                 VStack(spacing: 0) {
                     toggleRow(
@@ -134,6 +150,17 @@ private struct GeneralSettingsSection: View {
             }
 
             SettingsFootnote("开启 Dock 隐藏后，关闭主窗口时应用会留在菜单栏；首次引导可随时重新打开。")
+        }
+        .onAppear {
+            launchAtLoginPreference.refresh()
+        }
+    }
+
+    private var launchesAtLogin: Binding<Bool> {
+        Binding {
+            launchAtLoginPreference.launchesAtLogin
+        } set: { newValue in
+            launchAtLoginPreference.setLaunchesAtLogin(newValue)
         }
     }
 
@@ -795,6 +822,7 @@ private func historyLimitRow(
             pasteboard: PreviewClipboardService()
         ),
         dockIconPreference: DockIconPreference(),
+        launchAtLoginPreference: LaunchAtLoginPreference(),
         updateManager: AppUpdateManager(),
         openOnboardingAction: {}
     )

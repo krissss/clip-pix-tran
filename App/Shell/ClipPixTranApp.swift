@@ -18,6 +18,7 @@ struct ClipPixTranApp: App {
     @State private var translationController: TranslationController
     @State private var shortcutController: AppShortcutController
     @State private var dockIconPreference: DockIconPreference
+    @State private var launchAtLoginPreference: LaunchAtLoginPreference
     @State private var onboardingPreference: FirstLaunchOnboardingPreference
     @State private var updateManager: AppUpdateManager
     @State private var selectedSection: AppSection = .clip
@@ -60,6 +61,7 @@ struct ClipPixTranApp: App {
             )
         )
         self._dockIconPreference = State(initialValue: DockIconPreference())
+        self._launchAtLoginPreference = State(initialValue: LaunchAtLoginPreference())
         self._onboardingPreference = State(initialValue: FirstLaunchOnboardingPreference())
         self._updateManager = State(initialValue: AppUpdateManager())
     }
@@ -156,6 +158,7 @@ struct ClipPixTranApp: App {
             screenshotHistory: screenshotController.history,
             translationController: translationController,
             dockIconPreference: dockIconPreference,
+            launchAtLoginPreference: launchAtLoginPreference,
             updateManager: updateManager,
             openOnboardingAction: openOnboardingWindow
         )
