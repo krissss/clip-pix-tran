@@ -70,13 +70,13 @@ final class LaunchAtLoginPreference {
 
         switch status {
         case .disabled:
-            return "关闭后，ClipPixTran 不会随系统登录自动启动。"
+            return L10n.launchAtLoginDisabledMessage
         case .enabled:
-            return "已开启，系统登录后会自动启动 ClipPixTran。"
+            return L10n.launchAtLoginEnabledMessage
         case .requiresApproval:
-            return "已请求开机启动，请在系统设置的登录项中允许 ClipPixTran。"
+            return L10n.launchAtLoginRequiresApprovalMessage
         case .unavailable:
-            return "当前构建无法注册为登录项。"
+            return L10n.launchAtLoginUnavailableMessage
         }
     }
 
@@ -97,7 +97,7 @@ final class LaunchAtLoginPreference {
             updateState(from: service.status)
         } catch {
             updateState(from: service.status)
-            errorMessage = "无法更新开机启动设置：\(error.localizedDescription)"
+            errorMessage = L10n.launchAtLoginUpdateFailed(error.localizedDescription)
         }
     }
 

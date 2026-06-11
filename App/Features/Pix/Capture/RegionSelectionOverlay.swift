@@ -628,17 +628,17 @@ private enum RegionAnnotationTool: CaseIterable {
     var title: String {
         switch self {
         case .rectangle:
-            "矩形"
+            L10n.captureToolRectangle
         case .ellipse:
-            "椭圆"
+            L10n.captureToolEllipse
         case .arrow:
-            "箭头"
+            L10n.captureToolArrow
         case .pen:
-            "画笔"
+            L10n.captureToolPen
         case .text:
-            "文字"
+            L10n.captureToolText
         case .mosaic:
-            "马赛克"
+            L10n.captureToolMosaic
         }
     }
 
@@ -653,7 +653,7 @@ private enum RegionAnnotationTool: CaseIterable {
         case .pen:
             "pencil.tip"
         case .text:
-            "textformat"
+            "t.circle"
         case .mosaic:
             "checkerboard.rectangle"
         }
@@ -1216,7 +1216,7 @@ private final class RegionSelectionView: NSView {
                 height: height
             )
         )
-        field.placeholderString = "文字"
+        field.placeholderString = L10n.captureToolText
         field.font = .systemFont(ofSize: activeStyle.fontSize, weight: .medium)
         field.textColor = activeStyle.nsColor
         field.backgroundColor = .clear
@@ -1914,17 +1914,20 @@ private struct RegionSelectionToolbarView: View {
 
     private var primaryToolbar: some View {
         HStack(spacing: 6) {
-            Picker("捕获模式", selection: Binding(
+            Picker(L10n.captureMode, selection: Binding(
                 get: { state.captureMode },
                 set: actions.setCaptureMode
             )) {
                 ForEach(ScreenshotRegionCaptureMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+                    Image(systemName: mode.systemImage)
+                        .tag(mode)
+                        .help(mode.title)
+                        .accessibilityLabel(mode.title)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 112)
+            .frame(width: 72)
 
             Divider()
                 .frame(height: 22)
@@ -1942,7 +1945,7 @@ private struct RegionSelectionToolbarView: View {
 
     private var screenshotToolbarItems: some View {
         Group {
-            toolButton(nil, symbolName: "hand.draw", title: "移动")
+            toolButton(nil, symbolName: "hand.draw", title: L10n.captureToolMove)
 
             ForEach(RegionAnnotationTool.allCases, id: \.self) { tool in
                 toolButton(tool, symbolName: tool.symbolName, title: tool.title)
@@ -1956,38 +1959,38 @@ private struct RegionSelectionToolbarView: View {
                     .frame(width: 22, height: 22)
             }
             .disabled(!state.canUndo)
-            .help("撤销")
+            .help(L10n.captureUndo)
 
             Button(action: actions.redo) {
                 Image(systemName: "arrow.uturn.forward")
                     .frame(width: 22, height: 22)
             }
             .disabled(!state.canRedo)
-            .help("重做")
+            .help(L10n.captureRedo)
 
             Button(action: actions.pin) {
                 Image(systemName: "pin")
                     .frame(width: 22, height: 22)
             }
-            .help("固定到屏幕")
+            .help(L10n.commonPinToScreen)
 
             Button(action: actions.save) {
                 Image(systemName: "square.and.arrow.down")
                     .frame(width: 22, height: 22)
             }
-            .help("保存")
+            .help(L10n.commonSave)
 
             Button(action: actions.cancel) {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help("取消")
+            .help(L10n.commonCancel)
 
             Button(action: actions.finish) {
                 Image(systemName: "checkmark")
                     .frame(width: 22, height: 22)
             }
-            .help("完成")
+            .help(L10n.commonDone)
             .keyboardShortcut(.return, modifiers: [])
         }
     }
@@ -1998,12 +2001,12 @@ private struct RegionSelectionToolbarView: View {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help("取消")
+            .help(L10n.commonCancel)
 
             Button(action: actions.startRecording) {
-                Label("开始录制", systemImage: "record.circle")
+                Label(L10n.captureStartRecording, systemImage: "record.circle")
             }
-            .help("开始录制")
+            .help(L10n.captureStartRecording)
             .keyboardShortcut(.return, modifiers: [])
         }
     }
@@ -2059,7 +2062,7 @@ private struct RegionSelectionToolbarView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 88)
-            .help("马赛克模式")
+            .help(L10n.captureMosaicMode)
 
             Divider().frame(height: 22)
 
@@ -2068,7 +2071,7 @@ private struct RegionSelectionToolbarView: View {
                 selected: state.activeStyle.mosaicBlockSize,
                 action: actions.setMosaicBlockSize
             )
-            .help("模糊块大小")
+            .help(L10n.captureMosaicBlockSize)
 
             if state.activeStyle.mosaicMode == .brush {
                 Divider().frame(height: 22)
@@ -2077,7 +2080,7 @@ private struct RegionSelectionToolbarView: View {
                     selected: state.activeStyle.mosaicBrushSize,
                     action: actions.setMosaicBrushSize
                 )
-                .help("涂抹范围")
+                .help(L10n.captureMosaicBrushSize)
             }
         }
     }
@@ -2097,7 +2100,7 @@ private struct RegionSelectionToolbarView: View {
                         .frame(width: color == state.activeStyle.colorComponents ? 18 : 14, height: color == state.activeStyle.colorComponents ? 18 : 14)
                         .frame(width: 22, height: 22)
                 }
-                .help("颜色")
+                .help(L10n.captureColor)
             }
         }
     }
@@ -2165,13 +2168,13 @@ private struct RegionSelectionConfirmToolbarView: View {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help("取消")
+            .help(L10n.commonCancel)
 
             Button(action: startAction) {
-                Label("开始录制", systemImage: "record.circle")
+                Label(L10n.captureStartRecording, systemImage: "record.circle")
             }
             .keyboardShortcut(.return, modifiers: [])
-            .help("开始录制")
+            .help(L10n.captureStartRecording)
         }
         .buttonStyle(.borderless)
         .toolbarSurface()

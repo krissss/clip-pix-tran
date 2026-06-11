@@ -1,5 +1,4 @@
 import SwiftUI
-import KeyboardShortcuts
 
 struct FirstLaunchOnboardingView: View {
     let permissionService: OnboardingPermissionStatusProviding
@@ -50,11 +49,11 @@ struct FirstLaunchOnboardingView: View {
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ClipPixTran")
+                    Text(L10n.appName)
                         .font(.title3.weight(.semibold))
                         .lineLimit(1)
 
-                    Text("准备使用")
+                    Text(L10n.onboardingReady)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -80,7 +79,7 @@ struct FirstLaunchOnboardingView: View {
 
             Spacer(minLength: 12)
 
-            Text("你可以跳过引导，之后从设置里重新打开。")
+            Text(L10n.onboardingSkipNote)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -114,26 +113,26 @@ struct FirstLaunchOnboardingView: View {
         switch selectedStep {
         case .screenRecording:
             permissionStep(
-                explanation: "Pix 需要读取屏幕内容来完成截图、区域选择和录屏。",
+                explanation: L10n.onboardingScreenRecordingExplanation,
                 status: screenRecordingStatus,
-                primaryTitle: "授权屏幕录制",
+                primaryTitle: L10n.onboardingAuthorizeScreenRecording,
                 primarySystemImage: "record.circle",
                 primaryAction: requestScreenRecordingAccess,
-                secondaryTitle: "打开系统设置",
+                secondaryTitle: L10n.commonOpenSystemSettings,
                 secondarySystemImage: "gearshape",
                 secondaryAction: openScreenRecordingSettings,
-                tertiaryTitle: "重新检测",
+                tertiaryTitle: L10n.onboardingRecheck,
                 tertiarySystemImage: "arrow.clockwise",
                 tertiaryAction: refreshPermissionStatuses
             )
         case .accessibility:
             permissionStep(
-                explanation: "Tran 需要辅助功能权限读取选中文本，Pix 也会用它识别窗口和控件位置。",
+                explanation: L10n.onboardingAccessibilityExplanation,
                 status: accessibilityStatus,
-                primaryTitle: "打开系统设置",
+                primaryTitle: L10n.commonOpenSystemSettings,
                 primarySystemImage: "gearshape",
                 primaryAction: openAccessibilitySettings,
-                secondaryTitle: "重新检测",
+                secondaryTitle: L10n.onboardingRecheck,
                 secondarySystemImage: "arrow.clockwise",
                 secondaryAction: refreshPermissionStatuses
             )
@@ -187,7 +186,7 @@ struct FirstLaunchOnboardingView: View {
 
     private var shortcutsStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("确认常用全局快捷键。这里和设置页使用同一套配置，之后也可以随时修改。")
+            Text(L10n.onboardingShortcutsExplanation)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -208,7 +207,7 @@ struct FirstLaunchOnboardingView: View {
             Button {
                 skipAction()
             } label: {
-                Label("跳过引导", systemImage: "forward")
+                Label(L10n.onboardingSkip, systemImage: "forward")
             }
 
             Spacer()
@@ -216,7 +215,7 @@ struct FirstLaunchOnboardingView: View {
             Button {
                 moveBackward()
             } label: {
-                Label("上一步", systemImage: "chevron.left")
+                Label(L10n.commonPrevious, systemImage: "chevron.left")
             }
             .disabled(selectedStep == OnboardingStep.allCases.first)
 
@@ -224,14 +223,14 @@ struct FirstLaunchOnboardingView: View {
                 Button {
                     completeAction()
                 } label: {
-                    Label("完成", systemImage: "checkmark")
+                    Label(L10n.commonDone, systemImage: "checkmark")
                 }
                 .keyboardShortcut(.defaultAction)
             } else {
                 Button {
                     moveForward()
                 } label: {
-                    Label("下一步", systemImage: "chevron.right")
+                    Label(L10n.commonNext, systemImage: "chevron.right")
                 }
                 .keyboardShortcut(.defaultAction)
             }
@@ -266,7 +265,7 @@ struct FirstLaunchOnboardingView: View {
             screenRecordingStatus = await permissionService.requestScreenRecordingAccess()
             isRequestingScreenRecording = false
             statusMessage = screenRecordingStatus == .authorized
-                ? .success("屏幕录制权限已授权。")
+                ? .success(L10n.onboardingScreenRecordingAuthorizedMessage)
                 : screenRecordingRequestFallbackMessage()
         }
     }
@@ -281,25 +280,25 @@ struct FirstLaunchOnboardingView: View {
         didOpenSettings: Bool
     ) -> OnboardingStatusMessage {
         if didOpenSettings {
-            return .warning("系统没有弹出授权提示。已为你打开系统设置，请允许 ClipPixTran 录制屏幕后重新检测。")
+            return .warning(L10n.onboardingScreenRecordingPromptFallbackOpenedSettings)
         }
 
-        return .warning("系统没有弹出授权提示。请手动前往隐私与安全性中的屏幕录制，允许 ClipPixTran 后重新检测。")
+        return .warning(L10n.onboardingScreenRecordingPromptFallbackManual)
     }
 
     private func openScreenRecordingSettings() {
         if permissionService.openScreenRecordingSettings() {
-            statusMessage = .info("系统设置已打开。授权后回到这里点击重新检测。")
+            statusMessage = .info(L10n.onboardingSettingsOpenedRecheck)
         } else {
-            statusMessage = .warning("无法打开系统设置，请手动前往隐私与安全性中的屏幕录制。")
+            statusMessage = .warning(L10n.onboardingScreenRecordingSettingsOpenFailed)
         }
     }
 
     private func openAccessibilitySettings() {
         if permissionService.openAccessibilitySettings() {
-            statusMessage = .info("系统设置已打开。打开 ClipPixTran 后回到这里点击重新检测。")
+            statusMessage = .info(L10n.onboardingAccessibilitySettingsOpened)
         } else {
-            statusMessage = .warning("无法打开系统设置，请手动前往隐私与安全性中的辅助功能。")
+            statusMessage = .warning(L10n.onboardingAccessibilitySettingsOpenFailed)
         }
     }
 
@@ -334,22 +333,22 @@ enum OnboardingStep: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .screenRecording:
-            "允许屏幕录制"
+            L10n.onboardingScreenRecordingTitle
         case .accessibility:
-            "允许辅助功能"
+            L10n.onboardingAccessibilityTitle
         case .shortcuts:
-            "确认全局快捷键"
+            L10n.onboardingShortcutsTitle
         }
     }
 
     var subtitle: String {
         switch self {
         case .screenRecording:
-            "用于 Pix 截图、区域选择和录屏"
+            L10n.onboardingScreenRecordingSubtitle
         case .accessibility:
-            "用于读取选中文本和识别窗口控件"
+            L10n.onboardingAccessibilitySubtitle
         case .shortcuts:
-            "让常用操作可以随手唤起"
+            L10n.onboardingShortcutsSubtitle
         }
     }
 
@@ -445,14 +444,14 @@ private struct OnboardingStepButton: View {
 
     private var statusText: String {
         guard let status else {
-            return "可调整"
+            return L10n.onboardingAdjustable
         }
 
         switch status {
         case .authorized:
-            return "已授权"
+            return L10n.onboardingAuthorized
         case .notAuthorized:
-            return "未授权"
+            return L10n.onboardingNotAuthorized
         }
     }
 
@@ -512,18 +511,18 @@ private struct OnboardingPermissionStatusCard: View {
     private var title: String {
         switch status {
         case .authorized:
-            "已授权"
+            L10n.onboardingAuthorized
         case .notAuthorized:
-            "未授权"
+            L10n.onboardingNotAuthorized
         }
     }
 
     private var subtitle: String {
         switch status {
         case .authorized:
-            "这项能力已经准备好。"
+            L10n.onboardingCapabilityReady
         case .notAuthorized:
-            "授权后功能体验会更完整。"
+            L10n.onboardingCapabilityNeedsPermission
         }
     }
 
@@ -600,8 +599,7 @@ private struct OnboardingShortcutRow: View {
 
             Spacer(minLength: 16)
 
-            KeyboardShortcuts.Recorder("", name: shortcut.name)
-                .labelsHidden()
+            LocalizedShortcutRecorder(name: shortcut.name)
                 .frame(width: ControlPanelDesign.Layout.Settings.controlWidth, alignment: .trailing)
         }
         .frame(minHeight: ControlPanelDesign.Layout.Settings.rowHeight)

@@ -12,7 +12,7 @@ enum ScreenshotPinError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidImageData:
-            "无法固定这张截图。"
+            L10n.screenshotPinFailed
         }
     }
 }
@@ -219,13 +219,13 @@ private struct PinnedScreenshotView: View {
                 Image(systemName: "doc.on.doc")
                     .frame(width: 20, height: 20)
             }
-            .help("复制截图")
+            .help(L10n.pixCopyScreenshot)
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .frame(width: 20, height: 20)
             }
-            .help("关闭固定截图")
+            .help(L10n.screenshotClosePinned)
         }
         .buttonStyle(.borderless)
         .padding(5)

@@ -15,7 +15,7 @@ enum ClipboardWriteError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .rejected:
-            "无法写入剪贴板。"
+            L10n.clipboardWriteFailed
         }
     }
 }

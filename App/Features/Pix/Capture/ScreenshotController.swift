@@ -11,9 +11,9 @@ enum PixCaptureMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .screenshot:
-            "截图"
+            L10n.pixScreenshot
         case .recording:
-            "录屏"
+            L10n.pixRecording
         }
     }
 }

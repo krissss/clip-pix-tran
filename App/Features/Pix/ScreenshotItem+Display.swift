@@ -15,7 +15,7 @@ extension ScreenshotItem {
         }
 
         guard let imagePixelSize else {
-            return isImage ? "PNG 图片" : "MP4 录屏"
+            return isImage ? L10n.pixPNGImage : L10n.pixMP4Recording
         }
 
         return imagePixelSize.pixDimensionText
@@ -31,14 +31,14 @@ extension ScreenshotItem {
 
     private var captureTypeText: String {
         if isRecording {
-            return "录屏"
+            return L10n.pixRecording
         }
 
         switch captureSource {
         case .fullScreen:
-            return "全屏"
+            return L10n.pixFullScreen
         case .selectedRegion, .none:
-            return "截图"
+            return L10n.pixScreenshot
         }
     }
 

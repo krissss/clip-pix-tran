@@ -13,41 +13,41 @@ struct PixCaptureControls: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Button(action: captureSelectedRegionAction) {
-                    PixCaptureButtonLabel(title: "截图", systemImage: "selection.pin.in.out")
+                    PixCaptureButtonLabel(title: L10n.pixCaptureSelected, systemImage: "selection.pin.in.out")
                 }
                 .buttonStyle(captureButtonStyle)
-                .help("拖拽选择屏幕区域截图")
+                .help(L10n.pixCaptureSelectedHelp)
 
                 Button(action: startRecordingAction) {
-                    PixCaptureButtonLabel(title: "录屏", systemImage: "record.circle")
+                    PixCaptureButtonLabel(title: L10n.pixRecordSelected, systemImage: "record.circle")
                 }
                 .buttonStyle(captureButtonStyle)
-                .help("拖拽选择屏幕区域并开始录屏")
+                .help(L10n.pixRecordSelectedHelp)
 
                 Button(action: captureMainDisplayAction) {
-                    PixCaptureButtonLabel(title: "全屏", systemImage: "display")
+                    PixCaptureButtonLabel(title: L10n.pixFullScreen, systemImage: "display")
                 }
                 .buttonStyle(captureButtonStyle)
-                .help("捕获主屏幕画面")
+                .help(L10n.pixCaptureFullScreenHelp)
             }
             .disabled(isCapturing || isRecording)
 
             if isCapturing {
                 Button(action: stopCaptureAction) {
-                    Label("取消框选", systemImage: "xmark.circle")
+                    Label(L10n.pixCancelSelection, systemImage: "xmark.circle")
                 }
                 .buttonStyle(ControlPanelButtonStyle(prominence: .destructive))
-                .help("结束当前框选")
+                .help(L10n.pixCancelSelectionHelp)
             } else if isRecording {
                 Button(action: stopCaptureAction) {
                     Label(
-                        isStoppingRecording ? "正在保存" : "停止录屏",
+                        isStoppingRecording ? L10n.pixSaving : L10n.pixStopRecording,
                         systemImage: isStoppingRecording ? "hourglass" : "stop.circle"
                     )
                 }
                 .buttonStyle(ControlPanelButtonStyle(prominence: .destructive))
                 .disabled(isStoppingRecording)
-                .help("停止并保存当前录屏")
+                .help(L10n.pixStopRecordingHelp)
             }
         }
         .padding(10)

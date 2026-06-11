@@ -75,7 +75,7 @@ struct TranslationLanguageTests {
     }
 
     @Test func nameForSourceOnlyLanguageReturnsDisplayName() {
-        #expect(TranslationLanguage.name(for: "zh-Hant") == "繁体中文")
+        #expect(TranslationLanguage.name(for: "zh-Hant") == L10n.languageZhHant)
     }
 
     @Test func supportCheckDistinguishesKnownAndUnknownCodes() {

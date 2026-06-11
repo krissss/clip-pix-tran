@@ -272,27 +272,27 @@ private struct ClipboardQuickPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                ControlPanelSearchField(text: $searchText, prompt: "搜索剪贴板历史")
+                ControlPanelSearchField(text: $searchText, prompt: L10n.clipSearch)
                     .focused($searchFieldFocused)
 
                 Button(action: onOpenFullClipboard) {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("打开完整剪贴板")
+                .help(L10n.clipOpenFull)
 
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("关闭")
+                .help(L10n.commonClose)
             }
             .padding(.horizontal, ControlPanelDesign.Layout.QuickPanel.headerHorizontalPadding)
             .padding(.vertical, ControlPanelDesign.Layout.QuickPanel.headerVerticalPadding)
 
             if visibleItems.isEmpty {
                 ControlPanelNoResultsState(
-                    title: "没有匹配记录",
+                    title: L10n.clipNoResults,
                     systemImage: "doc.text.magnifyingglass"
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -405,10 +405,10 @@ private struct ClipboardQuickPanelView: View {
 
     private var shortcutHints: some View {
         HStack(spacing: 10) {
-            ShortcutHint(keys: "↑↓", title: "选择")
-            ShortcutHint(keys: "Enter", title: "粘贴")
-            ShortcutHint(keys: "⌘Enter", title: "纯文本")
-            ShortcutHint(keys: "Esc", title: "关闭")
+            ShortcutHint(keys: "↑↓", title: L10n.commonSelect)
+            ShortcutHint(keys: "Enter", title: L10n.clipPaste)
+            ShortcutHint(keys: "⌘Enter", title: L10n.commonPlainText)
+            ShortcutHint(keys: "Esc", title: L10n.commonClose)
         }
         .font(.caption)
         .foregroundStyle(.secondary)

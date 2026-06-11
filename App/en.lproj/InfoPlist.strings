@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "ClipPixTran";
+"CFBundleName" = "ClipPixTran";
+"NSAccessibilityUsageDescription" = "ClipPixTran needs Accessibility access to read selected text and identify windows and controls during screenshots.";

@@ -41,6 +41,7 @@ final class FirstLaunchOnboardingWindowController: NSWindowController, NSWindowD
         if window == nil {
             window = makeWindow()
         } else {
+            window?.title = L10n.onboardingWindowTitle
             updateRootView()
         }
 
@@ -51,7 +52,7 @@ final class FirstLaunchOnboardingWindowController: NSWindowController, NSWindowD
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: makeHostingController())
-        window.title = "ClipPixTran 准备使用"
+        window.title = L10n.onboardingWindowTitle
         window.identifier = NSUserInterfaceItemIdentifier("ClipPixTran.FirstLaunchOnboardingWindow")
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false

@@ -165,13 +165,13 @@ private struct ScreenRecordingControlView: View {
                 Image(systemName: "stop.fill")
                     .frame(width: 22, height: 22)
             }
-            .help("停止并保存录屏")
+            .help(L10n.pixStopRecordingHelp)
 
             Button(action: cancelAction) {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help("取消录屏")
+            .help(L10n.recordingCancel)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)

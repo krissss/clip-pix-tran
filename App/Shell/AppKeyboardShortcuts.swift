@@ -8,19 +8,38 @@ extension KeyboardShortcuts.Name {
 }
 
 struct AppKeyboardShortcut: Identifiable {
-    let title: String
+    let titleKey: String
     let name: KeyboardShortcuts.Name
 
     var id: String {
         name.rawValue
     }
+
+    var title: String {
+        L10n.tr(titleKey, titleFallback)
+    }
+
+    private var titleFallback: String {
+        switch name {
+        case .showMainWindow:
+            "Open Main Window"
+        case .showClipboardQuickPanel:
+            "Clipboard Quick Panel"
+        case .captureSelectedRegion:
+            "Pix Capture"
+        case .translateSelectedText:
+            "Translate Selected Text"
+        default:
+            titleKey
+        }
+    }
 }
 
 extension AppKeyboardShortcut {
-    static let showMainWindow = Self(title: "打开主窗口", name: .showMainWindow)
-    static let showClipboardQuickPanel = Self(title: "剪贴板快速面板", name: .showClipboardQuickPanel)
-    static let captureSelectedRegion = Self(title: "Pix 捕获", name: .captureSelectedRegion)
-    static let translateSelectedText = Self(title: "翻译选中文本", name: .translateSelectedText)
+    static let showMainWindow = Self(titleKey: "shortcut.mainWindow", name: .showMainWindow)
+    static let showClipboardQuickPanel = Self(titleKey: "shortcut.clipboardPanel", name: .showClipboardQuickPanel)
+    static let captureSelectedRegion = Self(titleKey: "shortcut.pixCapture", name: .captureSelectedRegion)
+    static let translateSelectedText = Self(titleKey: "shortcut.translateSelection", name: .translateSelectedText)
 
     static let all: [Self] = [
         .showMainWindow,

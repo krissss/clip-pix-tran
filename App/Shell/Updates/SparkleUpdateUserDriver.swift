@@ -207,7 +207,7 @@ final class SparkleUpdateUserDriver: NSObject, SPUUserDriver, NSWindowDelegate {
     ) {
         state.resetActions()
         state.phase = .installed
-        state.message = relaunched ? nil : "更新已安装完成。"
+        state.message = relaunched ? nil : L10n.updateInstalledMessage
         state.acknowledgeAction = { [weak self] in
             self?.state.resetActions()
             acknowledgement()
@@ -253,11 +253,12 @@ final class SparkleUpdateUserDriver: NSObject, SPUUserDriver, NSWindowDelegate {
 
         if let windowController {
             controller = windowController
+            controller.window?.title = L10n.updateWindowTitle
             shouldCenterWindow = false
         } else {
             let hostingController = NSHostingController(rootView: UpdateDialogView(state: state))
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "ClipPixTran 更新"
+            window.title = L10n.updateWindowTitle
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.setContentSize(Self.windowContentSize)
             window.isReleasedWhenClosed = false
@@ -345,9 +346,9 @@ final class SparkleUpdateUserDriver: NSObject, SPUUserDriver, NSWindowDelegate {
     private func message(for updateState: SPUUserUpdateState) -> String? {
         switch updateState.stage {
         case .downloaded:
-            return "更新已下载完成。"
+            return L10n.updateDownloadedMessage
         case .installing:
-            return "正在安装更新..."
+            return L10n.updateInstallingProgress
         default:
             return nil
         }

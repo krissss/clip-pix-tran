@@ -39,18 +39,18 @@ struct ClipboardItemRow: View {
         switch item.kind {
         case .text:
             if item.payloads.isEmpty {
-                return "文本 · \(item.text.count) 个字符"
+                return L10n.clipTextSummary(characterCount: item.text.count)
             }
 
-            return "带格式文本 · \(item.text.count) 个字符 · \(item.payloads.count) 种格式"
+            return L10n.clipRichTextSummary(characterCount: item.text.count, formatCount: item.payloads.count)
         case .image:
             if item.filePaths.isEmpty {
-                return "图片 · 可预览"
+                return L10n.clipPreviewableImage
             }
 
-            return pathSummary(prefix: "图片", paths: item.filePaths)
+            return pathSummary(prefix: L10n.kindImage, paths: item.filePaths)
         case .file:
-            return pathSummary(prefix: "文件", paths: item.filePaths)
+            return pathSummary(prefix: L10n.kindFile, paths: item.filePaths)
         }
     }
 
@@ -65,7 +65,7 @@ struct ClipboardItemRow: View {
             return "\(prefix) · \(name)"
         }
 
-        return "\(prefix) · \(name) 等 \(paths.count) 项"
+        return L10n.clipPathSummary(prefix: prefix, name: name, count: paths.count)
     }
 
     @ViewBuilder

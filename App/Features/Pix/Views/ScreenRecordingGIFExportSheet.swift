@@ -52,7 +52,7 @@ struct ScreenRecordingGIFExportSheet: View {
                     .foregroundStyle(ControlPanelDesign.tint(for: .pix))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("导出 GIF")
+                    Text(L10n.gifExportTitle)
                         .font(.headline)
 
                     Text("\(item.durationText) · \(item.fileSizeText)")
@@ -73,7 +73,7 @@ struct ScreenRecordingGIFExportSheet: View {
                     gifOptionsGrid
 
                     HStack(spacing: 10) {
-                        Label("\(estimatedFrameCount) 帧", systemImage: "rectangle.stack")
+                        Label(L10n.gifFrameCount(estimatedFrameCount), systemImage: "rectangle.stack")
                         Label(outputDurationText, systemImage: "timer")
                     }
                     .font(.caption)
@@ -88,7 +88,7 @@ struct ScreenRecordingGIFExportSheet: View {
                 Spacer()
 
                 Button(action: cancelAction) {
-                    Label("取消", systemImage: "xmark")
+                    Label(L10n.commonCancel, systemImage: "xmark")
                 }
                 .buttonStyle(ControlPanelButtonStyle())
                 .keyboardShortcut(.cancelAction)
@@ -96,7 +96,7 @@ struct ScreenRecordingGIFExportSheet: View {
                 Button {
                     exportAction(sanitizedOptions)
                 } label: {
-                    Label("导出", systemImage: "square.and.arrow.down")
+                    Label(L10n.commonExport, systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
@@ -137,7 +137,7 @@ struct ScreenRecordingGIFExportSheet: View {
     private var gifOptionsGrid: some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
             GridRow {
-                Text("帧率")
+                Text(L10n.gifFrameRate)
                     .foregroundStyle(.secondary)
 
                 ScreenRecordingGIFDoubleInput(
@@ -151,7 +151,7 @@ struct ScreenRecordingGIFExportSheet: View {
             }
 
             GridRow {
-                Text("速度")
+                Text(L10n.gifSpeed)
                     .foregroundStyle(.secondary)
 
                 ScreenRecordingGIFDoubleInput(
@@ -165,7 +165,7 @@ struct ScreenRecordingGIFExportSheet: View {
             }
 
             GridRow {
-                Text("最大边长")
+                Text(L10n.gifMaxDimension)
                     .foregroundStyle(.secondary)
 
                 ScreenRecordingGIFDoubleInput(
@@ -179,14 +179,14 @@ struct ScreenRecordingGIFExportSheet: View {
             }
 
             GridRow {
-                Text("最大帧数")
+                Text(L10n.gifMaxFrames)
                     .foregroundStyle(.secondary)
 
                 ScreenRecordingGIFIntegerInput(
                     value: $options.maximumFrameCount,
                     lowerBound: 1,
                     step: 30,
-                    unit: "帧"
+                    unit: L10n.gifFrameUnit
                 )
             }
         }
@@ -293,10 +293,13 @@ private struct ScreenRecordingGIFPreviewPlayer: View {
 
     private func previewBadgeText(for preview: ScreenRecordingGIFPreview) -> String {
         if preview.isTruncated {
-            return "\(preview.frames.count) 帧 · 前 \(preview.previewedDuration.gifPreviewDurationText)"
+            return L10n.gifTruncatedPreview(
+                frameCount: preview.frames.count,
+                duration: preview.previewedDuration.gifPreviewDurationText
+            )
         }
 
-        return "\(preview.frames.count) 帧预览"
+        return L10n.gifPreviewFrameCount(preview.frames.count)
     }
 }
 

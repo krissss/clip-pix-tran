@@ -148,11 +148,11 @@ enum TranslationSpeechError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "当前发音服务不可用。请稍后重试，或检查发音 provider 配置。"
+            L10n.speechProviderUnavailable
         case .providerNotConfigured:
-            "发音 provider 尚未配置。请到设置里填写 Base URL、API Key、TTS Model 和 TTS Voice。"
+            L10n.speechProviderNotConfigured
         case .noAudioData:
-            "发音服务没有返回可播放的音频数据。"
+            L10n.speechNoAudioData
         case .requestFailed(let message):
             message
         }
@@ -400,7 +400,7 @@ final class GoogleTranslationSpeechService: TranslationSpeechService {
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw TranslationSpeechError.requestFailed("发音服务请求失败（HTTP \(httpResponse.statusCode)）。")
+            throw TranslationSpeechError.requestFailed(L10n.speechRequestFailed(statusCode: httpResponse.statusCode))
         }
     }
 
@@ -690,7 +690,7 @@ final class OpenAITextToSpeechService: TranslationSpeechService {
                 throw TranslationSpeechError.requestFailed(message)
             }
 
-            throw TranslationSpeechError.requestFailed("发音服务请求失败（HTTP \(httpResponse.statusCode)）。")
+            throw TranslationSpeechError.requestFailed(L10n.speechRequestFailed(statusCode: httpResponse.statusCode))
         }
     }
 }

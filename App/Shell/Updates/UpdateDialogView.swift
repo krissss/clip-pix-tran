@@ -59,7 +59,7 @@ struct UpdateDialogView: View {
         switch state.phase {
         case .checking:
             statusPanel(systemImage: "arrow.triangle.2.circlepath", color: .blue) {
-                progressRow(title: "正在检查更新...", progress: nil)
+                progressRow(title: L10n.updateCheckingProgress, progress: nil)
             }
         case .updateFound:
             if let message = state.message {
@@ -69,31 +69,31 @@ struct UpdateDialogView: View {
             }
         case let .downloading(progress):
             statusPanel(systemImage: "arrow.down.circle.fill", color: .blue) {
-                progressRow(title: "正在下载更新...", progress: progress)
+                progressRow(title: L10n.updateDownloadingProgress, progress: progress)
             }
         case let .extracting(progress):
             statusPanel(systemImage: "shippingbox.fill", color: .orange) {
-                progressRow(title: "正在准备更新...", progress: progress)
+                progressRow(title: L10n.updateExtractingProgress, progress: progress)
             }
         case .readyToInstall:
             statusPanel(systemImage: "checkmark.seal.fill", color: .green) {
-                statusText("更新已准备好。安装完成后 ClipPixTran 会重新启动。")
+                statusText(L10n.updateReadyToInstallMessage)
             }
         case .installing:
             statusPanel(systemImage: "arrow.triangle.2.circlepath.circle.fill", color: .blue) {
-                progressRow(title: "正在安装更新...", progress: nil)
+                progressRow(title: L10n.updateInstallingProgress, progress: nil)
             }
         case .installed:
             statusPanel(systemImage: "checkmark.circle.fill", color: .green) {
-                statusText("更新已安装完成。")
+                statusText(L10n.updateInstalledMessage)
             }
         case .notFound:
             statusPanel(systemImage: "checkmark.circle.fill", color: .green) {
-                statusText(state.message ?? "ClipPixTran 已经是最新版本。")
+                statusText(state.message ?? L10n.updateAlreadyLatestMessage)
             }
         case .error:
             statusPanel(systemImage: "exclamationmark.triangle.fill", color: .red) {
-                statusText(state.message ?? "ClipPixTran 无法完成更新检查。", color: .red)
+                statusText(state.message ?? L10n.updateCheckFailedMessage, color: .red)
             }
         }
     }
@@ -139,7 +139,7 @@ struct UpdateDialogView: View {
                 Button {
                     skipAction()
                 } label: {
-                    Label("跳过此版本", systemImage: "forward.end.fill")
+                    Label(L10n.updateSkipVersion, systemImage: "forward.end.fill")
                 }
                 .buttonStyle(ControlPanelButtonStyle())
             }
@@ -150,7 +150,7 @@ struct UpdateDialogView: View {
                 Button {
                     cancelAction()
                 } label: {
-                    Label("取消", systemImage: "xmark.circle.fill")
+                    Label(L10n.commonCancel, systemImage: "xmark.circle.fill")
                 }
                 .buttonStyle(ControlPanelButtonStyle())
             }
@@ -159,7 +159,7 @@ struct UpdateDialogView: View {
                 Button {
                     dismissAction()
                 } label: {
-                    Label("稍后", systemImage: "clock.fill")
+                    Label(L10n.commonLater, systemImage: "clock.fill")
                 }
                 .buttonStyle(ControlPanelButtonStyle())
             }
@@ -168,7 +168,7 @@ struct UpdateDialogView: View {
                 Button {
                     acknowledgeAction()
                 } label: {
-                    Label("好", systemImage: "checkmark.circle.fill")
+                    Label(L10n.commonOK, systemImage: "checkmark.circle.fill")
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(ControlPanelButtonStyle(tint: accentColor, prominence: .primary))
@@ -192,7 +192,7 @@ struct UpdateDialogView: View {
 
     private var sectionHeader: some View {
         ControlPanelCompactSectionHeader(
-            title: "更新内容",
+            title: L10n.updateReleaseNotes,
             systemImage: "list.bullet.rectangle"
         )
     }
@@ -279,30 +279,30 @@ struct UpdateDialogView: View {
     private var title: String {
         switch state.phase {
         case .notFound:
-            return "已是最新版本"
+            return L10n.updateTitleAlreadyLatest
         case .error:
-            return "更新失败"
+            return L10n.updateTitleFailed
         case .readyToInstall:
-            return "可以安装了"
+            return L10n.updateTitleReadyToInstall
         case .installing:
-            return "正在安装更新..."
+            return L10n.updateTitleInstalling
         case .installed:
-            return "更新已安装"
+            return L10n.updateTitleInstalled
         default:
             if state.latestVersion.isEmpty {
-                return "ClipPixTran 更新"
+                return L10n.updateWindowTitle
             }
 
-            return "ClipPixTran \(state.latestVersion) 可用"
+            return L10n.updateAvailableTitle(state.latestVersion)
         }
     }
 
     private var subtitle: String {
         if state.currentVersion.isEmpty || state.latestVersion.isEmpty {
-            return "ClipPixTran"
+            return L10n.appName
         }
 
-        return "当前 \(state.currentVersion) -> 最新 \(state.latestVersion)"
+        return L10n.updateVersionSubtitle(current: state.currentVersion, latest: state.latestVersion)
     }
 
     private var showsVersionBadge: Bool {
@@ -350,10 +350,10 @@ struct UpdateDialogView: View {
 
     private var installButtonTitle: String {
         if case .readyToInstall = state.phase {
-            return "安装并重启"
+            return L10n.updateInstallAndRelaunch
         }
 
-        return "安装更新"
+        return L10n.updateInstall
     }
 
     private struct PhaseAppearance {

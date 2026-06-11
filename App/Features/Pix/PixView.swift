@@ -41,17 +41,17 @@ struct PixView: View {
             selectFirstVisibleItemIfNeeded()
         }
         .confirmationDialog(
-            "清空 Pix 历史？",
+            L10n.pixClearTitle,
             isPresented: $showsClearHistoryConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空历史", role: .destructive) {
+            Button(L10n.commonClearHistory, role: .destructive) {
                 clearHistory()
             }
 
-            Button("取消", role: .cancel) {}
+            Button(L10n.commonCancel, role: .cancel) {}
         } message: {
-            Text("这会删除全部截图和录屏历史记录，无法撤销。")
+            Text(L10n.pixClearMessage)
         }
         .sheet(item: $gifExportItem) { item in
             ScreenRecordingGIFExportSheet(
@@ -72,7 +72,7 @@ struct PixView: View {
         VStack(spacing: 0) {
             sidebarHeader
 
-            ControlPanelSearchField(text: $searchText, prompt: "搜索 Pix 历史")
+            ControlPanelSearchField(text: $searchText, prompt: L10n.pixSearch)
                 .padding(.horizontal, ControlPanelDesign.Layout.searchHorizontalPadding)
                 .padding(.bottom, 10)
 
@@ -84,7 +84,7 @@ struct PixView: View {
     private var sidebarHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             ControlPanelSidebarHeader(
-                title: "Pix 历史",
+                title: L10n.pixHistory,
                 systemImage: "camera.viewfinder",
                 tint: ControlPanelDesign.tint(for: .pix)
             ) {
@@ -112,14 +112,14 @@ struct PixView: View {
     private var sidebarContent: some View {
         if controller.history.items.isEmpty {
             ControlPanelEmptyState(
-                title: "暂无截图",
+                title: L10n.pixEmpty,
                 systemImage: "camera.viewfinder",
                 tint: ControlPanelDesign.tint(for: .pix)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if visibleItems.isEmpty {
             ControlPanelNoResultsState(
-                title: "没有匹配 Pix 记录",
+                title: L10n.pixNoResults,
                 systemImage: "photo.badge.magnifyingglass"
             )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -148,7 +148,7 @@ struct PixView: View {
 
     private var historyActions: some View {
         HStack {
-            Label("\(visibleItems.count) 项记录", systemImage: "clock")
+            Label(L10n.commonItemsCount(visibleItems.count), systemImage: "clock")
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -160,7 +160,7 @@ struct PixView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(controller.history.items.isEmpty)
-            .help("清空截图历史")
+            .help(L10n.pixClearHelp)
         }
         .font(.callout)
         .padding(.vertical, 4)
@@ -230,44 +230,44 @@ struct PixView: View {
             Button {
                 controller.copyToPasteboard(item)
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label(L10n.commonCopy, systemImage: "doc.on.doc")
             }
 
             Button {
                 controller.save(item)
             } label: {
-                Label("保存", systemImage: "square.and.arrow.down")
+                Label(L10n.commonSave, systemImage: "square.and.arrow.down")
             }
 
             Button {
                 controller.pinToScreen(item)
             } label: {
-                Label("固定到屏幕", systemImage: "pin")
+                Label(L10n.commonPinToScreen, systemImage: "pin")
             }
         } else {
             Button {
                 controller.exportMP4(item)
             } label: {
-                Label("导出 MP4", systemImage: "film")
+                Label(L10n.commonExportMP4, systemImage: "film")
             }
 
             Button {
                 configureGIFExport(for: item)
             } label: {
-                Label("导出 GIF", systemImage: "square.and.arrow.down")
+                Label(L10n.commonExportGIF, systemImage: "square.and.arrow.down")
             }
         }
 
         Button {
             SystemImagePreviewService.openInPreviewApp(item: item)
         } label: {
-            Label("预览", systemImage: "eye")
+            Label(L10n.commonPreview, systemImage: "eye")
         }
 
         Button(role: .destructive) {
             delete(item)
         } label: {
-            Label("删除", systemImage: "trash")
+            Label(L10n.commonDelete, systemImage: "trash")
         }
     }
 

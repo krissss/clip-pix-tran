@@ -831,9 +831,26 @@ struct TranslationControllerTests {
         }
         #expect(googleState != nil)
         if case .idle(let message) = googleState?.status {
-            #expect(message == "输入文本后点击翻译，结果会显示在这里。")
+            #expect(message == L10n.tranDefaultIdleMessage)
         } else {
             Issue.record("Expected re-enabled provider to be idle.")
+        }
+    }
+
+    @Test func refreshLocalizedMessagesUpdatesIdleState() {
+        let controller = TranslationController(
+            translationService: FallbackTranslationService(),
+            pasteboard: CapturingClipboardService()
+        )
+        controller.refreshLocalizedMessages(languageCode: "zh-Hans")
+
+        controller.refreshLocalizedMessages(languageCode: "en")
+
+        let state = controller.activeProviderStates.first
+        if case .idle(let message) = state?.status {
+            #expect(message == "Enter text and click Translate. Results will appear here.")
+        } else {
+            Issue.record("Expected provider to remain idle.")
         }
     }
 
@@ -1057,7 +1074,7 @@ struct TranslationControllerTests {
         speechService.finishLatest(error: TranslationSpeechError.requestFailed("voice is invalid"))
 
         #expect(controller.speakingTarget == nil)
-        #expect(controller.speechErrorMessage == "发音失败：voice is invalid")
+        #expect(controller.speechErrorMessage == L10n.tranSpeechFailed("voice is invalid"))
     }
 
     @Test func speaksUsingConfiguredSpeechProvider() {

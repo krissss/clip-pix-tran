@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "ClipPixTran";
+"CFBundleName" = "ClipPixTran";
+"NSAccessibilityUsageDescription" = "ClipPixTran 需要辅助功能权限来读取选中文本，并在截图时识别窗口和控件位置。";

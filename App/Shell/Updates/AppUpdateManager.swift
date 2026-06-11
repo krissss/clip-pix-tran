@@ -51,14 +51,14 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
     var statusMessage: String {
         if Self.runsDebugBuild {
-            return "Debug 构建不会检查更新；请使用 Release 构建测试 Sparkle 更新。"
+            return L10n.updateUnavailableDebugBuild
         }
 
         if Self.sparkleConfigurationIsValid {
-            return "自动更新通过 GitHub Release 和 Sparkle appcast 提供。"
+            return L10n.updateAvailableStatus
         }
 
-        return "当前构建未配置 Sparkle appcast 或公钥。"
+        return L10n.updateUnavailableConfiguration
     }
 
     override init() {
@@ -84,8 +84,8 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
         guard Self.sparkleConfigurationIsValid else {
             let alert = NSAlert()
-            alert.messageText = "自动更新未配置"
-            alert.informativeText = "Release 构建需要在发布流程中使用 SPARKLE_PRIVATE_KEY 签名更新包。"
+            alert.messageText = L10n.updateUnavailableAlertTitle
+            alert.informativeText = L10n.updateUnavailableAlertMessage
             alert.runModal()
             return
         }
@@ -207,11 +207,11 @@ enum UpdateCheckInterval: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .daily:
-            "每天"
+            L10n.updateFrequencyDaily
         case .weekly:
-            "每周"
+            L10n.updateFrequencyWeekly
         case .monthly:
-            "每月"
+            L10n.updateFrequencyMonthly
         }
     }
 

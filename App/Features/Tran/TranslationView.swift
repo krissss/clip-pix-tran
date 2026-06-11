@@ -14,17 +14,17 @@ struct TranslationView: View {
         .navigationTitle("Tran")
         .background(ControlPanelBackground())
         .confirmationDialog(
-            "清空翻译历史？",
+            L10n.tranClearTitle,
             isPresented: $showsClearHistoryConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空历史", role: .destructive) {
+            Button(L10n.commonClearHistory, role: .destructive) {
                 controller.clearHistory()
             }
 
-            Button("取消", role: .cancel) {}
+            Button(L10n.commonCancel, role: .cancel) {}
         } message: {
-            Text("这会删除全部翻译历史记录，无法撤销。")
+            Text(L10n.tranClearMessage)
         }
     }
 
@@ -57,7 +57,7 @@ struct TranslationView: View {
     private var translateToolbar: some View {
         HStack(spacing: 12) {
             ControlPanelSidebarHeader(
-                title: "文本翻译",
+                title: L10n.tranTextTranslation,
                 systemImage: "text.bubble",
                 tint: ControlPanelDesign.tint(for: .tran)
             )
@@ -75,7 +75,7 @@ struct TranslationView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Label("翻译", systemImage: "arrow.right.circle")
+                    Label(L10n.tranTranslate, systemImage: "arrow.right.circle")
                 }
             }
             .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .tran), prominence: .primary))
@@ -100,7 +100,7 @@ struct TranslationView: View {
 
     private var sourcePaneHeader: some View {
         HStack(spacing: 8) {
-            Label("原文", systemImage: "text.alignleft")
+            Label(L10n.tranSourceText, systemImage: "text.alignleft")
                 .font(.headline)
 
             Spacer()
@@ -113,7 +113,7 @@ struct TranslationView: View {
                 isPreparing: controller.preparingSpeechTarget == .source,
                 isSpeaking: controller.speakingTarget == .source,
                 canSpeak: canSpeakSourceText,
-                idleHelp: "朗读原文",
+                idleHelp: L10n.tranSpeakSource,
                 speechProviderName: controller.currentSpeechProviderName,
                 action: controller.speakSourceText
             )
@@ -124,9 +124,9 @@ struct TranslationView: View {
     private var resultPane: some View {
         VStack(alignment: .leading, spacing: 8) {
             paneHeader(
-                title: "翻译结果",
+                title: L10n.tranResult,
                 systemImage: "rectangle.stack",
-                accessory: "\(visibleProviders.count) 个服务"
+                accessory: L10n.tranProviderCount(visibleProviders.count)
             )
 
             providerDeck
@@ -168,7 +168,7 @@ struct TranslationView: View {
 
     private var languageBar: some View {
         HStack(spacing: 10) {
-            Picker("原文语言", selection: sourceLanguageSelection) {
+            Picker(L10n.tranSourceLanguage, selection: sourceLanguageSelection) {
                 Text(TranslationLanguage.automaticSourceName)
                     .tag(TranslationLanguage.automaticSourceCode)
                 ForEach(TranslationLanguage.supportedSources) { language in
@@ -183,9 +183,9 @@ struct TranslationView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle())
             .disabled(!canSwapLanguages)
-            .help("交换语言")
+            .help(L10n.tranSwapLanguages)
 
-            Picker("目标语言", selection: targetLanguageSelection) {
+            Picker(L10n.tranTargetLanguage, selection: targetLanguageSelection) {
                 ForEach(TranslationLanguage.supported) { language in
                     Text(language.name).tag(language.code)
                 }
@@ -249,7 +249,7 @@ struct TranslationView: View {
         }
 
         if controller.sourceLanguageCode == nil {
-            return "\(TranslationLanguage.automaticSourceName)：\(TranslationLanguage.name(for: sourceLanguageCode))"
+            return L10n.tranAutoDetectedLanguage(TranslationLanguage.name(for: sourceLanguageCode))
         }
 
         return TranslationLanguage.name(for: sourceLanguageCode)
@@ -289,7 +289,7 @@ struct TranslationView: View {
         let visibleItems = controller.history.filteredItems(matching: historySearchText)
         if controller.history.items.isEmpty {
             ControlPanelEmptyState(
-                title: "还没有翻译记录",
+                title: L10n.tranEmptyHistory,
                 systemImage: "text.bubble",
                 tint: ControlPanelDesign.tint(for: .tran)
             )
@@ -299,7 +299,7 @@ struct TranslationView: View {
                 LazyVStack(spacing: 5) {
                     historyActions
 
-                    ControlPanelSearchField(text: $historySearchText, prompt: "搜索翻译历史")
+                    ControlPanelSearchField(text: $historySearchText, prompt: L10n.tranSearchHistory)
                         .padding(.horizontal, 18)
                         .padding(.bottom, 6)
 
@@ -313,7 +313,7 @@ struct TranslationView: View {
 
                     if visibleItems.isEmpty {
                         ControlPanelNoResultsState(
-                            title: "没有匹配翻译",
+                            title: L10n.tranNoResults,
                             systemImage: "text.bubble.fill"
                         )
                             .padding(.vertical, 36)
@@ -343,7 +343,7 @@ struct TranslationView: View {
 
     private var historyActions: some View {
         HStack {
-            ControlPanelSectionLabel(title: "翻译历史", systemImage: "clock")
+            ControlPanelSectionLabel(title: L10n.tranHistory, systemImage: "clock")
 
             Text(historyCountText)
                 .font(.callout)
@@ -358,7 +358,7 @@ struct TranslationView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(controller.history.items.isEmpty)
-            .help("清空翻译历史")
+            .help(L10n.tranClearHelp)
         }
         .font(.callout)
         .padding(.horizontal, 18)
@@ -370,10 +370,10 @@ struct TranslationView: View {
         let totalCount = controller.history.items.count
         let visibleCount = controller.history.filteredItems(matching: historySearchText).count
         if historySearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "\(totalCount) 条记录"
+            return L10n.commonRecordsCount(totalCount)
         }
 
-        return "\(visibleCount)/\(totalCount) 条记录"
+        return L10n.commonFilteredRecordsCount(visible: visibleCount, total: totalCount)
     }
 
     private var targetLanguageSelection: Binding<String> {
@@ -555,13 +555,13 @@ private struct TranslationHistoryRow: View {
                     Image(systemName: "arrow.up.left")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("载入这条翻译")
+                .help(L10n.tranLoadHistory)
 
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
-                .help("删除翻译记录")
+                .help(L10n.tranDeleteHistory)
             }
         }
         .controlPanelHistoryRow(isSelected: false, tint: ControlPanelDesign.tint(for: .tran))
@@ -587,7 +587,7 @@ private struct TranslationHistoryRow: View {
                 )
         }
         .buttonStyle(.plain)
-        .help("切换到 \(providerResult.providerName) 的结果")
+        .help(L10n.tranSwitchProvider(providerResult.providerName))
         .disabled(isSelected)
     }
 }

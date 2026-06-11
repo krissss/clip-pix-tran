@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct AppShellView: View {
-    @Environment(\.openSettings) private var openSettings
-
     @Bindable var clipboardMonitor: ClipboardMonitor
     @Bindable var screenshotController: ScreenshotController
     @Bindable var translationController: TranslationController
     let shortcutController: AppShortcutController
+    @Bindable var localizationPreference: LocalizationPreference
+    let openSettingsAction: () -> Void
     @Binding var selectedSection: AppSection
 
     var body: some View {
@@ -49,14 +49,14 @@ struct AppShellView: View {
             Spacer(minLength: 16)
 
             Button {
-                openSettings()
+                openSettingsAction()
             } label: {
                 VStack(spacing: 5) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 30, height: 28)
 
-                    Text("设置")
+                    Text(L10n.appSettings)
                         .font(.caption2)
                 }
                 .frame(maxWidth: .infinity)
@@ -65,7 +65,7 @@ struct AppShellView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("打开设置")
+            .help(L10n.appOpenSettings)
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
         }
@@ -131,8 +131,8 @@ private struct DebugBuildBadge: View {
                 RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
                     .stroke(Color(nsColor: .systemRed).opacity(0.24), lineWidth: 1)
             }
-            .help("Debug 构建")
-            .accessibilityLabel("Debug 构建")
+            .help(L10n.appDebugBuild)
+            .accessibilityLabel(L10n.appDebugBuild)
     }
 }
 #endif
@@ -208,6 +208,8 @@ private struct SidebarSectionButton: View {
                 pasteboard: PreviewClipboardService()
             )
         ),
+        localizationPreference: LocalizationPreference(),
+        openSettingsAction: {},
         selectedSection: .constant(.clip)
     )
 }

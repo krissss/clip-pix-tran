@@ -280,10 +280,10 @@ private struct TranslationQuickPanelView: View {
 
     private var sourcePreviewText: String {
         if visibleErrorMessage != nil {
-            return "输入原文"
+            return L10n.tranInputSource
         }
 
-        return "正在读取选中文本..."
+        return L10n.tranReadingSelection
     }
 
     var body: some View {
@@ -306,7 +306,7 @@ private struct TranslationQuickPanelView: View {
 
     private var header: some View {
         ControlPanelSidebarHeader(
-            title: "划词翻译",
+            title: L10n.tranSelectionTranslation,
             systemImage: "text.bubble",
             tint: tint
         ) {
@@ -323,25 +323,25 @@ private struct TranslationQuickPanelView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle())
             .disabled(controller.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .help("复制原文")
+            .help(L10n.tranCopySource)
 
             Button(action: onTogglePinned) {
                 Image(systemName: isPinned ? "pin.fill" : "pin")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: isPinned ? .selected : .normal, tint: tint))
-            .help(isPinned ? "取消固定" : "固定小窗")
+            .help(isPinned ? L10n.commonUnpinWindow : L10n.commonPinWindow)
 
             Button(action: onOpenFullTranslation) {
                 Image(systemName: "arrow.up.forward.app")
             }
             .buttonStyle(ControlPanelIconButtonStyle())
-            .help("打开完整翻译")
+            .help(L10n.tranOpenFull)
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
             }
             .buttonStyle(ControlPanelIconButtonStyle())
-            .help("关闭")
+            .help(L10n.commonClose)
         }
     }
 
@@ -377,13 +377,13 @@ private struct TranslationQuickPanelView: View {
 
     private var languageBar: some View {
         HStack(spacing: 8) {
-            Label("语言", systemImage: "globe")
+            Label(L10n.languageHeader, systemImage: "globe")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .labelStyle(.titleAndIcon)
                 .frame(width: 56, alignment: .leading)
 
-            Picker("原文语言", selection: sourceLanguageSelection) {
+            Picker(L10n.tranSourceLanguage, selection: sourceLanguageSelection) {
                 Text(TranslationLanguage.automaticSourceName)
                     .tag(TranslationLanguage.automaticSourceCode)
                 Divider()
@@ -395,7 +395,7 @@ private struct TranslationQuickPanelView: View {
             .pickerStyle(.menu)
             .controlSize(.small)
             .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
-            .help("切换原文语言")
+            .help(L10n.tranChangeSourceLanguage)
 
             Button(action: swapLanguages) {
                 Image(systemName: "arrow.left.arrow.right")
@@ -403,9 +403,9 @@ private struct TranslationQuickPanelView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle())
             .disabled(!canSwapLanguages)
-            .help("交换语言")
+            .help(L10n.tranSwapLanguages)
 
-            Picker("目标语言", selection: targetLanguageSelection) {
+            Picker(L10n.tranTargetLanguage, selection: targetLanguageSelection) {
                 ForEach(TranslationLanguage.supported) { language in
                     Text(language.name).tag(language.code)
                 }
@@ -414,7 +414,7 @@ private struct TranslationQuickPanelView: View {
             .pickerStyle(.menu)
             .controlSize(.small)
             .frame(width: ControlPanelDesign.Layout.QuickPanel.languagePickerWidth)
-            .help("切换目标语言")
+            .help(L10n.tranChangeTargetLanguage)
         }
         .padding(.horizontal, ControlPanelDesign.Layout.QuickPanel.groupPadding)
         .padding(.vertical, 6)
@@ -433,18 +433,18 @@ private struct TranslationQuickPanelView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Text("原文")
+                Text(L10n.tranSourceText)
                     .font(.subheadline.weight(.semibold))
 
                 Spacer(minLength: 8)
 
                 if !controller.sourceText.isEmpty {
-                    Text("\(controller.sourceText.count) 字")
+                    Text(L10n.tranCharacterCount(controller.sourceText.count))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                Text("Enter 翻译 / ⌘↩ 换行")
+                Text(L10n.tranQuickPanelShortcut)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
@@ -452,7 +452,7 @@ private struct TranslationQuickPanelView: View {
                     isPreparing: controller.preparingSpeechTarget == .source,
                     isSpeaking: controller.speakingTarget == .source,
                     canSpeak: canSpeakSource,
-                    idleHelp: "朗读原文",
+                    idleHelp: L10n.tranSpeakSource,
                     speechProviderName: controller.currentSpeechProviderName,
                     action: controller.speakSourceText
                 )
@@ -462,7 +462,7 @@ private struct TranslationQuickPanelView: View {
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
                 .disabled(!canTranslateSource)
-                .help("用当前原文重新翻译")
+                .help(L10n.tranRetranslateCurrentSource)
             }
             .frame(height: 22)
 
@@ -496,13 +496,13 @@ private struct TranslationQuickPanelView: View {
 
     private var resultsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ControlPanelCompactSectionHeader(title: "翻译结果", systemImage: "rectangle.stack") {
+            ControlPanelCompactSectionHeader(title: L10n.tranResult, systemImage: "rectangle.stack") {
                 Text(resultSummaryText)
             }
 
             if visibleProviders.isEmpty {
                 ControlPanelNoResultsState(
-                    title: "暂无翻译服务",
+                    title: L10n.tranNoProviders,
                     systemImage: "text.badge.xmark"
                 )
                 .frame(maxWidth: .infinity, minHeight: 112)
@@ -547,7 +547,7 @@ private struct TranslationQuickPanelView: View {
 
     private func providerStatus(for provider: TranslationProviderState) -> TranslationProviderStatus {
         if isReadingSelection {
-            return .loading("正在读取选中文本...")
+            return .loading(L10n.tranReadingSelection)
         }
 
         if controller.isTranslating {
@@ -580,12 +580,12 @@ private struct TranslationQuickPanelView: View {
     }
 
     private var resultSummaryText: String {
-        let providerCount = "\(visibleProviders.count) 个服务"
+        let providerCount = L10n.tranProviderCount(visibleProviders.count)
         guard let sourceLanguageCode = controller.effectiveSourceLanguageCode else {
             return providerCount
         }
 
-        return "检测：\(TranslationLanguage.name(for: sourceLanguageCode)) · \(providerCount)"
+        return L10n.tranDetectedSummary(language: TranslationLanguage.name(for: sourceLanguageCode), providerCount: providerCount)
     }
 
     private var targetLanguageSelection: Binding<String> {

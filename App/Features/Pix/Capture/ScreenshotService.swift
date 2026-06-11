@@ -12,9 +12,18 @@ enum ScreenshotRegionCaptureMode: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .screenshot:
-            "截图"
+            L10n.pixScreenshot
         case .recording:
-            "录屏"
+            L10n.pixRecording
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .screenshot:
+            "camera.viewfinder"
+        case .recording:
+            "record.circle"
         }
     }
 }

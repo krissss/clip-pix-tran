@@ -20,11 +20,11 @@ enum ClipboardContentKind: String, Codable, Equatable {
     var displayName: String {
         switch self {
         case .text:
-            "文本"
+            L10n.kindText
         case .image:
-            "图片"
+            L10n.kindImage
         case .file:
-            "文件"
+            L10n.kindFile
         }
     }
 }
@@ -172,13 +172,13 @@ struct ClipboardItem: Codable, Identifiable, Equatable {
             }
 
             if let imageSizeText {
-                return "图片 \(imageSizeText)"
+                return "\(L10n.kindImage) \(imageSizeText)"
             }
 
-            return "图片"
+            return L10n.kindImage
         case .file:
             guard let firstPath = filePaths.first else {
-                return "文件"
+                return L10n.kindFile
             }
 
             return fileTitle(for: firstPath, count: filePaths.count)
@@ -191,7 +191,7 @@ struct ClipboardItem: Codable, Identifiable, Equatable {
             return text
         case .image:
             if filePaths.isEmpty {
-                return "图片"
+                return L10n.kindImage
             }
 
             return filePaths.joined(separator: "\n")
@@ -254,7 +254,7 @@ struct ClipboardItem: Codable, Identifiable, Equatable {
             return name
         }
 
-        return "\(name) 等 \(count) 个项目"
+        return L10n.commonFileItemsMore(name: name, count: count)
     }
 
     private var imageSizeText: String? {

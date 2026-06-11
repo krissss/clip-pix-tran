@@ -223,10 +223,10 @@ private struct ImagePreviewDetailView: View {
                 Button {
                     zoomScale = max(minZoomScale, zoomScale - zoomStep(for: zoomScale))
                 } label: {
-                    Label("缩小", systemImage: "minus.magnifyingglass")
+                    Label(L10n.commonZoomOut, systemImage: "minus.magnifyingglass")
                 }
                 .disabled(zoomScale <= minZoomScale)
-                .help("缩小图片")
+                .help(L10n.commonZoomOut)
 
                 Text(zoomPercentText)
                     .font(.callout.monospacedDigit())
@@ -236,32 +236,32 @@ private struct ImagePreviewDetailView: View {
                 Button {
                     zoomScale = 1.0
                 } label: {
-                    Label("适应窗口", systemImage: "arrow.down.right.and.arrow.up.left")
+                    Label(L10n.commonFitWindow, systemImage: "arrow.down.right.and.arrow.up.left")
                 }
                 .disabled(zoomScale == 1.0)
-                .help("适应窗口")
+                .help(L10n.commonFitWindow)
 
                 Button {
                     zoomScale = min(maxZoomScale, zoomScale + zoomStep(for: zoomScale))
                 } label: {
-                    Label("放大", systemImage: "plus.magnifyingglass")
+                    Label(L10n.commonZoomIn, systemImage: "plus.magnifyingglass")
                 }
                 .disabled(zoomScale >= maxZoomScale)
-                .help("放大图片")
+                .help(L10n.commonZoomIn)
 
                 Button(action: onCopy) {
-                    Label("复制", systemImage: "doc.on.doc")
+                    Label(L10n.commonCopy, systemImage: "doc.on.doc")
                 }
-                .help("复制图片")
+                .help(L10n.commonCopyImage)
 
                 if let onSave {
                     Button(action: onSave) {
-                        Label("保存", systemImage: "square.and.arrow.down")
+                        Label(L10n.commonSave, systemImage: "square.and.arrow.down")
                     }
-                    .help("保存图片")
+                    .help(L10n.commonSaveImage)
                 }
 
-                Button("完成") {
+                Button(L10n.commonDone) {
                     onClose()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -278,7 +278,7 @@ private struct ImagePreviewDetailView: View {
                     )
                 } else if didLoadImage {
                     ContentUnavailableView(
-                        "无法预览图片",
+                        L10n.commonCannotPreviewImage,
                         systemImage: "exclamationmark.triangle"
                     )
                 } else {

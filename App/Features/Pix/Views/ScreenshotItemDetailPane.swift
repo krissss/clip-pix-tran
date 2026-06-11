@@ -31,41 +31,41 @@ struct ScreenshotItemDetailPane: View {
         HStack(spacing: 10) {
             if item.isImage {
                 Button(action: copyAction) {
-                    Label("复制", systemImage: "doc.on.doc")
+                    Label(L10n.commonCopy, systemImage: "doc.on.doc")
                 }
                 .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
-                .help("复制截图")
+                .help(L10n.pixCopyScreenshot)
 
                 Button(action: saveAction) {
                     Image(systemName: "square.and.arrow.down")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("保存截图")
+                .help(L10n.pixSaveScreenshot)
 
                 Button(action: pinAction) {
                     Image(systemName: "pin")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("固定到屏幕")
+                .help(L10n.commonPinToScreen)
             } else {
                 Button(action: exportMP4Action) {
                     Label("MP4", systemImage: "film")
                 }
                 .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
-                .help("导出 MP4")
+                .help(L10n.commonExportMP4)
 
                 Button(action: exportGIFAction) {
                     Label("GIF", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(ControlPanelButtonStyle())
-                .help("导出 GIF")
+                .help(L10n.commonExportGIF)
             }
 
             Button(action: previewAction) {
                 Image(systemName: "eye")
             }
             .buttonStyle(ControlPanelIconButtonStyle())
-            .help(item.isImage ? "用系统预览.app打开截图" : "打开录屏")
+            .help(item.isImage ? L10n.pixOpenInPreview : L10n.pixOpenRecording)
 
             Spacer()
 
@@ -73,7 +73,7 @@ struct ScreenshotItemDetailPane: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
-            .help("删除截图")
+            .help(L10n.pixDeleteScreenshot)
         }
         .controlPanelActionBar()
     }
@@ -82,7 +82,7 @@ struct ScreenshotItemDetailPane: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ControlPanelSectionLabel(
-                    title: item.isImage ? "图片预览" : "录屏预览",
+                    title: item.isImage ? L10n.pixImagePreview : L10n.pixRecordingPreview,
                     systemImage: item.isImage ? "photo" : "video"
                 )
             }
@@ -94,7 +94,7 @@ struct ScreenshotItemDetailPane: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("用系统预览.app打开截图")
+                .help(L10n.pixOpenInPreview)
                 .padding(ControlPanelDesign.Layout.detailContentPadding)
                 .controlPanelTextSurface()
             } else {
@@ -109,17 +109,17 @@ struct ScreenshotItemDetailPane: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ControlPanelSectionLabel(title: "详情", systemImage: "info.circle")
+            ControlPanelSectionLabel(title: L10n.pixDetails, systemImage: "info.circle")
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
-                ScreenshotMetadataRow(title: "类型", value: item.isImage ? "PNG 图片" : "MP4 录屏")
-                ScreenshotMetadataRow(title: "创建时间", value: item.createdAt.absoluteDisplayString)
-                ScreenshotMetadataRow(title: "文件大小", value: item.fileSizeText)
+                ScreenshotMetadataRow(title: L10n.pixType, value: item.isImage ? L10n.pixPNGImage : L10n.pixMP4Recording)
+                ScreenshotMetadataRow(title: L10n.pixCreatedAt, value: item.createdAt.absoluteDisplayString)
+                ScreenshotMetadataRow(title: L10n.pixFileSize, value: item.fileSizeText)
                 if item.isRecording {
-                    ScreenshotMetadataRow(title: "时长", value: item.durationText)
+                    ScreenshotMetadataRow(title: L10n.pixDuration, value: item.durationText)
                     if let pixelSize = item.pixelSize {
                         ScreenshotMetadataRow(
-                            title: "尺寸",
+                            title: L10n.pixDimensions,
                             value: "\(Int(pixelSize.width)) x \(Int(pixelSize.height))"
                         )
                     }
@@ -176,7 +176,7 @@ private struct ScreenRecordingPreviewCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("打开录屏")
+        .help(L10n.pixOpenRecording)
     }
 }
 

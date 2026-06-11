@@ -191,11 +191,11 @@ enum TranslationProviderError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "当前翻译服务不可用。请稍后重试，或检查系统翻译语言包。"
+            L10n.tranProviderUnavailable
         case .noEnabledProviders:
-            "请至少启用一个翻译 provider。"
+            L10n.tranProviderNoneEnabled
         case .providerNotConfigured:
-            "此翻译 provider 尚未配置。请到设置里填写必要信息。"
+            L10n.tranProviderNotConfigured
         case .requestFailed(let message):
             message
         }

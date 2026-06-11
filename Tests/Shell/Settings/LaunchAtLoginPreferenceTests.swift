@@ -20,7 +20,7 @@ struct LaunchAtLoginPreferenceTests {
         )
 
         #expect(preference.launchesAtLogin)
-        #expect(preference.statusMessage.contains("系统设置"))
+        #expect(preference.statusMessage == L10n.launchAtLoginRequiresApprovalMessage)
     }
 
     @Test func registersLaunchAtLogin() {

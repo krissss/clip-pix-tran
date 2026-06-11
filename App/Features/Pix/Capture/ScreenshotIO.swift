@@ -24,17 +24,17 @@ enum ScreenshotCaptureError: LocalizedError, Equatable {
         case .cancelled:
             nil
         case .permissionDenied:
-            "无法读取屏幕内容。请在系统设置中允许 ClipPixTran 录制屏幕，授权后重启应用再试。"
+            L10n.screenshotPermissionDenied
         case .missingEntitlements:
-            "当前构建缺少屏幕录制所需权限配置。请检查 Xcode 的签名和沙盒设置。"
+            L10n.screenshotMissingEntitlements
         case .displayNotFound:
-            "无法定位要截图的显示器。"
+            L10n.screenshotDisplayNotFound
         case .timedOut:
-            "截图响应超时，请重试。"
+            L10n.screenshotTimedOut
         case .unavailable:
-            "无法获取当前屏幕截图。"
+            L10n.screenshotUnavailable
         case .pngEncodingFailed:
-            "截图已生成，但无法转换为 PNG。"
+            L10n.screenshotPNGEncodingFailed
         }
     }
 }
@@ -46,9 +46,9 @@ enum ScreenshotPasteboardError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidImageData:
-            "无法识别这张截图。"
+            L10n.screenshotInvalidImageData
         case .rejected:
-            "无法写入剪贴板。"
+            L10n.clipboardWriteFailed
         }
     }
 }
@@ -62,7 +62,7 @@ enum ScreenshotSaveError: LocalizedError, Equatable {
         case .cancelled:
             nil
         case .missingDestination:
-            "未选择保存位置。"
+            L10n.screenshotMissingDestination
         }
     }
 }

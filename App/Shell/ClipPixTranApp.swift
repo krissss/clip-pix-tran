@@ -21,6 +21,7 @@ struct ClipPixTranApp: App {
     @State private var launchAtLoginPreference: LaunchAtLoginPreference
     @State private var onboardingPreference: FirstLaunchOnboardingPreference
     @State private var updateManager: AppUpdateManager
+    @State private var localizationPreference: LocalizationPreference
     @State private var selectedSection: AppSection = .clip
     @State private var hasConfiguredRuntime = false
 
@@ -64,6 +65,7 @@ struct ClipPixTranApp: App {
         self._launchAtLoginPreference = State(initialValue: LaunchAtLoginPreference())
         self._onboardingPreference = State(initialValue: FirstLaunchOnboardingPreference())
         self._updateManager = State(initialValue: AppUpdateManager())
+        self._localizationPreference = State(initialValue: LocalizationPreference())
     }
 
     var body: some Scene {
@@ -73,11 +75,17 @@ struct ClipPixTranApp: App {
                 screenshotController: screenshotController,
                 translationController: translationController,
                 shortcutController: shortcutController,
+                localizationPreference: localizationPreference,
+                openSettingsAction: openSettingsWindow,
                 selectedSection: $selectedSection
             )
+                .id(localizationPreference.version)
                 .frame(minWidth: 760, minHeight: 520)
                 .onAppear {
                     AppDockIconController.shared.updateActivationPolicy()
+                }
+                .onChange(of: localizationPreference.version) {
+                    translationController.refreshLocalizedMessages()
                 }
         }
         .defaultLaunchBehavior(.suppressed)
@@ -85,9 +93,13 @@ struct ClipPixTranApp: App {
         .onChange(of: scenePhase, initial: true) {
             configureAppRuntime()
         }
-
-        Settings {
-            appSettingsView
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button(L10n.appSettings) {
+                    openSettingsWindow()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
         }
     }
 
@@ -159,9 +171,15 @@ struct ClipPixTranApp: App {
             translationController: translationController,
             dockIconPreference: dockIconPreference,
             launchAtLoginPreference: launchAtLoginPreference,
+            localizationPreference: localizationPreference,
             updateManager: updateManager,
             openOnboardingAction: openOnboardingWindow
         )
+        .id(localizationPreference.version)
+        .onChange(of: localizationPreference.version) {
+            AppSettingsWindowController.shared.updateTitle()
+            translationController.refreshLocalizedMessages()
+        }
         .onDisappear {
             AppDockIconController.shared.updateActivationPolicy()
         }
@@ -169,9 +187,9 @@ struct ClipPixTranApp: App {
 
     private var mainWindowTitle: String {
         #if DEBUG
-        "ClipPixTran Debug"
+        L10n.appDebugBuildTitle
         #else
-        "ClipPixTran"
+        L10n.appName
         #endif
     }
 }
@@ -222,14 +240,19 @@ private final class AppSettingsWindowController: NSWindowController, NSWindowDel
             window = makeWindow(content: content)
         }
 
+        updateTitle()
         window?.center()
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func updateTitle() {
+        window?.title = L10n.appSettings
     }
 
     private func makeWindow(content: AnyView) -> NSWindow {
         let hostingController = NSHostingController(rootView: content)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "设置"
+        window.title = L10n.appSettings
         window.identifier = NSUserInterfaceItemIdentifier("ClipPixTran.SettingsWindow")
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false

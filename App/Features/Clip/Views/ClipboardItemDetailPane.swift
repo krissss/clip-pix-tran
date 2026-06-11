@@ -41,31 +41,31 @@ struct ClipboardItemDetailPane: View {
     private var actionBar: some View {
         HStack(spacing: 10) {
             Button(action: copyAction) {
-                Label("复制", systemImage: "doc.on.doc")
+                Label(L10n.commonCopy, systemImage: "doc.on.doc")
             }
             .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .clip), prominence: .primary))
-            .help("复制回剪贴板")
+            .help(L10n.clipCopyBack)
 
             if canCopyPlainText {
                 Button(action: copyPlainTextAction) {
                     Image(systemName: "text.alignleft")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("复制为纯文本")
+                .help(L10n.commonCopyPlainText)
             }
 
             Button(action: togglePinnedAction) {
                 Image(systemName: item.isPinned ? "pin.slash" : "pin")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: item.isPinned ? .selected : .normal, tint: ControlPanelDesign.tint(for: .clip)))
-            .help(item.isPinned ? "取消收藏" : "收藏")
+            .help(item.isPinned ? L10n.commonUnfavorite : L10n.commonFavorite)
 
             if item.isText {
                 Button(action: translateAction) {
                     Image(systemName: "text.bubble")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("发送到 Tran")
+                .help(L10n.clipSendToTran)
             }
 
             if canPreview {
@@ -73,7 +73,7 @@ struct ClipboardItemDetailPane: View {
                     Image(systemName: "eye")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("用系统预览.app打开图片")
+                .help(L10n.pixOpenInPreview)
             }
 
             if canRevealInFinder {
@@ -81,7 +81,7 @@ struct ClipboardItemDetailPane: View {
                     Image(systemName: "folder")
                 }
                 .buttonStyle(ControlPanelIconButtonStyle())
-                .help("在访达中显示")
+                .help(L10n.commonRevealInFinder)
             }
 
             Spacer()
@@ -90,7 +90,7 @@ struct ClipboardItemDetailPane: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
-            .help("删除记录")
+            .help(L10n.commonDeleteRecord)
         }
         .controlPanelActionBar()
     }
@@ -109,20 +109,20 @@ struct ClipboardItemDetailPane: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ControlPanelSectionLabel(title: "详情", systemImage: "info.circle")
+            ControlPanelSectionLabel(title: L10n.pixDetails, systemImage: "info.circle")
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
-                ClipboardMetadataRow(title: "类型", value: item.kind.displayName)
-                ClipboardMetadataRow(title: "创建时间", value: item.createdAt.absoluteDisplayString)
-                ClipboardMetadataRow(title: "最近复制", value: item.lastCopiedAt.absoluteDisplayString)
+                ClipboardMetadataRow(title: L10n.pixType, value: item.kind.displayName)
+                ClipboardMetadataRow(title: L10n.pixCreatedAt, value: item.createdAt.absoluteDisplayString)
+                ClipboardMetadataRow(title: L10n.clipLastCopied, value: item.lastCopiedAt.absoluteDisplayString)
 
                 if item.isText {
-                    ClipboardMetadataRow(title: "字符数", value: "\(item.text.count)")
-                    ClipboardMetadataRow(title: "格式数", value: "\(item.payloads.count)")
+                    ClipboardMetadataRow(title: L10n.clipCharacterCount, value: "\(item.text.count)")
+                    ClipboardMetadataRow(title: L10n.clipFormatCount, value: "\(item.payloads.count)")
                 }
 
                 if item.kind != .text {
-                    ClipboardMetadataRow(title: "项目数", value: "\(max(item.filePaths.count, item.imageData == nil ? 0 : 1))")
+                    ClipboardMetadataRow(title: L10n.clipItemCount, value: "\(max(item.filePaths.count, item.imageData == nil ? 0 : 1))")
                 }
             }
         }
@@ -137,14 +137,14 @@ private struct ClipboardTextPreview: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ControlPanelSectionLabel(
-                    title: item.payloads.isEmpty ? "文本预览" : "带格式文本",
+                    title: item.payloads.isEmpty ? L10n.clipTextPreview : L10n.clipRichText,
                     systemImage: "text.alignleft"
                 )
 
                 Spacer()
 
                 if !item.payloads.isEmpty {
-                    Label("保留格式", systemImage: "checkmark.seal")
+                    Label(L10n.clipKeepsFormatting, systemImage: "checkmark.seal")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -167,7 +167,7 @@ private struct ClipboardImagePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ControlPanelSectionLabel(title: "图片预览", systemImage: "photo")
+            ControlPanelSectionLabel(title: L10n.pixImagePreview, systemImage: "photo")
 
             if let imageData = item.imageData {
                 Button(action: previewAction) {
@@ -183,9 +183,9 @@ private struct ClipboardImagePreview: View {
                     .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.cardRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .help("用系统预览.app打开图片")
+                .help(L10n.pixOpenInPreview)
             } else {
-                ContentUnavailableView("无法预览图片", systemImage: "photo")
+                ContentUnavailableView(L10n.commonCannotPreviewImage, systemImage: "photo")
                     .frame(minHeight: 220)
             }
 
@@ -202,7 +202,7 @@ private struct ClipboardFilePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ControlPanelSectionLabel(title: "文件", systemImage: "doc")
+            ControlPanelSectionLabel(title: L10n.kindFile, systemImage: "doc")
 
             ClipboardPathList(paths: item.filePaths)
         }
@@ -241,7 +241,7 @@ private struct ClipboardPathList: View {
                         Image(systemName: "folder")
                     }
                     .buttonStyle(ControlPanelIconButtonStyle())
-                    .help("在访达中显示")
+                    .help(L10n.commonRevealInFinder)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)

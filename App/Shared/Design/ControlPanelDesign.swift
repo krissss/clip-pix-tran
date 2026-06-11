@@ -42,6 +42,7 @@ enum ControlPanelDesign {
             static let windowHeight: CGFloat = 480
             static let formMaxWidth: CGFloat = 500
             static let controlWidth: CGFloat = 210
+            static let paneTabMinWidth: CGFloat = 94
             static let sliderWidth: CGFloat = 154
             static let rowHeight: CGFloat = 44
             static let valueWidth: CGFloat = 42
@@ -336,7 +337,7 @@ struct ControlPanelSearchField: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .help("清除搜索")
+                .help(L10n.commonSearchClear)
             }
         }
         .font(.callout)

@@ -12,7 +12,7 @@ struct ScreenshotStatusBanner: View {
                     Button {
                         openScreenRecordingSettings()
                     } label: {
-                        Label("打开系统设置", systemImage: "gearshape")
+                        Label(L10n.commonOpenSystemSettings, systemImage: "gearshape")
                     }
                     .controlSize(.small)
                 }
@@ -33,7 +33,7 @@ struct ScreenshotEmptyDetailPane: View {
             )
 
             VStack(spacing: 6) {
-                Text("还没有截图")
+                Text(L10n.pixEmpty)
                     .font(.title3.weight(.semibold))
             }
 
@@ -41,7 +41,7 @@ struct ScreenshotEmptyDetailPane: View {
                 Button {
                     openScreenRecordingSettings()
                 } label: {
-                    Label("打开系统设置", systemImage: "gearshape")
+                    Label(L10n.commonOpenSystemSettings, systemImage: "gearshape")
                 }
             }
         }

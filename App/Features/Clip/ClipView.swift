@@ -40,17 +40,17 @@ struct ClipView: View {
             selectFirstVisibleItemIfNeeded()
         }
         .confirmationDialog(
-            "清空剪贴板历史？",
+            L10n.clipClearTitle,
             isPresented: $showsClearHistoryConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空历史", role: .destructive) {
+            Button(L10n.commonClearHistory, role: .destructive) {
                 clearHistory()
             }
 
-            Button("取消", role: .cancel) {}
+            Button(L10n.commonCancel, role: .cancel) {}
         } message: {
-            Text("这会删除全部剪贴板历史记录，无法撤销。")
+            Text(L10n.clipClearMessage)
         }
     }
 
@@ -58,7 +58,7 @@ struct ClipView: View {
         VStack(spacing: 0) {
             sidebarHeader
 
-            ControlPanelSearchField(text: $searchText, prompt: "搜索剪贴板历史")
+            ControlPanelSearchField(text: $searchText, prompt: L10n.clipSearch)
                 .padding(.horizontal, ControlPanelDesign.Layout.searchHorizontalPadding)
                 .padding(.bottom, 10)
 
@@ -69,7 +69,7 @@ struct ClipView: View {
 
     private var sidebarHeader: some View {
         ControlPanelSidebarHeader(
-            title: "剪贴板历史",
+            title: L10n.clipHistory,
             systemImage: "doc.on.clipboard",
             tint: ControlPanelDesign.tint(for: .clip)
         ) {
@@ -85,14 +85,14 @@ struct ClipView: View {
     private var sidebarContent: some View {
         if monitor.history.items.isEmpty {
             ControlPanelEmptyState(
-                title: "暂无剪贴板记录",
+                title: L10n.clipEmpty,
                 systemImage: "doc.on.clipboard",
                 tint: ControlPanelDesign.tint(for: .clip)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if visibleItems.isEmpty {
             ControlPanelNoResultsState(
-                title: "没有匹配记录",
+                title: L10n.clipNoResults,
                 systemImage: "doc.text.magnifyingglass"
             )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -121,7 +121,7 @@ struct ClipView: View {
 
     private var historyActions: some View {
         HStack {
-            Label("\(visibleItems.count) 条记录", systemImage: "clock")
+            Label(L10n.commonRecordsCount(visibleItems.count), systemImage: "clock")
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -133,7 +133,7 @@ struct ClipView: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
             .disabled(monitor.history.items.isEmpty)
-            .help("清空剪贴板历史")
+            .help(L10n.clipClearHelp)
         }
         .font(.callout)
         .padding(.vertical, 4)
@@ -170,7 +170,7 @@ struct ClipView: View {
                 )
             } else {
                 ControlPanelEmptyState(
-                    title: "选择一条记录",
+                    title: L10n.clipSelectItem,
                     systemImage: "sidebar.right",
                     tint: ControlPanelDesign.tint(for: .clip)
                 )
@@ -202,14 +202,14 @@ struct ClipView: View {
         Button {
             monitor.copyToPasteboard(item)
         } label: {
-            Label("复制", systemImage: "doc.on.doc")
+            Label(L10n.commonCopy, systemImage: "doc.on.doc")
         }
 
         Button {
             monitor.history.togglePinned(item)
         } label: {
             Label(
-                item.isPinned ? "取消收藏" : "收藏",
+                item.isPinned ? L10n.commonUnfavorite : L10n.commonFavorite,
                 systemImage: item.isPinned ? "pin.slash" : "pin"
             )
         }
@@ -219,14 +219,14 @@ struct ClipView: View {
                 Button {
                     monitor.copyPlainTextToPasteboard(item)
                 } label: {
-                    Label("复制纯文本", systemImage: "text.alignleft")
+                    Label(L10n.commonCopyPlainText, systemImage: "text.alignleft")
                 }
             }
 
             Button {
                 translateAction(item)
             } label: {
-                Label("翻译", systemImage: "text.bubble")
+                Label(L10n.commonTranslate, systemImage: "text.bubble")
             }
         }
 
@@ -234,7 +234,7 @@ struct ClipView: View {
             Button {
                 SystemImagePreviewService.openInPreviewApp(item: item)
             } label: {
-                Label("预览", systemImage: "eye")
+                Label(L10n.commonPreview, systemImage: "eye")
             }
         }
 
@@ -242,14 +242,14 @@ struct ClipView: View {
             Button {
                 FinderRevealService.revealFirstPath(in: item)
             } label: {
-                Label("在访达中显示", systemImage: "folder")
+                Label(L10n.commonRevealInFinder, systemImage: "folder")
             }
         }
 
         Button(role: .destructive) {
             delete(item)
         } label: {
-            Label("删除", systemImage: "trash")
+            Label(L10n.commonDelete, systemImage: "trash")
         }
     }
 

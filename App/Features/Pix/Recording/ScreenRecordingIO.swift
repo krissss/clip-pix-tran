@@ -178,15 +178,15 @@ enum ScreenRecordingError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .missingRecordingFile:
-            "找不到录屏文件。"
+            L10n.recordingMissingFile
         case .recordingOutputRejected:
-            "无法创建录屏输出。"
+            L10n.recordingOutputRejected
         case .recordingDidNotFinish:
-            "录屏文件写入超时，请重试。"
+            L10n.recordingDidNotFinish
         case .gifDestinationFailed:
-            "无法创建 GIF 文件。"
+            L10n.recordingGIFDestinationFailed
         case .gifFrameGenerationFailed:
-            "无法从录屏中生成 GIF 帧。"
+            L10n.recordingGIFFrameGenerationFailed
         }
     }
 }

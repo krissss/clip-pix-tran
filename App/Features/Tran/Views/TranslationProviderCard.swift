@@ -59,7 +59,7 @@ struct TranslationProviderCard: View {
                 .lineLimit(1)
 
             if provider.isLocal {
-                Label("本地", systemImage: "lock")
+                Label(L10n.tranLocalProvider, systemImage: "lock")
                     .font(isCompact ? .caption2 : .caption)
                     .foregroundStyle(.secondary)
                     .labelStyle(.titleAndIcon)
@@ -150,7 +150,7 @@ struct TranslationProviderCard: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(ControlPanelIconButtonStyle(role: .destructive))
-                    .help("重新翻译")
+                    .help(L10n.tranRetry)
                 }
             }
             .padding(.horizontal, horizontalPadding)
@@ -164,7 +164,7 @@ struct TranslationProviderCard: View {
                 isPreparing: isPreparingSpeech,
                 isSpeaking: isSpeaking,
                 canSpeak: canSpeak,
-                idleHelp: "朗读译文",
+                idleHelp: L10n.tranSpeakTranslation,
                 speechProviderName: speechProviderName,
                 action: onSpeak
             )
@@ -174,7 +174,7 @@ struct TranslationProviderCard: View {
             }
             .buttonStyle(ControlPanelIconButtonStyle())
             .disabled(!canCopy)
-            .help("复制译文")
+            .help(L10n.tranCopyTranslation)
         }
     }
 }

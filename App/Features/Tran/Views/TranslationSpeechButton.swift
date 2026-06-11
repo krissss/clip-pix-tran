@@ -10,7 +10,7 @@ struct TranslationSpeechButton: View {
 
     private let tint = ControlPanelDesign.tint(for: .tran)
     private var helpText: String {
-        let actionText = (isPreparing || isSpeaking) ? "停止朗读" : idleHelp
+        let actionText = (isPreparing || isSpeaking) ? L10n.tranStopSpeaking : idleHelp
         guard let speechProviderName, !speechProviderName.isEmpty else {
             return actionText
         }

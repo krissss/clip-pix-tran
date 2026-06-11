@@ -59,14 +59,14 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
 
     private var statusItemToolTip: String {
         #if DEBUG
-        "ClipPixTran Debug"
+        L10n.appDebugBuildTitle
         #else
-        "ClipPixTran"
+        L10n.appName
         #endif
     }
 
     private var statusBarImage: NSImage? {
-        let image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: "ClipPixTran")
+        let image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: L10n.appName)
         image?.isTemplate = true
         return image
     }
@@ -104,20 +104,20 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
         addPlainItem(
-            title: "设置...",
+            title: "\(L10n.appSettings)...",
             systemImage: "gearshape",
             keyEquivalent: ",",
             action: #selector(openSettings)
         )
         addPlainItem(
-            title: "重新打开引导",
+            title: L10n.appReopenOnboarding,
             systemImage: "sparkles.rectangle.stack",
             action: #selector(openOnboarding)
         )
 
         menu.addItem(.separator())
         addPlainItem(
-            title: "退出 ClipPixTran",
+            title: L10n.appQuit,
             keyEquivalent: "q",
             action: #selector(quit)
         )
@@ -153,11 +153,11 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
 
     #if DEBUG
     private func addDebugBuildItem() {
-        let item = NSMenuItem(title: "Debug 构建 · ClipPixTran", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L10n.appDebugBuildTitle, action: nil, keyEquivalent: "")
         item.image = menuImage(systemName: "hammer")
         item.isEnabled = true
         item.attributedTitle = NSAttributedString(
-            string: "Debug 构建 · ClipPixTran",
+            string: L10n.appDebugBuildTitle,
             attributes: [
                 .foregroundColor: NSColor.systemRed,
                 .font: NSFont.menuFont(ofSize: 0)

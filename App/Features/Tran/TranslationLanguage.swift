@@ -9,27 +9,29 @@ struct TranslationLanguage: Identifiable, Equatable {
 
 extension TranslationLanguage {
     static let automaticSourceCode = "auto"
-    static let automaticSourceName = "自动识别"
-    static let defaultTarget = TranslationLanguage(code: "zh-Hans", name: "简体中文")
+    static var automaticSourceName: String { L10n.languageAutoDetect }
+    static var defaultTarget: TranslationLanguage {
+        TranslationLanguage(code: "zh-Hans", name: L10n.languageZhHans)
+    }
 
-    static let supported: [TranslationLanguage] = [
+    static var supported: [TranslationLanguage] { [
         defaultTarget,
-        TranslationLanguage(code: "en", name: "英语"),
-        TranslationLanguage(code: "ja", name: "日语"),
-        TranslationLanguage(code: "ko", name: "韩语"),
-        TranslationLanguage(code: "fr", name: "法语"),
-        TranslationLanguage(code: "de", name: "德语")
-    ]
+        TranslationLanguage(code: "en", name: L10n.languageEnglish),
+        TranslationLanguage(code: "ja", name: L10n.languageJapanese),
+        TranslationLanguage(code: "ko", name: L10n.languageKorean),
+        TranslationLanguage(code: "fr", name: L10n.languageFrench),
+        TranslationLanguage(code: "de", name: L10n.languageGerman)
+    ] }
 
-    static let supportedSources: [TranslationLanguage] = [
+    static var supportedSources: [TranslationLanguage] { [
         defaultTarget,
-        TranslationLanguage(code: "zh-Hant", name: "繁体中文"),
-        TranslationLanguage(code: "en", name: "英语"),
-        TranslationLanguage(code: "ja", name: "日语"),
-        TranslationLanguage(code: "ko", name: "韩语"),
-        TranslationLanguage(code: "fr", name: "法语"),
-        TranslationLanguage(code: "de", name: "德语")
-    ]
+        TranslationLanguage(code: "zh-Hant", name: L10n.languageZhHant),
+        TranslationLanguage(code: "en", name: L10n.languageEnglish),
+        TranslationLanguage(code: "ja", name: L10n.languageJapanese),
+        TranslationLanguage(code: "ko", name: L10n.languageKorean),
+        TranslationLanguage(code: "fr", name: L10n.languageFrench),
+        TranslationLanguage(code: "de", name: L10n.languageGerman)
+    ] }
 
     static func name(for code: String) -> String {
         supported.first { $0.code == code }?.name

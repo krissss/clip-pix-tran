@@ -24,9 +24,9 @@ final class TranslationController {
     private(set) var speechErrorMessage: String?
     var lastErrorMessage: String?
 
-    private static let defaultIdleMessage = "输入文本后点击翻译，结果会显示在这里。"
-    private static let historyIdleMessage = "载入历史记录后，可点击翻译刷新其它 provider。"
-    private static let disabledProviderMessage = "此 provider 已在设置中关闭。"
+    private static var defaultIdleMessage: String { L10n.tranDefaultIdleMessage }
+    private static var historyIdleMessage: String { L10n.tranHistoryIdleMessage }
+    private static var disabledProviderMessage: String { L10n.tranDisabledProviderMessage }
     private static let languageDetectionThreshold = 0.3
 
     var enabledProviders: [TranslationProvider] {
@@ -243,7 +243,7 @@ final class TranslationController {
         isTranslating = true
         lastErrorMessage = nil
         speechErrorMessage = nil
-        setActiveProviderStates(status: .loading("正在翻译..."), result: nil)
+        setActiveProviderStates(status: .loading(L10n.tranTranslating), result: nil)
         defer { isTranslating = false }
 
         let languageResolution = resolveLanguages(for: trimmedText)
@@ -459,6 +459,40 @@ final class TranslationController {
         history.clear()
     }
 
+    func refreshLocalizedMessages(languageCode: String? = nil) {
+        let languageCode = languageCode ?? LocalizationPreference.effectiveLanguageCode
+        providerStates = providerStates.map { state in
+            guard case .idle(let message) = state.status,
+                  state.result == nil else {
+                return state
+            }
+
+            let localizedMessage: String
+            switch message {
+            case Self.defaultIdleMessage,
+                 L10n.tr("tran.defaultIdleMessage", "", languageCode: "en"),
+                 L10n.tr("tran.defaultIdleMessage", "", languageCode: "zh-Hans"):
+                localizedMessage = L10n.tr("tran.defaultIdleMessage", "", languageCode: languageCode)
+            case Self.historyIdleMessage,
+                 L10n.tr("tran.historyIdleMessage", "", languageCode: "en"),
+                 L10n.tr("tran.historyIdleMessage", "", languageCode: "zh-Hans"):
+                localizedMessage = L10n.tr("tran.historyIdleMessage", "", languageCode: languageCode)
+            case Self.disabledProviderMessage,
+                 L10n.tr("tran.disabledProviderMessage", "", languageCode: "en"),
+                 L10n.tr("tran.disabledProviderMessage", "", languageCode: "zh-Hans"):
+                localizedMessage = L10n.tr("tran.disabledProviderMessage", "", languageCode: languageCode)
+            default:
+                return state
+            }
+
+            return TranslationProviderState(
+                provider: state.provider,
+                status: .idle(localizedMessage),
+                result: nil
+            )
+        }
+    }
+
     private func setActiveProviderStates(
         status: TranslationProviderStatus,
         result: TranslationResult?
@@ -658,7 +692,7 @@ final class TranslationController {
                 self?.speakingTarget = nil
                 self?.activeSpeechProviderID = nil
                 if let error {
-                    self?.speechErrorMessage = "发音失败：\(error.localizedDescription)"
+                    self?.speechErrorMessage = L10n.tranSpeechFailed(error.localizedDescription)
                 }
             }
         )
@@ -699,7 +733,7 @@ enum TranslationValidationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .emptySource:
-            "请输入要翻译的文本。"
+            L10n.tranEmptySourceError
         }
     }
 }

@@ -7,22 +7,22 @@ struct AppSettingsView: View {
     @Bindable var translationController: TranslationController
     @Bindable var dockIconPreference: DockIconPreference
     @Bindable var launchAtLoginPreference: LaunchAtLoginPreference
+    @Bindable var localizationPreference: LocalizationPreference
     @Bindable var updateManager: AppUpdateManager
     let openOnboardingAction: () -> Void
     @State private var selectedPane: SettingsPane = .general
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("设置")
-                        .font(.headline)
-                }
-
-                Spacer()
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L10n.appSettings)
+                    .font(.headline)
+                    .lineLimit(1)
 
                 SettingsPaneToolbar(selectedPane: $selectedPane)
+                    .layoutPriority(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
@@ -44,6 +44,7 @@ struct AppSettingsView: View {
             GeneralSettingsSection(
                 preference: dockIconPreference,
                 launchAtLoginPreference: launchAtLoginPreference,
+                localizationPreference: localizationPreference,
                 openOnboardingAction: openOnboardingAction
             )
         case .shortcuts:
@@ -73,9 +74,9 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general:
-            "通用"
+            L10n.settingsGeneral
         case .shortcuts:
-            "快捷键"
+            L10n.settingsShortcuts
         case .clip:
             "Clip"
         case .pix:
@@ -83,7 +84,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         case .tran:
             "Tran"
         case .about:
-            "关于"
+            L10n.settingsAbout
         }
     }
 
@@ -109,14 +110,15 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 private struct GeneralSettingsSection: View {
     @Bindable var preference: DockIconPreference
     @Bindable var launchAtLoginPreference: LaunchAtLoginPreference
+    @Bindable var localizationPreference: LocalizationPreference
     let openOnboardingAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SettingsGroup(title: "启动") {
+            SettingsGroup(title: L10n.settingsStartup) {
                 VStack(spacing: 0) {
                     toggleRow(
-                        "开机时启动 ClipPixTran",
+                        L10n.settingsLaunchAtLogin,
                         isOn: launchesAtLogin
                     )
                     .disabled(launchAtLoginPreference.isToggleDisabled)
@@ -126,30 +128,45 @@ private struct GeneralSettingsSection: View {
 
             SettingsFootnote(launchAtLoginPreference.statusMessage)
 
-            SettingsGroup(title: "Dock") {
+            SettingsGroup(title: L10n.settingsDock) {
                 VStack(spacing: 0) {
                     toggleRow(
-                        "关闭主窗口后隐藏 Dock 图标",
+                        L10n.settingsHideDockIcon,
                         isOn: hidesDockIconWhenMainWindowClosed
                     )
                 }
                 .settingsRowGroup()
             }
 
-            SettingsGroup(title: "引导") {
+            SettingsGroup(title: L10n.languageHeader) {
                 VStack(spacing: 0) {
-                    SettingsFormRow(title: "首次启动引导") {
+                    SettingsFormRow(title: L10n.languageHeader) {
+                        Picker("", selection: appLanguage) {
+                            ForEach(AppLanguage.allCases) { language in
+                                Text(language.displayName).tag(language)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                }
+                .settingsRowGroup()
+            }
+
+            SettingsGroup(title: L10n.settingsOnboarding) {
+                VStack(spacing: 0) {
+                    SettingsFormRow(title: L10n.settingsFirstLaunchOnboarding) {
                         Button {
                             openOnboardingAction()
                         } label: {
-                            Label("重新打开", systemImage: "sparkles.rectangle.stack")
+                            Label(L10n.settingsReopen, systemImage: "sparkles.rectangle.stack")
                         }
                     }
                 }
                 .settingsRowGroup()
             }
 
-            SettingsFootnote("开启 Dock 隐藏后，关闭主窗口时应用会留在菜单栏；首次引导可随时重新打开。")
+            SettingsFootnote(L10n.settingsGeneralFootnote)
         }
         .onAppear {
             launchAtLoginPreference.refresh()
@@ -171,6 +188,14 @@ private struct GeneralSettingsSection: View {
             preference.updateHidesDockIconWhenMainWindowClosed(newValue)
         }
     }
+
+    private var appLanguage: Binding<AppLanguage> {
+        Binding {
+            localizationPreference.language
+        } set: { newValue in
+            localizationPreference.updateLanguage(newValue)
+        }
+    }
 }
 
 private struct SettingsPaneToolbar: View {
@@ -190,9 +215,13 @@ private struct SettingsPaneToolbar: View {
 
                         Text(pane.title)
                             .font(.caption)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .foregroundStyle(selectedPane == pane ? Color.accentColor : Color.secondary)
-                    .frame(width: 62, height: 30)
+                    .padding(.horizontal, 8)
+                    .frame(minWidth: ControlPanelDesign.Layout.Settings.paneTabMinWidth, minHeight: 30)
+                    .fixedSize(horizontal: true, vertical: false)
                     .controlPanelRoundedSurface(
                         background: ControlPanelDesign.selectedFill(
                             tint: Color.accentColor,
@@ -231,7 +260,7 @@ private struct SettingsContentPanel<Content: View>: View {
 
 private struct ShortcutsSettingsSection: View {
     var body: some View {
-        SettingsGroup(title: "全局快捷键") {
+        SettingsGroup(title: L10n.settingsGlobalShortcuts) {
             VStack(spacing: 0) {
                 ForEach(AppKeyboardShortcut.all) { shortcut in
                     shortcutRow(shortcut)
@@ -243,8 +272,7 @@ private struct ShortcutsSettingsSection: View {
 
     private func shortcutRow(_ shortcut: AppKeyboardShortcut) -> some View {
         SettingsFormRow(title: shortcut.title) {
-            KeyboardShortcuts.Recorder("", name: shortcut.name)
-                .labelsHidden()
+            LocalizedShortcutRecorder(name: shortcut.name)
         }
     }
 }
@@ -253,11 +281,11 @@ private struct ClipSettingsSection: View {
     @Bindable var history: ClipboardHistoryStore
 
     var body: some View {
-        SettingsGroup(title: "历史") {
+        SettingsGroup(title: L10n.settingsHistory) {
             VStack(spacing: 0) {
-                toggleRow("重启后保留剪贴板历史", isOn: persistsHistory)
+                toggleRow(L10n.settingsPersistClipboardHistory, isOn: persistsHistory)
                 historyLimitRow(
-                    title: "普通历史上限",
+                    title: L10n.settingsNormalHistoryLimit,
                     value: maximumNormalItems,
                     range: 10...200,
                     step: 10
@@ -266,7 +294,7 @@ private struct ClipSettingsSection: View {
             .settingsRowGroup()
         }
 
-        SettingsFootnote("关闭保留历史后，已保存的剪贴板历史文件会被删除。")
+        SettingsFootnote(L10n.settingsClipHistoryFootnote)
     }
 
     private var maximumNormalItems: Binding<Double> {
@@ -290,11 +318,11 @@ private struct PixSettingsSection: View {
     @Bindable var history: ScreenshotHistoryStore
 
     var body: some View {
-        SettingsGroup(title: "历史") {
+        SettingsGroup(title: L10n.settingsHistory) {
             VStack(spacing: 0) {
-                toggleRow("重启后保留截图历史", isOn: persistsHistory)
+                toggleRow(L10n.settingsPersistScreenshotHistory, isOn: persistsHistory)
                 historyLimitRow(
-                    title: "截图历史上限",
+                    title: L10n.settingsScreenshotHistoryLimit,
                     value: maximumItems,
                     range: 5...200,
                     step: 5
@@ -303,7 +331,7 @@ private struct PixSettingsSection: View {
             .settingsRowGroup()
         }
 
-        SettingsFootnote("截图可能包含敏感信息；开启保留历史后，会把最近截图保存到本机应用支持目录。")
+        SettingsFootnote(L10n.settingsPixHistoryFootnote)
     }
 
     private var maximumItems: Binding<Double> {
@@ -328,9 +356,9 @@ private struct TranSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SettingsGroup(title: "默认语言") {
+            SettingsGroup(title: L10n.settingsDefaultLanguages) {
                 VStack(spacing: 0) {
-                    SettingsFormRow(title: "默认原文语言") {
+                    SettingsFormRow(title: L10n.settingsDefaultSourceLanguage) {
                         Picker("", selection: sourceLanguageSelection) {
                             Text(TranslationLanguage.automaticSourceName)
                                 .tag(TranslationLanguage.automaticSourceCode)
@@ -342,7 +370,7 @@ private struct TranSettingsSection: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                     }
-                    SettingsFormRow(title: "默认目标语言") {
+                    SettingsFormRow(title: L10n.settingsDefaultTargetLanguage) {
                         Picker("", selection: targetLanguageSelection) {
                             ForEach(TranslationLanguage.supported) { language in
                                 Text(language.name).tag(language.code)
@@ -355,7 +383,7 @@ private struct TranSettingsSection: View {
                 .settingsRowGroup()
             }
 
-            SettingsGroup(title: "翻译服务") {
+            SettingsGroup(title: L10n.settingsTranslationServices) {
                 VStack(spacing: 0) {
                     ForEach(TranslationProviderDescriptor.builtIn) { provider in
                         providerToggleRow(provider)
@@ -364,9 +392,9 @@ private struct TranSettingsSection: View {
                 .settingsRowGroup()
             }
 
-            SettingsGroup(title: "发音服务") {
+            SettingsGroup(title: L10n.settingsSpeechServices) {
                 VStack(spacing: 0) {
-                    SettingsFormRow(title: "默认发音") {
+                    SettingsFormRow(title: L10n.settingsDefaultSpeech) {
                         Picker("", selection: speechProviderSelection) {
                             ForEach(TranslationSpeechProviderDescriptor.builtIn) { provider in
                                 Label(provider.name, systemImage: provider.systemImage)
@@ -409,14 +437,14 @@ private struct TranSettingsSection: View {
                 }
                 .settingsRowGroup()
 
-                SettingsFootnote("MiMo 发音：Base URL 可填到 host 或 /v1；TTS Voice 使用 mimo_default、Chloe 等，alloy 会自动按 mimo_default 处理。")
+                SettingsFootnote(L10n.settingsMimoFootnote)
             }
 
-            SettingsGroup(title: "历史") {
+            SettingsGroup(title: L10n.settingsHistory) {
                 VStack(spacing: 0) {
-                    toggleRow("重启后保留翻译历史", isOn: persistsHistory)
+                    toggleRow(L10n.settingsPersistTranslationHistory, isOn: persistsHistory)
                     historyLimitRow(
-                        title: "翻译历史上限",
+                        title: L10n.settingsTranslationHistoryLimit,
                         value: maximumItems,
                         range: 10...200,
                         step: 10
@@ -426,7 +454,7 @@ private struct TranSettingsSection: View {
             }
         }
 
-        SettingsFootnote("目标语言默认跟随系统；发音默认使用系统语音；翻译历史会保存到本机。")
+        SettingsFootnote(L10n.settingsTranFootnote)
     }
 
     private var targetLanguageSelection: Binding<String> {
@@ -464,7 +492,7 @@ private struct TranSettingsSection: View {
                     .foregroundStyle(.primary)
 
                 if provider.requiresConfiguration {
-                    Text("需要配置")
+                    Text(L10n.settingsRequiresConfiguration)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -595,9 +623,9 @@ private struct AboutSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsGroup(title: "更新") {
+            SettingsGroup(title: L10n.settingsUpdates) {
                 VStack(spacing: 0) {
-                    SettingsFormRow(title: "当前版本") {
+                    SettingsFormRow(title: L10n.settingsCurrentVersion) {
                         HStack(spacing: 8) {
                             Text(appVersionText)
                                 .font(.callout.monospacedDigit())
@@ -608,12 +636,12 @@ private struct AboutSettingsSection: View {
                         }
                     }
 
-                    toggleRow("自动检查更新", isOn: automaticallyChecksForUpdates)
+                    toggleRow(L10n.settingsAutoCheckUpdates, isOn: automaticallyChecksForUpdates)
                         .disabled(!updateManager.updateCheckingIsAvailable)
-                    toggleRow("自动下载更新", isOn: automaticallyDownloadsUpdates)
+                    toggleRow(L10n.settingsAutoDownloadUpdates, isOn: automaticallyDownloadsUpdates)
                         .disabled(!updateManager.updateCheckingIsAvailable)
 
-                    SettingsFormRow(title: "检查频率") {
+                    SettingsFormRow(title: L10n.settingsCheckFrequency) {
                         Picker("", selection: updateCheckInterval) {
                             ForEach(UpdateCheckInterval.allCases) { interval in
                                 Text(interval.displayName).tag(interval)
@@ -624,7 +652,7 @@ private struct AboutSettingsSection: View {
                         .disabled(!updateManager.updateCheckingIsAvailable)
                     }
 
-                    SettingsFormRow(title: "上次检查") {
+                    SettingsFormRow(title: L10n.settingsLastChecked) {
                         HStack(spacing: 10) {
                             Text(lastUpdateCheckText)
                                 .font(.callout)
@@ -634,7 +662,7 @@ private struct AboutSettingsSection: View {
                             Button {
                                 updateManager.checkForUpdates()
                             } label: {
-                                Label("检查更新", systemImage: "arrow.clockwise")
+                                Label(L10n.settingsCheckUpdates, systemImage: "arrow.clockwise")
                             }
                             .controlSize(.small)
                             .disabled(!updateManager.canCheckForUpdates)
@@ -649,7 +677,7 @@ private struct AboutSettingsSection: View {
     }
 
     private var appVersionText: String {
-        let version = bundleInfoValue("CFBundleShortVersionString") ?? "未知"
+        let version = bundleInfoValue("CFBundleShortVersionString") ?? L10n.settingsUnknown
         guard let build = bundleInfoValue("CFBundleVersion"),
               build != version else {
             return version
@@ -660,7 +688,7 @@ private struct AboutSettingsSection: View {
 
     private var lastUpdateCheckText: String {
         guard let date = updateManager.lastUpdateCheckDate else {
-            return "从未检查"
+            return L10n.settingsNeverChecked
         }
 
         return date.formatted(date: .numeric, time: .shortened)
@@ -714,7 +742,7 @@ private struct DebugSettingsBadge: View {
                 RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
                     .fill(Color(nsColor: .systemRed).opacity(0.12))
             }
-            .accessibilityLabel("Debug 构建")
+            .accessibilityLabel(L10n.appDebugBuild)
     }
 }
 #endif
@@ -823,6 +851,7 @@ private func historyLimitRow(
         ),
         dockIconPreference: DockIconPreference(),
         launchAtLoginPreference: LaunchAtLoginPreference(),
+        localizationPreference: LocalizationPreference(),
         updateManager: AppUpdateManager(),
         openOnboardingAction: {}
     )

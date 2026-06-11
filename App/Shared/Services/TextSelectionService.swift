@@ -43,7 +43,7 @@ enum TextSelectionError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .noSelection:
-            "没有检测到选中文本。"
+            L10n.textSelectionNoSelection
         }
     }
 }
