@@ -99,8 +99,8 @@ enum L10n {
             "app.settings": "Settings",
             "app.openSettings": "Open Settings",
             "app.debugBuild": "Debug Build",
-            "app.debugBuild.title": "Debug Build · %@",
-            "app.quit": "Quit %@",
+            "app.debugBuild.title": "Debug Build",
+            "app.quit": "Quit",
             "app.reopenOnboarding": "Reopen Onboarding",
 
             "language.header": "Language",
@@ -109,8 +109,9 @@ enum L10n {
             "settings.shortcuts": "Shortcuts",
             "settings.about": "About",
             "settings.startup": "Startup",
-            "settings.launchAtLogin": "Launch %@ at Login",
+            "settings.launchAtLogin": "Launch at Login",
             "settings.dock": "Dock",
+            "settings.interfaceLanguage": "Interface Language",
             "settings.hideDockIcon": "Hide Dock Icon After Closing Main Window",
             "settings.onboarding": "Onboarding",
             "settings.firstLaunchOnboarding": "First Launch Onboarding",
@@ -357,12 +358,12 @@ enum L10n {
             "recording.gifDestinationFailed": "Could not create the GIF file.",
             "recording.gifFrameGenerationFailed": "Could not generate GIF frames from the recording.",
             "recording.cancel": "Cancel Recording",
-            "launchAtLogin.disabledMessage": "When disabled, %@ will not start automatically when you log in.",
-            "launchAtLogin.enabledMessage": "Enabled. %@ will start automatically when you log in.",
-            "launchAtLogin.requiresApprovalMessage": "Launch at login was requested. Allow %@ in System Settings login items.",
+            "launchAtLogin.disabledMessage": "When disabled, this app will not start automatically when you log in.",
+            "launchAtLogin.enabledMessage": "Enabled. This app will start automatically when you log in.",
+            "launchAtLogin.requiresApprovalMessage": "Launch at login was requested. Allow this app in System Settings login items.",
             "launchAtLogin.unavailableMessage": "This build cannot register as a login item.",
             "launchAtLogin.updateFailed": "Could not update launch at login: %@",
-            "onboarding.windowTitle": "%@ Ready",
+            "onboarding.windowTitle": "Ready",
             "onboarding.ready": "Ready",
             "onboarding.skipNote": "You can skip onboarding and reopen it later from Settings.",
             "onboarding.screenRecordingExplanation": "Pix needs screen access for screenshots, region selection, and recording.",
@@ -392,11 +393,11 @@ enum L10n {
             "update.checkingProgress": "Checking for updates...",
             "update.downloadingProgress": "Downloading update...",
             "update.extractingProgress": "Preparing update...",
-            "update.readyToInstallMessage": "The update is ready. %@ will relaunch after installation.",
+            "update.readyToInstallMessage": "The update is ready. The app will relaunch after installation.",
             "update.installingProgress": "Installing update...",
             "update.installedMessage": "The update has been installed.",
-            "update.alreadyLatestMessage": "%@ is up to date.",
-            "update.checkFailedMessage": "%@ could not complete the update check.",
+            "update.alreadyLatestMessage": "The app is up to date.",
+            "update.checkFailedMessage": "Could not complete the update check.",
             "update.skipVersion": "Skip This Version",
             "update.releaseNotes": "Release Notes",
             "update.titleAlreadyLatest": "Up to Date",
@@ -404,8 +405,8 @@ enum L10n {
             "update.titleReadyToInstall": "Ready to Install",
             "update.titleInstalling": "Installing Update...",
             "update.titleInstalled": "Update Installed",
-            "update.windowTitle": "%@ Updates",
-            "update.availableTitle": "%@ %@ Available",
+            "update.windowTitle": "Updates",
+            "update.availableTitle": "%@ Available",
             "update.versionSubtitle": "Current %@ -> Latest %@",
             "update.installAndRelaunch": "Install and Relaunch",
             "update.install": "Install Update",
@@ -424,8 +425,8 @@ enum L10n {
             "app.settings": "设置",
             "app.openSettings": "打开设置",
             "app.debugBuild": "Debug 构建",
-            "app.debugBuild.title": "Debug 构建 · %@",
-            "app.quit": "退出 %@",
+            "app.debugBuild.title": "Debug 构建",
+            "app.quit": "退出",
             "app.reopenOnboarding": "重新打开引导",
 
             "language.header": "语言",
@@ -434,8 +435,9 @@ enum L10n {
             "settings.shortcuts": "快捷键",
             "settings.about": "关于",
             "settings.startup": "启动",
-            "settings.launchAtLogin": "开机时启动 %@",
+            "settings.launchAtLogin": "开机时启动",
             "settings.dock": "Dock",
+            "settings.interfaceLanguage": "界面语言",
             "settings.hideDockIcon": "关闭主窗口后隐藏 Dock 图标",
             "settings.onboarding": "引导",
             "settings.firstLaunchOnboarding": "首次启动引导",
@@ -682,12 +684,12 @@ enum L10n {
             "recording.gifDestinationFailed": "无法创建 GIF 文件。",
             "recording.gifFrameGenerationFailed": "无法从录屏中生成 GIF 帧。",
             "recording.cancel": "取消录屏",
-            "launchAtLogin.disabledMessage": "关闭后，%@ 不会随系统登录自动启动。",
-            "launchAtLogin.enabledMessage": "已开启，系统登录后会自动启动 %@。",
-            "launchAtLogin.requiresApprovalMessage": "已请求开机启动，请在系统设置的登录项中允许 %@。",
+            "launchAtLogin.disabledMessage": "关闭后，此应用不会随系统登录自动启动。",
+            "launchAtLogin.enabledMessage": "已开启，系统登录后会自动启动此应用。",
+            "launchAtLogin.requiresApprovalMessage": "已请求开机启动，请在系统设置的登录项中允许此应用。",
             "launchAtLogin.unavailableMessage": "当前构建无法注册为登录项。",
             "launchAtLogin.updateFailed": "无法更新开机启动设置：%@",
-            "onboarding.windowTitle": "%@ 准备使用",
+            "onboarding.windowTitle": "准备使用",
             "onboarding.ready": "准备使用",
             "onboarding.skipNote": "你可以跳过引导，之后从设置里重新打开。",
             "onboarding.screenRecordingExplanation": "Pix 需要读取屏幕内容来完成截图、区域选择和录屏。",
@@ -717,11 +719,11 @@ enum L10n {
             "update.checkingProgress": "正在检查更新...",
             "update.downloadingProgress": "正在下载更新...",
             "update.extractingProgress": "正在准备更新...",
-            "update.readyToInstallMessage": "更新已准备好。安装完成后 %@ 会重新启动。",
+            "update.readyToInstallMessage": "更新已准备好。安装完成后应用会重新启动。",
             "update.installingProgress": "正在安装更新...",
             "update.installedMessage": "更新已安装完成。",
-            "update.alreadyLatestMessage": "%@ 已经是最新版本。",
-            "update.checkFailedMessage": "%@ 无法完成更新检查。",
+            "update.alreadyLatestMessage": "应用已经是最新版本。",
+            "update.checkFailedMessage": "无法完成更新检查。",
             "update.skipVersion": "跳过此版本",
             "update.releaseNotes": "更新内容",
             "update.titleAlreadyLatest": "已是最新版本",
@@ -729,8 +731,8 @@ enum L10n {
             "update.titleReadyToInstall": "可以安装了",
             "update.titleInstalling": "正在安装更新...",
             "update.titleInstalled": "更新已安装",
-            "update.windowTitle": "%@ 更新",
-            "update.availableTitle": "%@ %@ 可用",
+            "update.windowTitle": "更新",
+            "update.availableTitle": "%@ 可用",
             "update.versionSubtitle": "当前 %@ -> 最新 %@",
             "update.installAndRelaunch": "安装并重启",
             "update.install": "安装更新",
@@ -752,8 +754,8 @@ extension L10n {
     static var appSettings: String { tr("app.settings", "设置") }
     static var appOpenSettings: String { tr("app.openSettings", "打开设置") }
     static var appDebugBuild: String { tr("app.debugBuild", "Debug 构建") }
-    static var appDebugBuildTitle: String { format("app.debugBuild.title", "Debug 构建 · %@", appName) }
-    static var appQuit: String { format("app.quit", "退出 %@", appName) }
+    static var appDebugBuildTitle: String { tr("app.debugBuild.title", "Debug 构建") }
+    static var appQuit: String { tr("app.quit", "退出") }
     static var appReopenOnboarding: String { tr("app.reopenOnboarding", "重新打开引导") }
 
     static var languageHeader: String { tr("language.header", "语言") }
@@ -762,8 +764,9 @@ extension L10n {
     static var settingsShortcuts: String { tr("settings.shortcuts", "快捷键") }
     static var settingsAbout: String { tr("settings.about", "关于") }
     static var settingsStartup: String { tr("settings.startup", "启动") }
-    static var settingsLaunchAtLogin: String { format("settings.launchAtLogin", "开机时启动 %@", appName) }
+    static var settingsLaunchAtLogin: String { tr("settings.launchAtLogin", "开机时启动") }
     static var settingsDock: String { tr("settings.dock", "Dock") }
+    static var settingsInterfaceLanguage: String { tr("settings.interfaceLanguage", "界面语言") }
     static var settingsHideDockIcon: String { tr("settings.hideDockIcon", "关闭主窗口后隐藏 Dock 图标") }
     static var settingsOnboarding: String { tr("settings.onboarding", "引导") }
     static var settingsFirstLaunchOnboarding: String { tr("settings.firstLaunchOnboarding", "首次启动引导") }
@@ -1035,20 +1038,14 @@ extension L10n {
     static var recordingGIFDestinationFailed: String { tr("recording.gifDestinationFailed", "无法创建 GIF 文件。") }
     static var recordingGIFFrameGenerationFailed: String { tr("recording.gifFrameGenerationFailed", "无法从录屏中生成 GIF 帧。") }
     static var recordingCancel: String { tr("recording.cancel", "取消录屏") }
-    static var launchAtLoginDisabledMessage: String {
-        format("launchAtLogin.disabledMessage", "关闭后，%@ 不会随系统登录自动启动。", appName)
-    }
-    static var launchAtLoginEnabledMessage: String {
-        format("launchAtLogin.enabledMessage", "已开启，系统登录后会自动启动 %@。", appName)
-    }
-    static var launchAtLoginRequiresApprovalMessage: String {
-        format("launchAtLogin.requiresApprovalMessage", "已请求开机启动，请在系统设置的登录项中允许 %@。", appName)
-    }
+    static var launchAtLoginDisabledMessage: String { tr("launchAtLogin.disabledMessage", "关闭后，此应用不会随系统登录自动启动。") }
+    static var launchAtLoginEnabledMessage: String { tr("launchAtLogin.enabledMessage", "已开启，系统登录后会自动启动此应用。") }
+    static var launchAtLoginRequiresApprovalMessage: String { tr("launchAtLogin.requiresApprovalMessage", "已请求开机启动，请在系统设置的登录项中允许此应用。") }
     static var launchAtLoginUnavailableMessage: String { tr("launchAtLogin.unavailableMessage", "当前构建无法注册为登录项。") }
     static func launchAtLoginUpdateFailed(_ message: String) -> String {
         format("launchAtLogin.updateFailed", "无法更新开机启动设置：%@", message)
     }
-    static var onboardingWindowTitle: String { format("onboarding.windowTitle", "%@ 准备使用", appName) }
+    static var onboardingWindowTitle: String { tr("onboarding.windowTitle", "准备使用") }
     static var onboardingReady: String { tr("onboarding.ready", "准备使用") }
     static var onboardingSkipNote: String { tr("onboarding.skipNote", "你可以跳过引导，之后从设置里重新打开。") }
     static var onboardingScreenRecordingExplanation: String { tr("onboarding.screenRecordingExplanation", "Pix 需要读取屏幕内容来完成截图、区域选择和录屏。") }
@@ -1084,17 +1081,11 @@ extension L10n {
     static var updateCheckingProgress: String { tr("update.checkingProgress", "正在检查更新...") }
     static var updateDownloadingProgress: String { tr("update.downloadingProgress", "正在下载更新...") }
     static var updateExtractingProgress: String { tr("update.extractingProgress", "正在准备更新...") }
-    static var updateReadyToInstallMessage: String {
-        format("update.readyToInstallMessage", "更新已准备好。安装完成后 %@ 会重新启动。", appName)
-    }
+    static var updateReadyToInstallMessage: String { tr("update.readyToInstallMessage", "更新已准备好。安装完成后应用会重新启动。") }
     static var updateInstallingProgress: String { tr("update.installingProgress", "正在安装更新...") }
     static var updateInstalledMessage: String { tr("update.installedMessage", "更新已安装完成。") }
-    static var updateAlreadyLatestMessage: String {
-        format("update.alreadyLatestMessage", "%@ 已经是最新版本。", appName)
-    }
-    static var updateCheckFailedMessage: String {
-        format("update.checkFailedMessage", "%@ 无法完成更新检查。", appName)
-    }
+    static var updateAlreadyLatestMessage: String { tr("update.alreadyLatestMessage", "应用已经是最新版本。") }
+    static var updateCheckFailedMessage: String { tr("update.checkFailedMessage", "无法完成更新检查。") }
     static var updateSkipVersion: String { tr("update.skipVersion", "跳过此版本") }
     static var updateReleaseNotes: String { tr("update.releaseNotes", "更新内容") }
     static var updateTitleAlreadyLatest: String { tr("update.titleAlreadyLatest", "已是最新版本") }
@@ -1102,9 +1093,9 @@ extension L10n {
     static var updateTitleReadyToInstall: String { tr("update.titleReadyToInstall", "可以安装了") }
     static var updateTitleInstalling: String { tr("update.titleInstalling", "正在安装更新...") }
     static var updateTitleInstalled: String { tr("update.titleInstalled", "更新已安装") }
-    static var updateWindowTitle: String { format("update.windowTitle", "%@ 更新", appName) }
+    static var updateWindowTitle: String { tr("update.windowTitle", "更新") }
     static func updateAvailableTitle(_ version: String) -> String {
-        format("update.availableTitle", "%@ %@ 可用", appName, version)
+        format("update.availableTitle", "%@ 可用", version)
     }
     static func updateVersionSubtitle(current: String, latest: String) -> String {
         format("update.versionSubtitle", "当前 %@ -> 最新 %@", current, latest)

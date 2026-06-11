@@ -12,25 +12,29 @@ struct PixCaptureControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Button(action: captureSelectedRegionAction) {
-                    PixCaptureButtonLabel(title: L10n.pixCaptureSelected, systemImage: "selection.pin.in.out")
-                }
-                .buttonStyle(captureButtonStyle)
-                .help(L10n.pixCaptureSelectedHelp)
+                captureActionButton(
+                    title: L10n.pixCaptureSelected,
+                    systemImage: "selection.pin.in.out",
+                    help: L10n.pixCaptureSelectedHelp,
+                    action: captureSelectedRegionAction
+                )
 
-                Button(action: startRecordingAction) {
-                    PixCaptureButtonLabel(title: L10n.pixRecordSelected, systemImage: "record.circle")
-                }
-                .buttonStyle(captureButtonStyle)
-                .help(L10n.pixRecordSelectedHelp)
+                captureActionButton(
+                    title: L10n.pixRecordSelected,
+                    systemImage: "record.circle",
+                    help: L10n.pixRecordSelectedHelp,
+                    action: startRecordingAction
+                )
 
-                Button(action: captureMainDisplayAction) {
-                    PixCaptureButtonLabel(title: L10n.pixFullScreen, systemImage: "display")
-                }
-                .buttonStyle(captureButtonStyle)
-                .help(L10n.pixCaptureFullScreenHelp)
+                captureActionButton(
+                    title: L10n.pixFullScreen,
+                    systemImage: "display",
+                    help: L10n.pixCaptureFullScreenHelp,
+                    action: captureMainDisplayAction
+                )
             }
             .disabled(isCapturing || isRecording)
+            .opacity(isCapturing || isRecording ? 0.56 : 1)
 
             if isCapturing {
                 Button(action: stopCaptureAction) {
@@ -55,27 +59,29 @@ struct PixCaptureControls: View {
         .controlPanelRoundedSurface(background: ControlPanelDesign.embeddedPanelBackground)
     }
 
-    private var captureButtonStyle: ControlPanelButtonStyle {
-        ControlPanelButtonStyle(
-            tint: ControlPanelDesign.tint(for: .pix),
-            prominence: .primary
-        )
-    }
-}
-
-private struct PixCaptureButtonLabel: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 7) {
+    private func captureActionButton(
+        title: String,
+        systemImage: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .frame(width: 18, height: 18)
-
-            Text(title)
+                .frame(maxWidth: .infinity, minHeight: 34)
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .foregroundStyle(.white)
+        .background(
+            ControlPanelDesign.tint(for: .pix).opacity(0.88),
+            in: RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous))
+        .help(help)
+        .accessibilityLabel(title)
+        .accessibilityHint(help)
     }
 }

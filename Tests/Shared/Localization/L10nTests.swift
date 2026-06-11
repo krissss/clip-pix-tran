@@ -17,44 +17,18 @@ struct L10nTests {
 
         #expect(L10n.tr("app.name", "", languageCode: "en") == "ClipPixTran")
         #expect(L10n.tr("app.settings", "", languageCode: "en") == "Settings")
-        #expect(
-            L10n.format(
-                "settings.launchAtLogin",
-                "",
-                languageCode: "en",
-                "ClipPixTran"
-            ) == "Launch ClipPixTran at Login"
-        )
-        #expect(
-            L10n.format(
-                "onboarding.windowTitle",
-                "",
-                languageCode: "en",
-                "ClipPixTran"
-            ) == "ClipPixTran Ready"
-        )
+        #expect(L10n.tr("app.quit", "", languageCode: "en") == "Quit")
+        #expect(L10n.tr("settings.launchAtLogin", "", languageCode: "en") == "Launch at Login")
+        #expect(L10n.tr("onboarding.windowTitle", "", languageCode: "en") == "Ready")
 
         preference.updateLanguage(.simplifiedChinese)
         #expect(preference.language == .simplifiedChinese)
 
         #expect(L10n.tr("app.name", "", languageCode: "zh-Hans") == "ClipPixTran")
         #expect(L10n.tr("app.settings", "", languageCode: "zh-Hans") == "设置")
-        #expect(
-            L10n.format(
-                "settings.launchAtLogin",
-                "",
-                languageCode: "zh-Hans",
-                "ClipPixTran"
-            ) == "开机时启动 ClipPixTran"
-        )
-        #expect(
-            L10n.format(
-                "onboarding.windowTitle",
-                "",
-                languageCode: "zh-Hans",
-                "ClipPixTran"
-            ) == "ClipPixTran 准备使用"
-        )
+        #expect(L10n.tr("app.quit", "", languageCode: "zh-Hans") == "退出")
+        #expect(L10n.tr("settings.launchAtLogin", "", languageCode: "zh-Hans") == "开机时启动")
+        #expect(L10n.tr("onboarding.windowTitle", "", languageCode: "zh-Hans") == "准备使用")
     }
 
 }

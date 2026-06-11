@@ -528,7 +528,7 @@ final class ScreenshotController {
             do {
                 try await self?.recordingExporter.saveGIFFile(
                     from: url,
-                    suggestedFileName: self?.suggestedFileName(forRecording: item, extension: "gif") ?? "ClipPixTran.gif",
+                    suggestedFileName: self?.suggestedFileName(forRecording: item, extension: "gif") ?? "Pix.gif",
                     options: options
                 )
                 self?.clearLastError()
@@ -555,13 +555,13 @@ final class ScreenshotController {
     private func suggestedFileName(forRecording item: ScreenshotItem, extension fileExtension: String) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        return "ClipPixTran-\(formatter.string(from: item.createdAt)).\(fileExtension)"
+        return "Pix-\(formatter.string(from: item.createdAt)).\(fileExtension)"
     }
 
     private func suggestedFileName(createdAt: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        return "ClipPixTran-\(formatter.string(from: createdAt)).png"
+        return "Pix-\(formatter.string(from: createdAt)).png"
     }
 
     private func clearLastError() {

@@ -331,12 +331,12 @@ extension TranslationHistoryStore {
         let store = TranslationHistoryStore()
         store.record(
             request: TranslationRequest(
-                sourceText: "Hello ClipPixTran",
+                sourceText: "Hello",
                 targetLanguageCode: "zh-Hans",
                 sourceLanguageCode: "en"
             ),
             result: TranslationResult(
-                translatedText: "【简体中文】Hello ClipPixTran",
+                translatedText: "【简体中文】你好",
                 sourceLanguageCode: "en",
                 targetLanguageCode: "zh-Hans"
             )

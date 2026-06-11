@@ -143,7 +143,7 @@ nonisolated struct ScreenRecordingFileStore: ScreenRecordingFileManaging {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
         let timestamp = formatter.string(from: createdAt)
-        let fileName = "ClipPixTran-\(timestamp)-\(UUID().uuidString.prefix(8)).mp4"
+        let fileName = "Pix-\(timestamp)-\(UUID().uuidString.prefix(8)).mp4"
         return Self.defaultDirectoryURL.appending(path: fileName)
     }
 
@@ -262,7 +262,7 @@ nonisolated struct SystemScreenRecordingService: ScreenRecordingService {
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         configuration.capturesAudio = false
         configuration.captureMicrophone = false
-        configuration.streamName = "ClipPixTran Pix Recording"
+        configuration.streamName = "Pix Recording"
 
         let createdAt = Date()
         let outputURL = try fileStore.makeRecordingURL(createdAt: createdAt)

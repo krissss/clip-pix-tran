@@ -14,17 +14,11 @@ struct AppSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L10n.appSettings)
-                    .font(.headline)
-                    .lineLimit(1)
-
-                SettingsPaneToolbar(selectedPane: $selectedPane)
-                    .layoutPriority(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            SettingsPaneToolbar(selectedPane: $selectedPane)
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
 
             SettingsContentPanel {
                 selectedPaneView
@@ -140,7 +134,7 @@ private struct GeneralSettingsSection: View {
 
             SettingsGroup(title: L10n.languageHeader) {
                 VStack(spacing: 0) {
-                    SettingsFormRow(title: L10n.languageHeader) {
+                    SettingsFormRow(title: L10n.settingsInterfaceLanguage) {
                         Picker("", selection: appLanguage) {
                             ForEach(AppLanguage.allCases) { language in
                                 Text(language.displayName).tag(language)

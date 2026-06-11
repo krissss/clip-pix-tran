@@ -653,7 +653,7 @@ struct ScreenshotControllerTests {
         controller.save(item)
 
         #expect(fileSaver.savedData == data)
-        #expect(fileSaver.suggestedFileName?.hasPrefix("ClipPixTran-") == true)
+        #expect(fileSaver.suggestedFileName?.hasPrefix("Pix-") == true)
         #expect(fileSaver.suggestedFileName?.hasSuffix(".png") == true)
         #expect(controller.lastErrorMessage == nil)
         #expect(controller.lastCaptureError == nil)
