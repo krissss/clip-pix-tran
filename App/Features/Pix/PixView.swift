@@ -124,21 +124,31 @@ struct PixView: View {
             )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List(selection: $selectedItemID) {
+            List {
                 Section {
                     historyActions
                 }
 
                 ForEach(visibleItems) { item in
-                    ScreenshotItemRow(item: item)
-                        .tag(item.id)
-                        .controlPanelListRow(
-                            isSelected: item.id == selectedItemID,
-                            tint: ControlPanelDesign.tint(for: .pix)
-                        )
-                        .contextMenu {
-                            contextMenu(for: item)
-                        }
+                    Button {
+                        selectedItemID = item.id
+                    } label: {
+                        ScreenshotItemRow(item: item)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .controlPanelHistoryRow(
+                                isSelected: item.id == selectedItemID,
+                                tint: ControlPanelDesign.tint(for: .pix)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius, style: .continuous)
+                            .fill(Color.clear)
+                    )
+                    .contextMenu {
+                        contextMenu(for: item)
+                    }
                 }
             }
             .listStyle(.plain)
