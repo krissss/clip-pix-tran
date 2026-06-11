@@ -6,29 +6,31 @@
         <description>ClipPixTran 版本更新</description>
         <language>zh-CN</language>
         <item>
-            <title>ClipPixTran 0.3.0</title>
-            <sparkle:version>43</sparkle:version>
-            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <title>ClipPixTran 0.4.0</title>
+            <sparkle:version>53</sparkle:version>
+            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
-            <pubDate>Wed, 10 Jun 2026 15:57:31 +0000</pubDate>
+            <pubDate>Thu, 11 Jun 2026 15:14:59 +0000</pubDate>
             <description><![CDATA[<b>What&#x27;s Changed</b>
 <b>Added</b>
 <ul>
-<li>支持跨版本更新日志展示</li>
+<li>支持开机启动设置</li>
+<li>支持应用内语言切换</li>
 </ul>
 <b>Fixed</b>
 <ul>
-<li>修复 release workflow 认证</li>
-<li>优先响应 Debug 版全局快捷键</li>
-<li>统一更新提示 UI 风格</li>
-<li>禁用 Debug 构建更新检查</li>
+<li>validate release signing certificate</li>
+<li>clarify release certificate validation</li>
+<li>support legacy release certificates</li>
+<li>精简界面冗余文案</li>
+<li>优化翻译面板与预览布局</li>
 </ul>
-**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...v0.3.0]]></description>
+**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...v0.4.0]]></description>
             <enclosure
-                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.3.0/ClipPixTran-v0.3.0.zip"
-                sparkle:edSignature="cHFivTqif3uxfglZD4L/kEVv/mvI5dMK8m6fZB4NASh6O88poTDrvTsQa9NOL3ufNmAx2oeHcy84ZUrU0e+JBQ=="
-                length="3114718"
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.4.0/ClipPixTran-v0.4.0.zip"
+                sparkle:edSignature="DK6ZHI90gPWzLO8yFlE2Sj5dUd0dp0cI9uwu1m+5+WQapBk+Epzy3EIgJyiJPpFpRAJB30c2AMTeFqjNexDMDQ=="
+                length="3269506"
                 type="application/octet-stream"
             />
         </item>
