@@ -34,6 +34,7 @@ enum ScreenshotCaptureCompletion: Equatable, Sendable {
     case save
     case pinToScreen
     case startRecording
+    case recognizeText
 }
 
 struct ScreenshotCaptureOutput: Equatable, Sendable {

@@ -682,6 +682,7 @@ private struct RegionToolbarActions {
     let pin: () -> Void
     let copy: () -> Void
     let save: () -> Void
+    let recognizeText: () -> Void
     let cancel: () -> Void
     let finish: () -> Void
     let startRecording: () -> Void
@@ -1711,6 +1712,10 @@ private final class RegionSelectionView: NSView {
                 self?.commitTextEditor()
                 self?.actions.finish(.save)
             },
+            recognizeText: { [weak self] in
+                self?.commitTextEditor()
+                self?.actions.finish(.recognizeText)
+            },
             cancel: { [weak self] in
                 self?.actions.cancel()
             },
@@ -1909,6 +1914,10 @@ private struct RegionSelectionToolbarView: View {
                     .transition(.opacity)
             }
         }
+        // 预留悬停提示的绘制空间:选区工具栏运行在透明无边框窗口中,
+        // 提示气泡以 overlay 形式绘制在按钮下方,需要窗口在布局上预留高度,
+        // 否则会落在窗口边界外而不可见。
+        .padding(.bottom, 32)
         .fixedSize()
     }
 
@@ -1959,38 +1968,44 @@ private struct RegionSelectionToolbarView: View {
                     .frame(width: 22, height: 22)
             }
             .disabled(!state.canUndo)
-            .help(L10n.captureUndo)
+            .hoverTooltip(L10n.captureUndo)
 
             Button(action: actions.redo) {
                 Image(systemName: "arrow.uturn.forward")
                     .frame(width: 22, height: 22)
             }
             .disabled(!state.canRedo)
-            .help(L10n.captureRedo)
+            .hoverTooltip(L10n.captureRedo)
 
             Button(action: actions.pin) {
                 Image(systemName: "pin")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonPinToScreen)
+            .hoverTooltip(L10n.commonPinToScreen)
+
+            Button(action: actions.recognizeText) {
+                Image(systemName: "doc.text.viewfinder")
+                    .frame(width: 22, height: 22)
+            }
+            .hoverTooltip(L10n.pixOCRTool)
 
             Button(action: actions.save) {
                 Image(systemName: "square.and.arrow.down")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonSave)
+            .hoverTooltip(L10n.commonSave)
 
             Button(action: actions.cancel) {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonCancel)
+            .hoverTooltip(L10n.commonCancel)
 
             Button(action: actions.finish) {
                 Image(systemName: "checkmark")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonDone)
+            .hoverTooltip(L10n.commonDone)
             .keyboardShortcut(.return, modifiers: [])
         }
     }
@@ -2001,12 +2016,12 @@ private struct RegionSelectionToolbarView: View {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonCancel)
+            .hoverTooltip(L10n.commonCancel)
 
             Button(action: actions.startRecording) {
                 Label(L10n.captureStartRecording, systemImage: "record.circle")
             }
-            .help(L10n.captureStartRecording)
+            .hoverTooltip(L10n.captureStartRecording)
             .keyboardShortcut(.return, modifiers: [])
         }
     }
@@ -2034,7 +2049,8 @@ private struct RegionSelectionToolbarView: View {
             sizeDots(
                 values: [2, 4, 7],
                 selected: state.activeStyle.lineWidth,
-                action: actions.setLineWidth
+                action: actions.setLineWidth,
+                help: L10n.captureLineWidth
             )
         }
     }
@@ -2046,7 +2062,8 @@ private struct RegionSelectionToolbarView: View {
             sizeDots(
                 values: [16, 20, 26, 32],
                 selected: state.activeStyle.fontSize,
-                action: actions.setFontSize
+                action: actions.setFontSize,
+                help: L10n.captureFontSize
             )
         }
     }
@@ -2062,25 +2079,25 @@ private struct RegionSelectionToolbarView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 88)
-            .help(L10n.captureMosaicMode)
+            .hoverTooltip(L10n.captureMosaicMode)
 
             Divider().frame(height: 22)
 
             sizeDots(
                 values: [8, 14, 22, 32],
                 selected: state.activeStyle.mosaicBlockSize,
-                action: actions.setMosaicBlockSize
+                action: actions.setMosaicBlockSize,
+                help: L10n.captureMosaicBlockSize
             )
-            .help(L10n.captureMosaicBlockSize)
 
             if state.activeStyle.mosaicMode == .brush {
                 Divider().frame(height: 22)
                 sizeDots(
                     values: [16, 28, 44],
                     selected: state.activeStyle.mosaicBrushSize,
-                    action: actions.setMosaicBrushSize
+                    action: actions.setMosaicBrushSize,
+                    help: L10n.captureMosaicBrushSize
                 )
-                .help(L10n.captureMosaicBrushSize)
             }
         }
     }
@@ -2100,7 +2117,7 @@ private struct RegionSelectionToolbarView: View {
                         .frame(width: color == state.activeStyle.colorComponents ? 18 : 14, height: color == state.activeStyle.colorComponents ? 18 : 14)
                         .frame(width: 22, height: 22)
                 }
-                .help(L10n.captureColor)
+                .hoverTooltip(L10n.captureColor)
             }
         }
     }
@@ -2108,7 +2125,8 @@ private struct RegionSelectionToolbarView: View {
     private func sizeDots(
         values: [CGFloat],
         selected: CGFloat,
-        action: @escaping (CGFloat) -> Void
+        action: @escaping (CGFloat) -> Void,
+        help: String? = nil
     ) -> some View {
         HStack(spacing: 10) {
             ForEach(values, id: \.self) { value in
@@ -2124,6 +2142,7 @@ private struct RegionSelectionToolbarView: View {
                                 .fill(abs(value - selected) < 0.1 ? Color.accentColor.opacity(0.16) : .clear)
                         )
                 }
+                .hoverTooltip(help ?? "")
             }
         }
     }
@@ -2149,7 +2168,7 @@ private struct RegionSelectionToolbarView: View {
             Image(systemName: symbolName)
                 .frame(width: 22, height: 22)
         }
-        .help(title)
+        .hoverTooltip(title)
         .padding(5)
         .background(
             RoundedRectangle(cornerRadius: 5)
@@ -2168,16 +2187,17 @@ private struct RegionSelectionConfirmToolbarView: View {
                 Image(systemName: "xmark")
                     .frame(width: 22, height: 22)
             }
-            .help(L10n.commonCancel)
+            .hoverTooltip(L10n.commonCancel)
 
             Button(action: startAction) {
                 Label(L10n.captureStartRecording, systemImage: "record.circle")
             }
             .keyboardShortcut(.return, modifiers: [])
-            .help(L10n.captureStartRecording)
+            .hoverTooltip(L10n.captureStartRecording)
         }
         .buttonStyle(.borderless)
         .toolbarSurface()
+        .padding(.bottom, 32)
         .fixedSize()
     }
 }
@@ -2190,6 +2210,56 @@ private extension View {
             .overlay {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(.quaternary)
+            }
+    }
+
+    /// 自绘悬停提示。
+    ///
+    /// 选区工具栏运行在透明无边框 `NSPanel` 中,系统的 `.help()` tooltip 在这种窗口里
+    /// 不会显示,因此这里用 SwiftUI overlay 在同一窗口内绘制提示气泡。
+    func hoverTooltip(_ text: String) -> some View {
+        modifier(RegionSelectionHoverTooltip(text: text))
+    }
+}
+
+/// 在控件上方显示提示气泡,鼠标悬停时出现。
+private struct RegionSelectionHoverTooltip: ViewModifier {
+    let text: String
+    @State private var isHovering = false
+    @State private var hoverTask: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hovering in
+                hoverTask?.cancel()
+                if hovering {
+                    // 轻微延迟,避免鼠标快速划过时闪烁。
+                    hoverTask = Task {
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        guard !Task.isCancelled else { return }
+                        isHovering = true
+                    }
+                } else {
+                    isHovering = false
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if isHovering {
+                    Text(text)
+                        .font(.caption)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.black.opacity(0.86))
+                        )
+                        .foregroundStyle(.white)
+                        .fixedSize()
+                        .offset(y: 30)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.12), value: isHovering)
+                        .allowsHitTesting(false)
+                }
             }
     }
 }

@@ -37,6 +37,7 @@ final class ScreenshotController {
     private let pinning: ScreenshotPinning
     private let recordingRegionOverlayFactory: (CGRect) -> ScreenRecordingRegionOverlayPresenting
     private let captureTimeoutNanoseconds: UInt64
+    private let ocrService: OCRService?
 
     var captureMode: PixCaptureMode = .screenshot
     var isCapturing = false
@@ -46,6 +47,10 @@ final class ScreenshotController {
     var lastErrorMessage: String?
     var lastCaptureError: ScreenshotCaptureError?
     var recordingDidFinish: (() -> Void)?
+    /// OCR 截图入历史后的回调，由 App Shell 注入（切到 Pix + 打开主窗口）。
+    var ocrCaptureDidRecord: (() -> Void)?
+    /// OCR 文本送入翻译的回调，由 App Shell 注入（切到 Tran + 预填文本）。
+    var translateText: ((String) -> Void)?
     var needsScreenRecordingPermission: Bool {
         lastCaptureError == .permissionDenied
     }
@@ -69,7 +74,8 @@ final class ScreenshotController {
         recordingRegionOverlayFactory: @escaping (CGRect) -> ScreenRecordingRegionOverlayPresenting = {
             ScreenRecordingRegionOverlay(recordingRect: $0)
         },
-        captureTimeoutNanoseconds: UInt64 = 5_000_000_000
+        captureTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        ocrService: OCRService? = nil
     ) {
         self.history = history ?? ScreenshotHistoryStore()
         self.screenshotService = screenshotService
@@ -80,6 +86,7 @@ final class ScreenshotController {
         self.pinning = pinning ?? ScreenshotPinToScreenPresenter()
         self.recordingRegionOverlayFactory = recordingRegionOverlayFactory
         self.captureTimeoutNanoseconds = captureTimeoutNanoseconds
+        self.ocrService = ocrService
     }
 
     @discardableResult
@@ -194,6 +201,11 @@ final class ScreenshotController {
                 captureMode = .screenshot
                 history.record(output.data, captureSource: captureSource)
                 try pinning.pinPNGData(output.data, sourceRect: output.sourceRect)
+            case .recognizeText:
+                captureMode = .screenshot
+                history.record(output.data, captureSource: captureSource)
+                ocrCaptureDidRecord?()
+                await recognizeAndCopyImageData(output.data)
             case .startRecording:
                 guard let sourceRect = output.sourceRect else {
                     throw ScreenshotCaptureError.unavailable
@@ -546,6 +558,79 @@ final class ScreenshotController {
 
     func clearHistory() {
         history.clear()
+    }
+
+    // MARK: - OCR
+
+    /// OCR 服务，供视图观察识别进度。可能为 nil（无 OCR 能力）。
+    var ocr: OCRService? {
+        ocrService
+    }
+
+    /// 对历史中的某张截图触发 OCR，成功后把文本写回历史。
+    func recognizeText(_ item: ScreenshotItem) async {
+        guard let ocrService else {
+            return
+        }
+
+        do {
+            let result = try await ocrService.recognize(imageData: item.data, itemID: item.id)
+            history.updateRecognizedText(result.text, for: item.id)
+            clearLastError()
+        } catch let error as OCRError {
+            setOperationError(error)
+        } catch {
+            setOperationError(error)
+        }
+    }
+
+    /// 用编辑后的文本回写某张截图的识别结果。
+    func updateRecognizedText(_ item: ScreenshotItem, text: String?) {
+        history.updateRecognizedText(text, for: item.id)
+    }
+
+    /// 把某张截图的识别文本送入翻译。
+    func translateRecognizedText(_ item: ScreenshotItem) {
+        let text = item.recognizedText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !text.isEmpty else {
+            return
+        }
+        translateText?(text)
+    }
+
+    /// 复制识别文本到剪贴板。
+    func copyRecognizedText(_ item: ScreenshotItem) {
+        let text = item.recognizedText ?? ""
+        guard !text.isEmpty else {
+            return
+        }
+        pasteboard.writeString(text)
+        clearLastError()
+    }
+
+    /// 对刚捕获的图片数据跑 OCR，把结果写入最新的历史项并复制到剪贴板。
+    private func recognizeAndCopyImageData(_ data: Data) async {
+        guard let ocrService else {
+            return
+        }
+
+        let itemID = history.items.first?.id
+        guard let itemID else {
+            return
+        }
+
+        do {
+            let result = try await ocrService.recognize(imageData: data, itemID: itemID)
+            history.updateRecognizedText(result.text, for: itemID)
+            if !result.text.isEmpty {
+                pasteboard.writeString(result.text)
+            }
+            clearLastError()
+        } catch let error as OCRError {
+            setOperationError(error)
+        } catch {
+            setOperationError(error)
+        }
     }
 
     private func suggestedFileName(for item: ScreenshotItem) -> String {

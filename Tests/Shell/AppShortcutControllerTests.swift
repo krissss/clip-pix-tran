@@ -97,6 +97,9 @@ private final class ShortcutFakeClipboardService: ClipboardService {
 private final class ShortcutFakeScreenshotPasteboardService: ScreenshotPasteboardService {
     func writePNGData(_ data: Data) throws {
     }
+
+    func writeString(_ string: String) {
+    }
 }
 
 private final class ShortcutFakeScreenshotFileSaver: ScreenshotFileSaving {

@@ -89,6 +89,7 @@ extension [ScreenshotItem] {
                 || item.dimensionsText.localizedCaseInsensitiveContains(trimmedSearchText)
                 || item.fileSizeText.localizedCaseInsensitiveContains(trimmedSearchText)
                 || item.durationText.localizedCaseInsensitiveContains(trimmedSearchText)
+                || (item.recognizedText ?? "").localizedCaseInsensitiveContains(trimmedSearchText)
         }
     }
 }

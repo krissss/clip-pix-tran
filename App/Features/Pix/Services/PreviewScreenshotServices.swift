@@ -13,6 +13,9 @@ struct PreviewScreenshotService: ScreenshotService {
 struct PreviewScreenshotPasteboardService: ScreenshotPasteboardService {
     func writePNGData(_ data: Data) throws {
     }
+
+    func writeString(_ string: String) {
+    }
 }
 
 struct PreviewScreenshotFileSaver: ScreenshotFileSaving {

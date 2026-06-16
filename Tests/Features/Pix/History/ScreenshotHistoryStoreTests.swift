@@ -263,6 +263,75 @@ struct ScreenshotHistoryStoreTests {
         #expect(store.limit == 2)
     }
 
+    @Test func updatesRecognizedTextAndPersists() async throws {
+        let fileURL = temporaryFileURL()
+        let data = try #require("ocr".data(using: .utf8))
+        let store = ScreenshotHistoryStore(
+            persistsHistory: true,
+            persistence: FileScreenshotHistoryPersistence(fileURL: fileURL)
+        )
+
+        store.record(data, at: Date(timeIntervalSince1970: 10))
+        let itemID = try #require(store.items.first?.id)
+        #expect(store.items.first?.recognizedText == nil)
+
+        let didUpdate = store.updateRecognizedText("Hello world", for: itemID)
+        #expect(didUpdate)
+        #expect(store.items.first?.recognizedText == "Hello world")
+        await store.waitForPendingPersistence()
+
+        let reloadedStore = ScreenshotHistoryStore(
+            persistence: FileScreenshotHistoryPersistence(fileURL: fileURL)
+        )
+        #expect(reloadedStore.items.first?.recognizedText == "Hello world")
+    }
+
+    @Test func updateRecognizedTextReturnsFalseForUnknownItem() {
+        let store = ScreenshotHistoryStore()
+
+        let didUpdate = store.updateRecognizedText("text", for: UUID())
+
+        #expect(!didUpdate)
+    }
+
+    @Test func ignoresNoOpRecognizedTextUpdate() {
+        let store = ScreenshotHistoryStore()
+        store.record(Data([0x1]))
+        let itemID = store.items.first!.id
+
+        store.updateRecognizedText("same", for: itemID)
+        let didUpdateAgain = store.updateRecognizedText("same", for: itemID)
+
+        #expect(didUpdateAgain)
+    }
+
+    @Test func decodesLegacyItemWithoutRecognizedTextAsNil() throws {
+        let data = try #require("legacy-ocr".data(using: .utf8))
+        let itemID = UUID()
+        let createdAt = Date(timeIntervalSince1970: 42)
+        let encodedData = data.base64EncodedString()
+        let json = """
+        {
+          "items": [
+            {
+              "id": "\(itemID.uuidString)",
+              "kind": "image",
+              "data": "\(encodedData)",
+              "createdAt": \(createdAt.timeIntervalSinceReferenceDate)
+            }
+          ],
+          "maximumItems": 20,
+          "persistsHistory": true
+        }
+        """
+        let snapshot = try JSONDecoder().decode(
+            ScreenshotHistorySnapshot.self,
+            from: try #require(json.data(using: .utf8))
+        )
+
+        #expect(snapshot.items.first?.recognizedText == nil)
+    }
+
     private func temporaryFileURL() -> URL {
         FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -41,7 +41,8 @@ struct ClipPixTranApp: App {
             screenshotService: SystemScreenshotService(),
             pasteboard: SystemScreenshotPasteboardService(),
             fileSaver: SystemScreenshotFileSaver(),
-            pinning: ScreenshotPinToScreenPresenter()
+            pinning: ScreenshotPinToScreenPresenter(),
+            ocrService: OCRService()
         )
         let translationController = TranslationController(
             history: TranslationHistoryStore(
@@ -111,6 +112,15 @@ struct ClipPixTranApp: App {
         }
         screenshotController.recordingDidFinish = {
             selectedSection = .pix
+            openMainWindow()
+        }
+        screenshotController.ocrCaptureDidRecord = {
+            selectedSection = .pix
+            openMainWindow()
+        }
+        screenshotController.translateText = { text in
+            translationController.prefillSourceText(text)
+            selectedSection = .tran
             openMainWindow()
         }
         AppStatusMenuController.shared.configure(

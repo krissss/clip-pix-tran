@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ScreenshotItemDetailPane: View {
     let item: ScreenshotItem
+    let ocrStatus: OCRService.Status
     let copyAction: () -> Void
     let saveAction: () -> Void
     let pinAction: () -> Void
@@ -10,6 +11,10 @@ struct ScreenshotItemDetailPane: View {
     let exportMP4Action: () -> Void
     let exportGIFAction: () -> Void
     let deleteAction: () -> Void
+    let extractTextAction: () -> Void
+    let copyTextAction: () -> Void
+    let translateTextAction: () -> Void
+    let updateTextAction: (String) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,6 +23,9 @@ struct ScreenshotItemDetailPane: View {
             VStack(alignment: .leading, spacing: 0) {
                 previewSection
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                recognizedTextSection
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
 
                 metadataSection
                     .frame(maxWidth: .infinity, alignment: .bottomLeading)
@@ -110,6 +118,21 @@ struct ScreenshotItemDetailPane: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .controlPanelDetailSection()
+    }
+
+    @ViewBuilder
+    private var recognizedTextSection: some View {
+        if item.isImage {
+            RecognizedTextSection(
+                item: item,
+                status: ocrStatus,
+                extractAction: extractTextAction,
+                copyAction: copyTextAction,
+                translateAction: translateTextAction,
+                updateAction: updateTextAction
+            )
+            .padding(.bottom, 12)
+        }
     }
 
     private var metadataSection: some View {
@@ -312,4 +335,165 @@ private struct ScreenshotMetadataRow: View {
         }
         .font(.callout)
     }
+}
+
+/// 截图详情中的「识别文本」区，三态：未识别 / 识别中 / 已识别。
+private struct RecognizedTextSection: View {
+    let item: ScreenshotItem
+    let status: OCRService.Status
+    let extractAction: () -> Void
+    let copyAction: () -> Void
+    let translateAction: () -> Void
+    let updateAction: (String) -> Void
+
+    @State private var editingText: String = ""
+
+    private var recognizedText: String? {
+        item.recognizedText
+    }
+
+    private var editingSyncKey: RecognizedTextEditingSyncKey {
+        RecognizedTextEditingSyncKey(itemID: item.id, text: recognizedText)
+    }
+
+    private var isRecognizing: Bool {
+        if case .recognizing = status {
+            return true
+        }
+        return false
+    }
+
+    private var failedMessage: String? {
+        if case .failed(let error) = status {
+            return error.errorDescription
+        }
+        return nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                ControlPanelSectionLabel(
+                    title: L10n.pixOCRSection,
+                    systemImage: "doc.text.viewfinder"
+                )
+
+                Spacer()
+            }
+
+            content
+        }
+        .controlPanelDetailSection()
+        .task(id: editingSyncKey) {
+            editingText = recognizedText ?? ""
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let text = recognizedText, !text.isEmpty {
+            recognizedContent(text: text)
+        } else if isRecognizing {
+            recognizingState
+        } else if case .failed = status {
+            failedState
+        } else {
+            emptyState
+        }
+    }
+
+    private func recognizedContent(text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextEditor(text: $editingText)
+                .font(.callout)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 64, maxHeight: 120)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: ControlPanelDesign.compactRadius)
+                        .fill(.quaternary.opacity(0.5))
+                )
+
+            HStack(spacing: 8) {
+                if editingText != text {
+                    Button(L10n.pixOCRSave) {
+                        updateAction(editingText)
+                    }
+                    .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix)))
+                }
+
+                Button {
+                    copyAction()
+                } label: {
+                    Label(L10n.pixOCRCopyText, systemImage: "doc.on.doc")
+                }
+                .buttonStyle(ControlPanelIconButtonStyle())
+
+                Button {
+                    translateAction()
+                } label: {
+                    Label(L10n.pixOCRTranslate, systemImage: "globe")
+                }
+                .buttonStyle(ControlPanelIconButtonStyle())
+
+                Spacer()
+
+                Button(action: extractAction) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(ControlPanelIconButtonStyle())
+                .disabled(isRecognizing)
+                .help(L10n.pixOCRRecognizeAgainHelp)
+            }
+        }
+    }
+
+    private var recognizingState: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(L10n.pixOCRRecognizing)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .font(.callout)
+    }
+
+    private var emptyState: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(L10n.pixOCREmpty)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer()
+
+            Button(action: extractAction) {
+                Label(L10n.pixOCRExtract, systemImage: "doc.text.viewfinder")
+            }
+            .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix), prominence: .primary))
+            .disabled(isRecognizing)
+            .help(L10n.pixOCRExtractHelp)
+        }
+    }
+
+    private var failedState: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(failedMessage ?? L10n.pixOCRNoText)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Button(action: extractAction) {
+                Label(L10n.pixOCRRecognizeAgain, systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(ControlPanelButtonStyle(tint: ControlPanelDesign.tint(for: .pix)))
+            .disabled(isRecognizing)
+            .help(L10n.pixOCRRecognizeAgainHelp)
+        }
+    }
+}
+
+private struct RecognizedTextEditingSyncKey: Equatable {
+    let itemID: ScreenshotItem.ID
+    let text: String?
 }

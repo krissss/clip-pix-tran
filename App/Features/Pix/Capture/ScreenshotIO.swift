@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 protocol ScreenshotPasteboardService {
     func writePNGData(_ data: Data) throws
+    func writeString(_ string: String)
 }
 
 protocol ScreenshotFileSaving {
@@ -539,6 +540,11 @@ struct SystemScreenshotPasteboardService: ScreenshotPasteboardService {
         if !didWrite {
             throw ScreenshotPasteboardError.rejected
         }
+    }
+
+    func writeString(_ string: String) {
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
     }
 }
 

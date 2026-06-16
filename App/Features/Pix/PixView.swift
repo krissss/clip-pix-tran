@@ -37,8 +37,12 @@ struct PixView: View {
         .navigationTitle("Pix")
         .background(ControlPanelBackground())
         .onAppear(perform: selectFirstVisibleItemIfNeeded)
-        .onChange(of: visibleItems.map(\.id)) { _, _ in
-            selectFirstVisibleItemIfNeeded()
+        .onChange(of: visibleItems.map(\.id)) { oldIDs, newIDs in
+            if oldIDs.first != newIDs.first {
+                selectedItemID = newIDs.first
+            } else {
+                selectFirstVisibleItemIfNeeded()
+            }
         }
         .confirmationDialog(
             L10n.pixClearTitle,
@@ -183,6 +187,7 @@ struct PixView: View {
             if let selectedItem {
                 ScreenshotItemDetailPane(
                     item: selectedItem,
+                    ocrStatus: controller.ocr?.status(for: selectedItem.id) ?? .idle,
                     copyAction: {
                         controller.copyToPasteboard(selectedItem)
                     },
@@ -203,6 +208,20 @@ struct PixView: View {
                     },
                     deleteAction: {
                         delete(selectedItem)
+                    },
+                    extractTextAction: {
+                        Task {
+                            await controller.recognizeText(selectedItem)
+                        }
+                    },
+                    copyTextAction: {
+                        controller.copyRecognizedText(selectedItem)
+                    },
+                    translateTextAction: {
+                        controller.translateRecognizedText(selectedItem)
+                    },
+                    updateTextAction: { text in
+                        controller.updateRecognizedText(selectedItem, text: text)
                     }
                 )
             } else {
@@ -253,6 +272,12 @@ struct PixView: View {
                 controller.pinToScreen(item)
             } label: {
                 Label(L10n.commonPinToScreen, systemImage: "pin")
+            }
+
+            Button {
+                Task { await controller.recognizeText(item) }
+            } label: {
+                Label(L10n.pixOCRExtract, systemImage: "doc.text.viewfinder")
             }
         } else {
             Button {

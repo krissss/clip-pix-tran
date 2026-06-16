@@ -114,6 +114,22 @@ final class ScreenshotHistoryStore {
         persistIfNeeded()
     }
 
+    /// 更新某张截图的 OCR 识别文本，并触发持久化。
+    @discardableResult
+    func updateRecognizedText(_ text: String?, for itemID: ScreenshotItem.ID) -> Bool {
+        guard let index = items.firstIndex(where: { $0.id == itemID }) else {
+            return false
+        }
+
+        guard items[index].recognizedText != text else {
+            return true
+        }
+
+        items[index].recognizedText = text
+        persistIfNeeded()
+        return true
+    }
+
     func clear() {
         deleteRecordingFiles(for: items)
         items.removeAll()

@@ -743,6 +743,193 @@ struct ScreenshotControllerTests {
         controller.clearHistory()
         #expect(history.items.isEmpty)
     }
+
+    // MARK: - OCR
+
+    @Test func recognizeTextWritesResultToHistory() async throws {
+        let data = try #require("ocr-image".data(using: .utf8))
+        let controller = makeController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data))
+            ),
+            ocrProvider: { _ in OCRResult(text: "Recognized line", confidence: 0.8) }
+        )
+        controller.history.record(data)
+
+        let item = try #require(controller.history.items.first)
+        #expect(item.recognizedText == nil)
+
+        await controller.recognizeText(item)
+
+        #expect(controller.history.items.first?.recognizedText == "Recognized line")
+        #expect(controller.lastErrorMessage == nil)
+    }
+
+    @Test func recognizeTextRecordsOCRErrorAsLastMessage() async throws {
+        let data = try #require("ocr-image".data(using: .utf8))
+        let controller = makeController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data))
+            ),
+            ocrProvider: { _ in throw OCRError.noTextRecognized }
+        )
+        controller.history.record(data)
+        let item = try #require(controller.history.items.first)
+
+        await controller.recognizeText(item)
+
+        #expect(controller.history.items.first?.recognizedText == nil)
+        #expect(controller.lastErrorMessage == OCRError.noTextRecognized.errorDescription)
+    }
+
+    @Test func copyRecognizedTextWritesToPasteboard() throws {
+        let pasteboard = FakeScreenshotPasteboardService()
+        let data = try #require("img".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data))
+            ),
+            pasteboard: pasteboard,
+            fileSaver: FakeScreenshotFileSaver(),
+            ocrService: OCRService(provider: ClosureOCRProvider(body: { @Sendable _ in OCRResult(text: "to copy", confidence: nil) }))
+        )
+        controller.history.record(data)
+        let itemID = controller.history.items.first!.id
+        controller.history.updateRecognizedText("to copy", for: itemID)
+        let item = controller.history.items.first!
+
+        controller.copyRecognizedText(item)
+
+        #expect(pasteboard.copiedString == "to copy")
+    }
+
+    @Test func translateRecognizedTextInvokesCallback() throws {
+        let data = try #require("img".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data))
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver()
+        )
+        controller.history.record(data)
+        let itemID = controller.history.items.first!.id
+        controller.history.updateRecognizedText("请翻译", for: itemID)
+
+        var received: String?
+        controller.translateText = { received = $0 }
+        controller.translateRecognizedText(controller.history.items.first!)
+
+        #expect(received == "请翻译")
+    }
+
+    @Test func translateRecognizedTextIgnoresEmptyText() throws {
+        let data = try #require("img".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(ScreenshotCaptureOutput(data: data))
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver()
+        )
+        controller.history.record(data)
+
+        var received: String?
+        controller.translateText = { received = $0 }
+        controller.translateRecognizedText(controller.history.items.first!)
+
+        #expect(received == nil)
+    }
+
+    @Test func recognizeTextCompletionRecordsAndCopiesText() async throws {
+        let data = try #require("region-ocr".data(using: .utf8))
+        let pasteboard = FakeScreenshotPasteboardService()
+        let controller = makeController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(
+                    ScreenshotCaptureOutput(data: data, completion: .recognizeText)
+                )
+            ),
+            pasteboard: pasteboard,
+            ocrProvider: { _ in OCRResult(text: "from region", confidence: nil) }
+        )
+
+        await controller.captureSelectedRegion()
+
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(controller.history.items.first?.recognizedText == "from region")
+        #expect(pasteboard.copiedString == "from region")
+        #expect(controller.lastErrorMessage == nil)
+    }
+
+    @Test func recognizeTextCompletionNotifiesAfterRecordingImage() async throws {
+        let data = try #require("region-ocr-open".data(using: .utf8))
+        let controller = makeController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(
+                    ScreenshotCaptureOutput(data: data, completion: .recognizeText)
+                )
+            ),
+            ocrProvider: { _ in OCRResult(text: "from region", confidence: nil) }
+        )
+        var recordedItemCounts: [Int] = []
+        controller.ocrCaptureDidRecord = {
+            recordedItemCounts.append(controller.history.items.count)
+        }
+
+        await controller.captureSelectedRegion()
+
+        #expect(recordedItemCounts == [1])
+        #expect(controller.history.items.first?.data == data)
+    }
+
+    @Test func recognizeTextCompletionWithoutOCRServiceStillRecordsImage() async throws {
+        let data = try #require("region-no-ocr".data(using: .utf8))
+        let controller = ScreenshotController(
+            screenshotService: FakeScreenshotService(
+                mainDisplayResult: .success(Data()),
+                selectedRegionResult: .success(
+                    ScreenshotCaptureOutput(data: data, completion: .recognizeText)
+                )
+            ),
+            pasteboard: FakeScreenshotPasteboardService(),
+            fileSaver: FakeScreenshotFileSaver()
+        )
+
+        await controller.captureSelectedRegion()
+
+        // 没有 OCRService 时，图仍入历史，只是不做识别。
+        #expect(controller.history.items.map(\.data) == [data])
+        #expect(controller.history.items.first?.recognizedText == nil)
+    }
+
+    private func makeController(
+        screenshotService: ScreenshotService,
+        pasteboard: ScreenshotPasteboardService = FakeScreenshotPasteboardService(),
+        ocrProvider: @escaping @Sendable (Data) async throws -> OCRResult
+    ) -> ScreenshotController {
+        ScreenshotController(
+            screenshotService: screenshotService,
+            pasteboard: pasteboard,
+            fileSaver: FakeScreenshotFileSaver(),
+            ocrService: OCRService(provider: ClosureOCRProvider(body: ocrProvider))
+        )
+    }
+}
+
+private struct ClosureOCRProvider: OCRProvider {
+    let body: @Sendable (Data) async throws -> OCRResult
+
+    func recognize(textIn data: Data) async throws -> OCRResult {
+        try await body(data)
+    }
 }
 
 @MainActor
@@ -891,6 +1078,7 @@ private final class FakeScreenRecordingRegionOverlay: ScreenRecordingRegionOverl
 
 private final class FakeScreenshotPasteboardService: ScreenshotPasteboardService {
     private(set) var copiedData: Data?
+    private(set) var copiedString: String?
     private let error: Error?
 
     init(error: Error? = nil) {
@@ -903,6 +1091,10 @@ private final class FakeScreenshotPasteboardService: ScreenshotPasteboardService
         }
 
         copiedData = data
+    }
+
+    func writeString(_ string: String) {
+        copiedString = string
     }
 }
 

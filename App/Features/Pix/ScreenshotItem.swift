@@ -21,6 +21,8 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
     let duration: TimeInterval?
     let pixelSize: CGSize?
     let fileSize: Int64?
+    /// OCR 识别出的文字。nil 表示未识别过；空字符串表示已识别但无文字。
+    var recognizedText: String?
 
     init(
         id: UUID = UUID(),
@@ -37,6 +39,7 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         self.duration = nil
         self.pixelSize = nil
         self.fileSize = Int64(data.count)
+        self.recognizedText = nil
     }
 
     init(
@@ -56,6 +59,7 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         self.duration = duration
         self.pixelSize = pixelSize
         self.fileSize = fileSize
+        self.recognizedText = nil
     }
 
     var isImage: Bool {
@@ -104,6 +108,7 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         case duration
         case pixelSize
         case fileSize
+        case recognizedText
     }
 
     init(from decoder: Decoder) throws {
@@ -121,5 +126,6 @@ struct ScreenshotItem: Codable, Identifiable, Equatable {
         self.duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
         self.pixelSize = try container.decodeIfPresent(CGSize.self, forKey: .pixelSize)
         self.fileSize = try container.decodeIfPresent(Int64.self, forKey: .fileSize)
+        self.recognizedText = try container.decodeIfPresent(String.self, forKey: .recognizedText)
     }
 }

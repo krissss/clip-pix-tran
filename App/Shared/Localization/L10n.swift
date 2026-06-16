@@ -258,6 +258,22 @@ enum L10n {
             "pix.fileSize": "File Size",
             "pix.duration": "Duration",
             "pix.dimensions": "Dimensions",
+            "pix.ocr.section": "Recognized Text",
+            "pix.ocr.extract": "Extract Text",
+            "pix.ocr.extract.help": "Recognize text in this screenshot",
+            "pix.ocr.recognizing": "Recognizing…",
+            "pix.ocr.empty": "No text recognized yet. Extract text from this screenshot to copy, translate, or search later.",
+            "pix.ocr.noText": "No text was found in this screenshot.",
+            "pix.ocr.recognizeAgain": "Re-extract",
+            "pix.ocr.recognizeAgain.help": "Run text recognition again",
+            "pix.ocr.save": "Save",
+            "pix.ocr.translate": "Translate",
+            "pix.ocr.copyText": "Copy Text",
+            "pix.ocr.tool": "Recognize Text",
+            "pix.ocr.tool.help": "Recognize text in the selected region and copy it",
+            "pix.ocr.invalidImage": "Couldn't read this image.",
+            "pix.ocr.noTextRecognized": "No text was recognized.",
+            "pix.ocr.recognizedCopied": "Text recognized and copied.",
             "gif.exportTitle": "Export GIF",
             "gif.frameCount": "%d frames",
             "gif.previewFrameCount": "%d-frame preview",
@@ -282,6 +298,8 @@ enum L10n {
             "capture.mosaicBlockSize": "Block Size",
             "capture.mosaicBrushSize": "Brush Size",
             "capture.color": "Color",
+            "capture.lineWidth": "Line Width",
+            "capture.fontSize": "Font Size",
             "language.autoDetect": "Auto Detect",
             "language.zhHans": "Simplified Chinese",
             "language.zhHant": "Traditional Chinese",
@@ -586,6 +604,22 @@ enum L10n {
             "pix.fileSize": "文件大小",
             "pix.duration": "时长",
             "pix.dimensions": "尺寸",
+            "pix.ocr.section": "识别文本",
+            "pix.ocr.extract": "提取文字",
+            "pix.ocr.extract.help": "识别这张截图中的文字",
+            "pix.ocr.recognizing": "识别中…",
+            "pix.ocr.empty": "尚未识别文字。提取截图文字后可复制、翻译，或日后通过搜索找到这张截图。",
+            "pix.ocr.noText": "这张截图中没有找到文字。",
+            "pix.ocr.recognizeAgain": "重新提取",
+            "pix.ocr.recognizeAgain.help": "重新进行文字识别",
+            "pix.ocr.save": "保存",
+            "pix.ocr.translate": "翻译",
+            "pix.ocr.copyText": "复制文字",
+            "pix.ocr.tool": "识别文字",
+            "pix.ocr.tool.help": "识别所选区域的文字并复制",
+            "pix.ocr.invalidImage": "无法读取这张图片。",
+            "pix.ocr.noTextRecognized": "未识别到文字。",
+            "pix.ocr.recognizedCopied": "已识别并复制文字。",
             "gif.exportTitle": "导出 GIF",
             "gif.frameCount": "%d 帧",
             "gif.previewFrameCount": "%d 帧预览",
@@ -610,6 +644,8 @@ enum L10n {
             "capture.mosaicBlockSize": "模糊块大小",
             "capture.mosaicBrushSize": "涂抹范围",
             "capture.color": "颜色",
+            "capture.lineWidth": "线条粗细",
+            "capture.fontSize": "字号大小",
             "language.autoDetect": "自动识别",
             "language.zhHans": "简体中文",
             "language.zhHant": "繁体中文",
@@ -926,6 +962,22 @@ extension L10n {
     static var pixFileSize: String { tr("pix.fileSize", "文件大小") }
     static var pixDuration: String { tr("pix.duration", "时长") }
     static var pixDimensions: String { tr("pix.dimensions", "尺寸") }
+    static var pixOCRSection: String { tr("pix.ocr.section", "识别文本") }
+    static var pixOCRExtract: String { tr("pix.ocr.extract", "提取文字") }
+    static var pixOCRExtractHelp: String { tr("pix.ocr.extract.help", "识别这张截图中的文字") }
+    static var pixOCRRecognizing: String { tr("pix.ocr.recognizing", "识别中…") }
+    static var pixOCREmpty: String { tr("pix.ocr.empty", "尚未识别文字。提取截图文字后可复制、翻译，或日后通过搜索找到这张截图。") }
+    static var pixOCRNoText: String { tr("pix.ocr.noText", "这张截图中没有找到文字。") }
+    static var pixOCRRecognizeAgain: String { tr("pix.ocr.recognizeAgain", "重新提取") }
+    static var pixOCRRecognizeAgainHelp: String { tr("pix.ocr.recognizeAgain.help", "重新进行文字识别") }
+    static var pixOCRSave: String { tr("pix.ocr.save", "保存") }
+    static var pixOCRTranslate: String { tr("pix.ocr.translate", "翻译") }
+    static var pixOCRCopyText: String { tr("pix.ocr.copyText", "复制文字") }
+    static var pixOCRTool: String { tr("pix.ocr.tool", "识别文字") }
+    static var pixOCRToolHelp: String { tr("pix.ocr.tool.help", "识别所选区域的文字并复制") }
+    static var pixOCRInvalidImage: String { tr("pix.ocr.invalidImage", "无法读取这张图片。") }
+    static var pixOCRNoTextRecognized: String { tr("pix.ocr.noTextRecognized", "未识别到文字。") }
+    static var pixOCRRecognizedCopied: String { tr("pix.ocr.recognizedCopied", "已识别并复制文字。") }
     static var gifExportTitle: String { tr("gif.exportTitle", "导出 GIF") }
     static func gifFrameCount(_ count: Int) -> String { format("gif.frameCount", "%d 帧", count) }
     static func gifPreviewFrameCount(_ count: Int) -> String { format("gif.previewFrameCount", "%d 帧预览", count) }
@@ -952,6 +1004,8 @@ extension L10n {
     static var captureMosaicBlockSize: String { tr("capture.mosaicBlockSize", "模糊块大小") }
     static var captureMosaicBrushSize: String { tr("capture.mosaicBrushSize", "涂抹范围") }
     static var captureColor: String { tr("capture.color", "颜色") }
+    static var captureLineWidth: String { tr("capture.lineWidth", "线条粗细") }
+    static var captureFontSize: String { tr("capture.fontSize", "字号大小") }
     static var languageAutoDetect: String { tr("language.autoDetect", "自动识别") }
     static var languageZhHans: String { tr("language.zhHans", "简体中文") }
     static var languageZhHant: String { tr("language.zhHant", "繁体中文") }
