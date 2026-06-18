@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-18
+
+### Added
+
+- 添加 Pix 截图 OCR 功能
+- 支持手动截长图
+- 支持双击预览图片
+
+### Changed
+
+- 移除 OpenAI 翻译与发音支持
+- 移除翻译硬编码 fallback
+
+### Fixed
+
+- 修复历史列表选中样式与点击区域
+- 修复系统翻译首次不可用误判
+
 ## [0.4.0] - 2026-06-11
 
 ### Added
@@ -75,7 +93,8 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/krissss/clip-pix-tran/compare/v0.1.1...v0.2.0
