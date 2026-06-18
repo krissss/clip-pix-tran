@@ -174,16 +174,14 @@ private struct ClipboardImagePreview: View {
             ControlPanelSectionLabel(title: L10n.pixImagePreview, systemImage: "photo")
 
             if let imageData = item.imageData {
-                Button(action: previewAction) {
-                    ClipboardFittedPreviewImage(data: imageData)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(L10n.pixOpenInPreview)
-                .padding(ControlPanelDesign.Layout.detailContentPadding)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .controlPanelTextSurface()
+                ClipboardFittedPreviewImage(data: imageData)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(ControlPanelDesign.Layout.detailContentPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .controlPanelTextSurface()
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: previewAction)
+                    .help(L10n.pixOpenInPreview)
             } else {
                 ContentUnavailableView(L10n.commonCannotPreviewImage, systemImage: "photo")
                     .frame(minHeight: 220)

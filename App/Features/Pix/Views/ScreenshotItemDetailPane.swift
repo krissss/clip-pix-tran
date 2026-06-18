@@ -98,16 +98,14 @@ struct ScreenshotItemDetailPane: View {
             }
 
             if item.isImage {
-                Button(action: previewAction) {
-                    ScreenshotFittedPreviewImage(data: item.data)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(L10n.pixOpenInPreview)
-                .padding(ControlPanelDesign.Layout.detailContentPadding)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .controlPanelTextSurface()
+                ScreenshotFittedPreviewImage(data: item.data)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(ControlPanelDesign.Layout.detailContentPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .controlPanelTextSurface()
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: previewAction)
+                    .help(L10n.pixOpenInPreview)
             } else {
                 ScreenRecordingPreviewCard(item: item, previewAction: previewAction)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
