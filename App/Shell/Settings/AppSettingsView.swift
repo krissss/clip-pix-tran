@@ -731,7 +731,6 @@ private func historyLimitRow(
         screenshotHistory: .preview,
         translationController: TranslationController(
             history: .preview,
-            translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
         ),
         dockIconPreference: DockIconPreference(),

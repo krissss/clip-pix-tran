@@ -8,7 +8,15 @@ struct TranslationControllerTests {
         let preferences = makePreferences()
         let controller = TranslationController(
             preferences: preferences,
-            translationService: FallbackTranslationService(),
+            translationService: FakeTranslationService(
+                result: .success(
+                    TranslationResult(
+                        translatedText: "你好",
+                        sourceLanguageCode: "en",
+                        targetLanguageCode: "zh-Hans"
+                    )
+                )
+            ),
             pasteboard: CapturingClipboardService()
         )
         controller.sourceText = " hello "
@@ -839,7 +847,6 @@ struct TranslationControllerTests {
 
     @Test func refreshLocalizedMessagesUpdatesIdleState() {
         let controller = TranslationController(
-            translationService: FallbackTranslationService(),
             pasteboard: CapturingClipboardService()
         )
         controller.refreshLocalizedMessages(languageCode: "zh-Hans")

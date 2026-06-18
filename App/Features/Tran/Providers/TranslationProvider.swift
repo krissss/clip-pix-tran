@@ -72,7 +72,7 @@ extension TranslationProvider {
         return [
             TranslationProvider(
                 descriptor: .systemTranslation,
-                service: HybridTranslationService()
+                service: SystemTranslationService()
             ),
             TranslationProvider(
                 descriptor: .google,

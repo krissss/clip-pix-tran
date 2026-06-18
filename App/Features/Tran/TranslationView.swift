@@ -742,7 +742,6 @@ private struct TranslationHistoryRow: View {
     TranslationView(
         controller: TranslationController(
             history: .preview,
-            translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
         )
     )

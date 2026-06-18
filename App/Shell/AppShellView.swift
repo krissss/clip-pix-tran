@@ -188,7 +188,6 @@ private struct SidebarSectionButton: View {
         ),
         translationController: TranslationController(
             history: .preview,
-            translationService: FallbackTranslationService(),
             pasteboard: PreviewClipboardService()
         ),
         shortcutController: AppShortcutController(
@@ -204,7 +203,6 @@ private struct SidebarSectionButton: View {
             ),
             translationController: TranslationController(
                 history: .preview,
-                translationService: FallbackTranslationService(),
                 pasteboard: PreviewClipboardService()
             )
         ),
