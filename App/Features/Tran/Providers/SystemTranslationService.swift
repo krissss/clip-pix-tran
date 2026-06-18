@@ -77,7 +77,7 @@ struct SystemTranslationService: TranslationService {
     ) async throws -> Locale.Language {
         if let sourceLanguageCode = request.sourceLanguageCode {
             let sourceLanguage = Self.systemLanguage(for: sourceLanguageCode)
-            guard await isInstalled(from: sourceLanguage, to: targetLanguage) else {
+            guard await isSupported(from: sourceLanguage, to: targetLanguage) else {
                 throw TranslationProviderError.unavailable
             }
 
@@ -85,7 +85,7 @@ struct SystemTranslationService: TranslationService {
         }
 
         for sourceLanguage in sourceLanguageCandidates(for: sourceText) {
-            if await isInstalled(from: sourceLanguage, to: targetLanguage) {
+            if await isSupported(from: sourceLanguage, to: targetLanguage) {
                 return sourceLanguage
             }
         }
@@ -93,11 +93,18 @@ struct SystemTranslationService: TranslationService {
         throw TranslationProviderError.unavailable
     }
 
-    private func isInstalled(
+    private func isSupported(
         from sourceLanguage: Locale.Language,
         to targetLanguage: Locale.Language
     ) async -> Bool {
-        await availabilityStatus(sourceLanguage, targetLanguage) == .installed
+        switch await availabilityStatus(sourceLanguage, targetLanguage) {
+        case .installed, .supported:
+            true
+        case .unsupported:
+            false
+        @unknown default:
+            false
+        }
     }
 
     private func sourceLanguageCandidates(for sourceText: String) -> [Locale.Language] {

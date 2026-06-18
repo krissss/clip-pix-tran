@@ -176,23 +176,28 @@ struct TranslationServiceTests {
         #expect(result.sourceLanguageCode == "en")
     }
 
-    @Test func systemRejectsSupportedButUninstalledLanguagePair() async {
+    @Test func systemAttemptsSupportedLanguagePair() async throws {
         let service = SystemTranslationService(
             availabilityStatus: { _, _ in .supported },
-            installedTranslator: { _, _, _, _ in
-                throw UnexpectedTranslationCallError()
+            installedTranslator: { source, _, sourceText, targetLanguageCode in
+                TranslationResult(
+                    translatedText: "\(sourceText)-supported",
+                    sourceLanguageCode: source.languageCode?.identifier,
+                    targetLanguageCode: targetLanguageCode
+                )
             }
         )
 
-        await #expect(throws: TranslationProviderError.unavailable) {
-            try await service.translate(
-                TranslationRequest(
-                    sourceText: "hello",
-                    targetLanguageCode: "zh-Hans",
-                    sourceLanguageCode: "en"
-                )
+        let result = try await service.translate(
+            TranslationRequest(
+                sourceText: "hello",
+                targetLanguageCode: "zh-Hans",
+                sourceLanguageCode: "en"
             )
-        }
+        )
+
+        #expect(result.translatedText == "hello-supported")
+        #expect(result.sourceLanguageCode == "en")
     }
 
     @Test func googleTranslationBuildsRequestAndParsesResponse() async throws {
