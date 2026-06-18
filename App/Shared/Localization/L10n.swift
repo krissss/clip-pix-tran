@@ -269,6 +269,11 @@ enum L10n {
             "pix.ocr.copyText": "Copy Text",
             "pix.ocr.tool": "Recognize Text",
             "pix.ocr.tool.help": "Recognize text in the selected region and copy it",
+            "pix.scrollingCapture.tool": "Scrolling Screenshot",
+            "pix.scrollingCapture.tool.help": "Scroll the selected region and stitch it into one image",
+            "pix.scrollingCapture.inProgress": "Scrolling screenshot",
+            "pix.scrollingCapture.finish.help": "Finish and save the scrolling screenshot",
+            "pix.scrollingCapture.cancel.help": "Cancel scrolling screenshot",
             "pix.ocr.invalidImage": "Couldn't read this image.",
             "pix.ocr.noTextRecognized": "No text was recognized.",
             "pix.ocr.recognizedCopied": "Text recognized and copied.",
@@ -610,6 +615,11 @@ enum L10n {
             "pix.ocr.copyText": "复制文字",
             "pix.ocr.tool": "识别文字",
             "pix.ocr.tool.help": "识别所选区域的文字并复制",
+            "pix.scrollingCapture.tool": "截长图",
+            "pix.scrollingCapture.tool.help": "滚动所选区域并拼接成长图",
+            "pix.scrollingCapture.inProgress": "截长图中",
+            "pix.scrollingCapture.finish.help": "完成并保存长图",
+            "pix.scrollingCapture.cancel.help": "取消截长图",
             "pix.ocr.invalidImage": "无法读取这张图片。",
             "pix.ocr.noTextRecognized": "未识别到文字。",
             "pix.ocr.recognizedCopied": "已识别并复制文字。",
@@ -963,6 +973,11 @@ extension L10n {
     static var pixOCRCopyText: String { tr("pix.ocr.copyText", "复制文字") }
     static var pixOCRTool: String { tr("pix.ocr.tool", "识别文字") }
     static var pixOCRToolHelp: String { tr("pix.ocr.tool.help", "识别所选区域的文字并复制") }
+    static var pixScrollingCaptureTool: String { tr("pix.scrollingCapture.tool", "截长图") }
+    static var pixScrollingCaptureToolHelp: String { tr("pix.scrollingCapture.tool.help", "滚动所选区域并拼接成长图") }
+    static var pixScrollingCaptureInProgress: String { tr("pix.scrollingCapture.inProgress", "截长图中") }
+    static var pixScrollingCaptureFinishHelp: String { tr("pix.scrollingCapture.finish.help", "完成并保存长图") }
+    static var pixScrollingCaptureCancelHelp: String { tr("pix.scrollingCapture.cancel.help", "取消截长图") }
     static var pixOCRInvalidImage: String { tr("pix.ocr.invalidImage", "无法读取这张图片。") }
     static var pixOCRNoTextRecognized: String { tr("pix.ocr.noTextRecognized", "未识别到文字。") }
     static var pixOCRRecognizedCopied: String { tr("pix.ocr.recognizedCopied", "已识别并复制文字。") }

@@ -186,7 +186,7 @@ final class ScreenshotController {
             case .recordOnly:
                 captureMode = .screenshot
                 history.record(output.data, captureSource: captureSource)
-            case .copy:
+            case .copy, .scrollingCapture:
                 captureMode = .screenshot
                 history.record(output.data, captureSource: captureSource)
                 try pasteboard.writePNGData(output.data)

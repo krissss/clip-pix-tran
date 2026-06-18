@@ -6,7 +6,7 @@ import SwiftUI
 final class RegionSelectionOverlay {
     private static var activeOverlay: RegionSelectionOverlay?
 
-    typealias CaptureProvider = (CGRect, Set<CGWindowID>) async throws -> Data
+    typealias CaptureProvider = @Sendable (CGRect, Set<CGWindowID>) async throws -> Data
 
     private var continuation: CheckedContinuation<RegionSelectionOverlayResult, Error>?
     private var windows: [NSWindow] = []
@@ -17,6 +17,7 @@ final class RegionSelectionOverlay {
     private var resignObserver: NSObjectProtocol?
     private var didFinish = false
     private var activeBaseCaptureID: UUID?
+    private var scrollingCaptureSession: ScrollingScreenshotCaptureSession?
     private let captureProvider: CaptureProvider
     private let initialMode: ScreenshotRegionCaptureMode
     private let initialSnapshots: [ScreenCaptureSnapshot]
@@ -290,6 +291,11 @@ final class RegionSelectionOverlay {
             return
         }
 
+        if completion == .scrollingCapture {
+            completeScrollingCapture(for: selection)
+            return
+        }
+
         activeBaseCaptureID = nil
         selectionViews.forEach { $0.prepareForCapture() }
         Task { [weak self] in
@@ -331,6 +337,81 @@ final class RegionSelectionOverlay {
                 finish(.failure(ScreenshotCaptureError.pngEncodingFailed))
             }
         }
+    }
+
+    private func completeScrollingCapture(for selection: RegionSelectionSnapshot) {
+        activeBaseCaptureID = nil
+        removeMonitors()
+        windows.forEach { window in
+            window.ignoresMouseEvents = true
+        }
+
+        do {
+            selectionViews.forEach {
+                $0.beginScrollingCaptureProgress(
+                    finish: { [weak self] in
+                        self?.finishScrollingCapture(for: selection)
+                    },
+                    cancel: { [weak self] in
+                        self?.cancelScrollingCapture()
+                    }
+                )
+            }
+            scrollingCaptureSession = try ScrollingScreenshotService().startManualCapture(
+                in: selection.rect,
+                excludingWindowIDs: excludedWindowIDs,
+                captureProvider: captureProvider
+            )
+        } catch let error as ScreenshotCaptureError {
+            finish(.failure(error))
+        } catch {
+            finish(.failure(ScreenshotCaptureError.unavailable))
+        }
+    }
+
+    private func finishScrollingCapture(for selection: RegionSelectionSnapshot) {
+        guard let session = scrollingCaptureSession else {
+            finish(.failure(ScreenshotCaptureError.cancelled))
+            return
+        }
+
+        scrollingCaptureSession = nil
+        selectionViews.forEach { $0.prepareForCapture() }
+        Task { [weak self, session] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let data = try await session.finish()
+                finish(
+                    .success(
+                        .capture(
+                            ScreenshotCaptureOutput(
+                                data: data,
+                                completion: .scrollingCapture,
+                                sourceRect: selection.rect
+                            )
+                        )
+                    )
+                )
+            } catch let error as ScreenshotCaptureError {
+                finish(.failure(error))
+            } catch is CancellationError {
+                finish(.failure(ScreenshotCaptureError.cancelled))
+            } catch {
+                finish(.failure(ScreenshotCaptureError.unavailable))
+            }
+        }
+    }
+
+    private func cancelScrollingCapture() {
+        let session = scrollingCaptureSession
+        scrollingCaptureSession = nil
+        Task {
+            await session?.cancel()
+        }
+        finish(.failure(ScreenshotCaptureError.cancelled))
     }
 
     private func completeSelection() {
@@ -414,7 +495,8 @@ final class RegionSelectionOverlay {
     private var excludedWindowIDs: Set<CGWindowID> {
         let selectionWindowIDs = windows.compactMap(\.windowNumber).map(CGWindowID.init)
         let toolbarWindowIDs = selectionViews.compactMap(\.toolbarWindowID)
-        return Set(selectionWindowIDs + toolbarWindowIDs)
+        let statusWindowIDs = selectionViews.compactMap(\.statusWindowID)
+        return Set(selectionWindowIDs + toolbarWindowIDs + statusWindowIDs)
     }
 
     private func finish(_ result: Result<RegionSelectionOverlayResult, Error>) {
@@ -424,6 +506,11 @@ final class RegionSelectionOverlay {
 
         didFinish = true
         removeMonitors()
+        let session = scrollingCaptureSession
+        scrollingCaptureSession = nil
+        Task {
+            await session?.cancel()
+        }
         NSCursor.arrow.set()
         selectionViews.forEach { $0.closeTransientUI() }
         selectionViews.removeAll()
@@ -584,6 +671,19 @@ private enum RegionSelectionInteraction {
     case movingAnnotation(id: UUID, start: CGPoint, originalAnnotation: ScreenshotAnnotation)
 }
 
+private enum RegionSelectionStatusOverlay {
+    case scrollingCapture(finish: () -> Void, cancel: () -> Void)
+}
+
+extension RegionSelectionStatusOverlay: Equatable {
+    static func == (lhs: RegionSelectionStatusOverlay, rhs: RegionSelectionStatusOverlay) -> Bool {
+        switch (lhs, rhs) {
+        case (.scrollingCapture, .scrollingCapture):
+            true
+        }
+    }
+}
+
 private struct RegionSelectionBaseImage {
     let screenRect: CGRect
     let pngData: Data
@@ -683,6 +783,7 @@ private struct RegionToolbarActions {
     let copy: () -> Void
     let save: () -> Void
     let recognizeText: () -> Void
+    let scrollingCapture: () -> Void
     let cancel: () -> Void
     let finish: () -> Void
     let startRecording: () -> Void
@@ -704,13 +805,30 @@ private final class RegionSelectionView: NSView {
     private var activeTool: RegionAnnotationTool?
     private var activeStyle = ScreenshotAnnotationStyle()
     private var toolbarWindow: NSWindow?
+    private var statusWindow: NSWindow?
     private var textEditor: NSTextField?
     private var hiddenForCapture = false
+    private var statusOverlay: RegionSelectionStatusOverlay? {
+        didSet {
+            guard statusOverlay != oldValue else {
+                return
+            }
+            if let statusOverlay {
+                showStatusControl(for: statusOverlay)
+            } else {
+                hideStatusControl()
+            }
+        }
+    }
     private var baseImage: RegionSelectionBaseImage?
     private let annotationHitSlop: CGFloat = 8
 
     var toolbarWindowID: CGWindowID? {
         toolbarWindow.map { CGWindowID($0.windowNumber) }
+    }
+
+    var statusWindowID: CGWindowID? {
+        statusWindow.map { CGWindowID($0.windowNumber) }
     }
 
     var selectionSnapshot: RegionSelectionSnapshot? {
@@ -771,6 +889,10 @@ private final class RegionSelectionView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        guard statusOverlay == nil else {
+            return
+        }
+
         if event.keyCode == 53 {
             actions.cancel()
         } else if event.keyCode == 36 {
@@ -786,11 +908,16 @@ private final class RegionSelectionView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        guard statusOverlay == nil else {
+            return
+        }
+
         actions.cancel()
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard !hiddenForCapture else {
+        guard !hiddenForCapture,
+              statusOverlay == nil else {
             return
         }
 
@@ -846,7 +973,8 @@ private final class RegionSelectionView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !hiddenForCapture else {
+        guard !hiddenForCapture,
+              statusOverlay == nil else {
             return
         }
 
@@ -911,7 +1039,8 @@ private final class RegionSelectionView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard !hiddenForCapture else {
+        guard !hiddenForCapture,
+              statusOverlay == nil else {
             return
         }
 
@@ -962,7 +1091,8 @@ private final class RegionSelectionView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        guard !hiddenForCapture else {
+        guard !hiddenForCapture,
+              statusOverlay == nil else {
             return
         }
 
@@ -978,15 +1108,27 @@ private final class RegionSelectionView: NSView {
             return
         }
 
-        drawDimmedBackground()
+        if statusOverlay == nil {
+            drawDimmedBackground()
+        } else {
+            NSColor.clear.setFill()
+            dirtyRect.fill(using: .clear)
+        }
 
         if let selectionRect {
-            drawUndimmedBackground(in: selectionRect)
+            if statusOverlay == nil {
+                drawUndimmedBackground(in: selectionRect)
+            }
 
             NSColor.white.withAlphaComponent(0.95).setStroke()
             let path = NSBezierPath(rect: selectionRect)
             path.lineWidth = 1
             path.stroke()
+
+            if let statusOverlay {
+                drawStatusOverlay(statusOverlay, around: selectionRect)
+                return
+            }
 
             drawSelectionHandles(in: selectionRect)
             drawSizeBadge(for: selectionRect)
@@ -1039,8 +1181,22 @@ private final class RegionSelectionView: NSView {
 
     func prepareForCapture() {
         hiddenForCapture = true
+        statusOverlay = nil
         closeTransientUI()
         needsDisplay = true
+    }
+
+    func beginScrollingCaptureProgress(
+        finish: @escaping () -> Void,
+        cancel: @escaping () -> Void
+    ) {
+        hiddenForCapture = false
+        statusOverlay = .scrollingCapture(finish: finish, cancel: cancel)
+        interaction = .idle
+        closeTransientUI()
+        autoSelectionCandidateRect = nil
+        needsDisplay = true
+        window?.invalidateCursorRects(for: self)
     }
 
     func setHiddenForBaseImageCapture(_ hidden: Bool) {
@@ -1079,6 +1235,9 @@ private final class RegionSelectionView: NSView {
 
     func closeTransientUI() {
         hideToolbar()
+        if statusOverlay == nil {
+            hideStatusControl()
+        }
         autoSelectionCandidateRect = nil
         textEditor?.removeFromSuperview()
         textEditor = nil
@@ -1388,6 +1547,20 @@ private final class RegionSelectionView: NSView {
         drawSizeBadge(for: rect)
     }
 
+    private func drawStatusOverlay(_ status: RegionSelectionStatusOverlay, around rect: CGRect) {
+        switch status {
+        case .scrollingCapture:
+            drawScrollingCaptureStatus(around: rect)
+        }
+    }
+
+    private func drawScrollingCaptureStatus(around rect: CGRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4)
+        NSColor.systemBlue.withAlphaComponent(0.95).setStroke()
+        path.lineWidth = 2
+        path.stroke()
+    }
+
     private func drawSizeBadge(for rect: CGRect) {
         let text = "\(Int(rect.width)) x \(Int(rect.height))"
         let attributes: [NSAttributedString.Key: Any] = [
@@ -1613,6 +1786,90 @@ private final class RegionSelectionView: NSView {
         positionToolbar()
     }
 
+    private func showStatusControl(for status: RegionSelectionStatusOverlay) {
+        guard let selectionRect else {
+            return
+        }
+
+        let statusView: RegionSelectionStatusControlView
+        switch status {
+        case .scrollingCapture(let finish, let cancel):
+            statusView = RegionSelectionStatusControlView(
+                title: L10n.pixScrollingCaptureInProgress,
+                finishHelp: L10n.pixScrollingCaptureFinishHelp,
+                cancelHelp: L10n.pixScrollingCaptureCancelHelp,
+                finishAction: finish,
+                cancelAction: cancel
+            )
+        }
+
+        let hostingView = NSHostingView(rootView: statusView)
+        hostingView.frame = CGRect(x: 0, y: 0, width: 240, height: 44)
+        hostingView.layoutSubtreeIfNeeded()
+        let fittingSize = hostingView.fittingSize
+        hostingView.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: max(fittingSize.width, 1),
+            height: max(fittingSize.height, 1)
+        )
+
+        let statusWindow = NSWindow(
+            contentRect: hostingView.frame,
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        statusWindow.contentView = hostingView
+        statusWindow.backgroundColor = .clear
+        statusWindow.isOpaque = false
+        statusWindow.level = .screenSaver
+        statusWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        statusWindow.ignoresMouseEvents = false
+        statusWindow.isReleasedWhenClosed = false
+        statusWindow.orderFront(nil)
+        self.statusWindow = statusWindow
+
+        _ = selectionRect
+        positionStatusControl()
+    }
+
+    private func positionStatusControl() {
+        guard let statusWindow,
+              let selectionRect else {
+            return
+        }
+
+        let statusSize = statusWindow.frame.size
+        let screenRect = screenRect(fromLocalRect: selectionRect)
+        let padding: CGFloat = 10
+        var origin = CGPoint(
+            x: screenRect.midX - statusSize.width / 2,
+            y: screenRect.minY - statusSize.height - padding
+        )
+
+        if origin.y < screenFrame.minY + padding {
+            origin.y = screenRect.maxY + padding
+        }
+
+        origin.x = min(
+            max(origin.x, screenFrame.minX + padding),
+            screenFrame.maxX - statusSize.width - padding
+        )
+        origin.y = min(
+            max(origin.y, screenFrame.minY + padding),
+            screenFrame.maxY - statusSize.height - padding
+        )
+
+        statusWindow.setFrameOrigin(origin)
+    }
+
+    private func hideStatusControl() {
+        statusWindow?.orderOut(nil)
+        statusWindow?.close()
+        statusWindow = nil
+    }
+
     private func refreshToolbar() {
         guard behavior == .capture else {
             positionToolbar()
@@ -1715,6 +1972,10 @@ private final class RegionSelectionView: NSView {
             recognizeText: { [weak self] in
                 self?.commitTextEditor()
                 self?.actions.finish(.recognizeText)
+            },
+            scrollingCapture: { [weak self] in
+                self?.commitTextEditor()
+                self?.actions.finish(.scrollingCapture)
             },
             cancel: { [weak self] in
                 self?.actions.cancel()
@@ -1989,6 +2250,12 @@ private struct RegionSelectionToolbarView: View {
             }
             .hoverTooltip(L10n.pixOCRTool)
 
+            Button(action: actions.scrollingCapture) {
+                Image(systemName: "arrow.down.doc")
+                    .frame(width: 22, height: 22)
+            }
+            .hoverTooltip(L10n.pixScrollingCaptureTool)
+
             Button(action: actions.save) {
                 Image(systemName: "square.and.arrow.down")
                     .frame(width: 22, height: 22)
@@ -2194,6 +2461,44 @@ private struct RegionSelectionConfirmToolbarView: View {
             }
             .keyboardShortcut(.return, modifiers: [])
             .hoverTooltip(L10n.captureStartRecording)
+        }
+        .buttonStyle(.borderless)
+        .toolbarSurface()
+        .padding(.bottom, 32)
+        .fixedSize()
+    }
+}
+
+private struct RegionSelectionStatusControlView: View {
+    let title: String
+    let finishHelp: String
+    let cancelHelp: String
+    let finishAction: () -> Void
+    let cancelAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 16, height: 16)
+
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Button(action: finishAction) {
+                Image(systemName: "checkmark")
+                    .frame(width: 22, height: 22)
+            }
+            .keyboardShortcut(.return, modifiers: [])
+            .hoverTooltip(finishHelp)
+
+            Button(action: cancelAction) {
+                Image(systemName: "xmark")
+                    .frame(width: 22, height: 22)
+            }
+            .hoverTooltip(cancelHelp)
         }
         .buttonStyle(.borderless)
         .toolbarSurface()
