@@ -119,7 +119,7 @@ final class TranslationController {
                 )
             ]
         } else {
-            self.providers = TranslationProvider.builtIn(preferences: self.preferences)
+            self.providers = TranslationProvider.builtIn()
         }
         self.pasteboard = pasteboard
         if let speechProviders, !speechProviders.isEmpty {
@@ -132,7 +132,7 @@ final class TranslationController {
                 )
             ]
         } else {
-            self.speechProviders = TranslationSpeechProvider.builtIn(preferences: self.preferences)
+            self.speechProviders = TranslationSpeechProvider.builtIn()
         }
         self.languageDetector = languageDetector ?? NaturalLanguageTranslationLanguageDetector()
         self.sourceLanguageCode = self.preferences.defaultSourceLanguageCode

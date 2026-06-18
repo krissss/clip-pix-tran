@@ -185,7 +185,6 @@ private enum LocalTranslationDictionary {
 enum TranslationProviderError: LocalizedError, Equatable {
     case unavailable
     case noEnabledProviders
-    case providerNotConfigured
     case requestFailed(String)
 
     var errorDescription: String? {
@@ -194,8 +193,6 @@ enum TranslationProviderError: LocalizedError, Equatable {
             L10n.tranProviderUnavailable
         case .noEnabledProviders:
             L10n.tranProviderNoneEnabled
-        case .providerNotConfigured:
-            L10n.tranProviderNotConfigured
         case .requestFailed(let message):
             message
         }

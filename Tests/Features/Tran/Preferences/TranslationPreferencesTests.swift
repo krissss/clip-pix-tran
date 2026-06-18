@@ -207,8 +207,7 @@ struct TranslationPreferencesTests {
     @Test func builtInProviderListIncludesExternalProviders() {
         #expect(TranslationProviderDescriptor.builtIn.map(\.id) == [
             TranslationProviderDescriptor.systemTranslation.id,
-            TranslationProviderDescriptor.google.id,
-            TranslationProviderDescriptor.openAICompatible.id
+            TranslationProviderDescriptor.google.id
         ])
     }
 
@@ -260,8 +259,7 @@ struct TranslationPreferencesTests {
     @Test func builtInSpeechProviderListIncludesExternalProviders() {
         #expect(TranslationSpeechProviderDescriptor.builtIn.map(\.id) == [
             TranslationSpeechProviderDescriptor.system.id,
-            TranslationSpeechProviderDescriptor.google.id,
-            TranslationSpeechProviderDescriptor.openAITextToSpeech.id
+            TranslationSpeechProviderDescriptor.google.id
         ])
     }
 
@@ -285,116 +283,6 @@ struct TranslationPreferencesTests {
         #expect(defaults.string(forKey: "tran.speechProviderID") == TranslationSpeechProviderDescriptor.system.id)
     }
 
-    @Test func persistsOpenAICompatibleConfiguration() {
-        let defaults = makeDefaults()
-        let secretStore = CapturingTranslationSecretStore()
-        var preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        preferences.updateOpenAICompatibleConfiguration(
-            OpenAICompatibleTranslationConfiguration(
-                baseURL: "https://api.deepseek.com/v1",
-                apiKey: "test-key",
-                model: "deepseek-chat"
-            )
-        )
-        preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        #expect(preferences.openAICompatibleConfiguration.baseURL == "https://api.deepseek.com/v1")
-        #expect(preferences.openAICompatibleConfiguration.apiKey == "test-key")
-        #expect(preferences.openAICompatibleConfiguration.model == "deepseek-chat")
-        #expect(defaults.string(forKey: "tran.openAICompatible.apiKey") == nil)
-    }
-
-    @Test func defaultsOpenAITextToSpeechConfigurationFromOpenAICompatibleCredentials() {
-        let defaults = makeDefaults()
-        defaults.set("https://proxy.example.com/v1", forKey: "tran.openAICompatible.baseURL")
-        let secretStore = CapturingTranslationSecretStore()
-        secretStore.updateOpenAICompatibleAPIKey("test-key")
-
-        let preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        #expect(preferences.openAITextToSpeechConfiguration.baseURL == "https://proxy.example.com/v1")
-        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "test-key")
-        #expect(preferences.openAITextToSpeechConfiguration.model == OpenAITextToSpeechConfiguration.defaultModel)
-        #expect(preferences.openAITextToSpeechConfiguration.voice == OpenAITextToSpeechConfiguration.defaultVoice)
-    }
-
-    @Test func migratesLegacyOpenAITextToSpeechSpeechEndpointDefaultModel() {
-        let defaults = makeDefaults()
-        defaults.set("gpt-4o-mini-tts", forKey: "tran.openAITextToSpeech.model")
-
-        let preferences = TranslationPreferences(defaults: defaults)
-
-        #expect(preferences.openAITextToSpeechConfiguration.model == OpenAITextToSpeechConfiguration.defaultModel)
-        #expect(defaults.string(forKey: "tran.openAITextToSpeech.model") == OpenAITextToSpeechConfiguration.defaultModel)
-    }
-
-    @Test func persistsOpenAITextToSpeechModelAndVoiceOnly() {
-        let defaults = makeDefaults()
-        let secretStore = CapturingTranslationSecretStore()
-        var preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        preferences.updateOpenAITextToSpeechConfiguration(
-            OpenAITextToSpeechConfiguration(
-                baseURL: "https://ignored.example.com/v1",
-                apiKey: "ignored-key",
-                model: "mimo-v2.5-tts",
-                voice: "mimo_default"
-            )
-        )
-        preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        #expect(preferences.openAITextToSpeechConfiguration.baseURL == OpenAICompatibleTranslationConfiguration.defaultBaseURL)
-        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "")
-        #expect(preferences.openAITextToSpeechConfiguration.model == "mimo-v2.5-tts")
-        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
-        #expect(defaults.string(forKey: "tran.openAITextToSpeech.apiKey") == nil)
-    }
-
-    @Test func normalizesOpenAIDefaultTextToSpeechVoiceForMiMoModel() {
-        let defaults = makeDefaults()
-        var preferences = TranslationPreferences(defaults: defaults)
-
-        preferences.updateOpenAITextToSpeechConfiguration(
-            OpenAITextToSpeechConfiguration(
-                baseURL: "https://token-plan-cn.xiaomimimo.com",
-                apiKey: "mimo-key",
-                model: "mimo-v2.5-tts",
-                voice: "alloy"
-            )
-        )
-        preferences = TranslationPreferences(defaults: defaults)
-
-        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
-        #expect(defaults.string(forKey: "tran.openAITextToSpeech.voice") == "mimo_default")
-    }
-
-    @Test func openAICompatibleUpdatesRefreshTextToSpeechCredentials() {
-        let defaults = makeDefaults()
-        let secretStore = CapturingTranslationSecretStore()
-        let preferences = TranslationPreferences(defaults: defaults, secretStore: secretStore)
-
-        preferences.updateOpenAITextToSpeechConfiguration(
-            OpenAITextToSpeechConfiguration(
-                baseURL: "",
-                apiKey: "",
-                model: "mimo-v2.5-tts",
-                voice: "mimo_default"
-            )
-        )
-        preferences.updateOpenAICompatibleConfiguration(
-            OpenAICompatibleTranslationConfiguration(
-                baseURL: "https://api.example.com/v1",
-                apiKey: "shared-key",
-                model: "gpt-test"
-            )
-        )
-
-        #expect(preferences.openAITextToSpeechConfiguration.baseURL == "https://api.example.com/v1")
-        #expect(preferences.openAITextToSpeechConfiguration.apiKey == "shared-key")
-        #expect(preferences.openAITextToSpeechConfiguration.model == "mimo-v2.5-tts")
-        #expect(preferences.openAITextToSpeechConfiguration.voice == "mimo_default")
-    }
 }
 
 private func makeDefaults() -> UserDefaults {
@@ -402,16 +290,4 @@ private func makeDefaults() -> UserDefaults {
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
-}
-
-private final class CapturingTranslationSecretStore: TranslationSecretStore {
-    private var apiKey = ""
-
-    func openAICompatibleAPIKey() -> String {
-        apiKey
-    }
-
-    func updateOpenAICompatibleAPIKey(_ apiKey: String) {
-        self.apiKey = apiKey
-    }
 }

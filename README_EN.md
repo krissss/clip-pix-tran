@@ -37,7 +37,7 @@ ClipPixTran keeps core workflows local to your Mac. Depending on the features yo
 - Screen Recording: used for screenshots, screen recording, and region capture.
 - Input Monitoring: used for some global shortcuts.
 
-Translation services may access the network; API keys are stored in the system Keychain.
+Network translation services may access the network when enabled.
 
 ## Development Requirements
 

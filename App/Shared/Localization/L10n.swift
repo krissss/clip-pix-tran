@@ -131,8 +131,6 @@ enum L10n {
             "settings.translationServices": "Translation Services",
             "settings.speechServices": "Speech Services",
             "settings.defaultSpeech": "Default Speech",
-            "settings.requiresConfiguration": "Requires Configuration",
-            "settings.mimoFootnote": "MiMo speech: Base URL can be a host or /v1. TTS Voice supports mimo_default, Chloe, and more; alloy is treated as mimo_default.",
             "settings.persistTranslationHistory": "Keep Translation History After Relaunch",
             "settings.translationHistoryLimit": "Translation History Limit",
             "settings.tranFootnote": "The target language follows the system by default. Speech uses the system voice by default. Translation history is saved locally.",
@@ -355,10 +353,7 @@ enum L10n {
             "tran.emptySourceError": "Enter text to translate.",
             "tran.providerUnavailable": "The translation service is unavailable. Try again later or check the system language package.",
             "tran.providerNoneEnabled": "Enable at least one translation provider.",
-            "tran.providerNotConfigured": "This translation provider is not configured. Fill in the required settings first.",
             "speech.providerUnavailable": "The speech service is unavailable. Try again later or check the speech provider configuration.",
-            "speech.providerNotConfigured": "The speech provider is not configured. Fill in Base URL, API Key, TTS Model, and TTS Voice in Settings.",
-            "speech.noAudioData": "The speech service returned no playable audio data.",
             "speech.requestFailed": "Speech service request failed (HTTP %d).",
             "textSelection.noSelection": "No selected text was detected.",
             "clipboard.writeFailed": "Could not write to the clipboard.",
@@ -477,8 +472,6 @@ enum L10n {
             "settings.translationServices": "翻译服务",
             "settings.speechServices": "发音服务",
             "settings.defaultSpeech": "默认发音",
-            "settings.requiresConfiguration": "需要配置",
-            "settings.mimoFootnote": "MiMo 发音：Base URL 可填到 host 或 /v1；TTS Voice 使用 mimo_default、Chloe 等，alloy 会自动按 mimo_default 处理。",
             "settings.persistTranslationHistory": "重启后保留翻译历史",
             "settings.translationHistoryLimit": "翻译历史上限",
             "settings.tranFootnote": "目标语言默认跟随系统；发音默认使用系统语音；翻译历史会保存到本机。",
@@ -701,10 +694,7 @@ enum L10n {
             "tran.emptySourceError": "请输入要翻译的文本。",
             "tran.providerUnavailable": "当前翻译服务不可用。请稍后重试，或检查系统翻译语言包。",
             "tran.providerNoneEnabled": "请至少启用一个翻译 provider。",
-            "tran.providerNotConfigured": "此翻译 provider 尚未配置。请到设置里填写必要信息。",
             "speech.providerUnavailable": "当前发音服务不可用。请稍后重试，或检查发音 provider 配置。",
-            "speech.providerNotConfigured": "发音 provider 尚未配置。请到设置里填写 Base URL、API Key、TTS Model 和 TTS Voice。",
-            "speech.noAudioData": "发音服务没有返回可播放的音频数据。",
             "speech.requestFailed": "发音服务请求失败（HTTP %d）。",
             "textSelection.noSelection": "没有检测到选中文本。",
             "clipboard.writeFailed": "无法写入剪贴板。",
@@ -826,8 +816,6 @@ extension L10n {
     static var settingsTranslationServices: String { tr("settings.translationServices", "翻译服务") }
     static var settingsSpeechServices: String { tr("settings.speechServices", "发音服务") }
     static var settingsDefaultSpeech: String { tr("settings.defaultSpeech", "默认发音") }
-    static var settingsRequiresConfiguration: String { tr("settings.requiresConfiguration", "需要配置") }
-    static var settingsMimoFootnote: String { tr("settings.mimoFootnote", "MiMo 发音：Base URL 可填到 host 或 /v1；TTS Voice 使用 mimo_default、Chloe 等，alloy 会自动按 mimo_default 处理。") }
     static var settingsPersistTranslationHistory: String { tr("settings.persistTranslationHistory", "重启后保留翻译历史") }
     static var settingsTranslationHistoryLimit: String { tr("settings.translationHistoryLimit", "翻译历史上限") }
     static var settingsTranFootnote: String { tr("settings.tranFootnote", "目标语言默认跟随系统；发音默认使用系统语音；翻译历史会保存到本机。") }
@@ -1071,10 +1059,7 @@ extension L10n {
     static var tranEmptySourceError: String { tr("tran.emptySourceError", "请输入要翻译的文本。") }
     static var tranProviderUnavailable: String { tr("tran.providerUnavailable", "当前翻译服务不可用。请稍后重试，或检查系统翻译语言包。") }
     static var tranProviderNoneEnabled: String { tr("tran.providerNoneEnabled", "请至少启用一个翻译 provider。") }
-    static var tranProviderNotConfigured: String { tr("tran.providerNotConfigured", "此翻译 provider 尚未配置。请到设置里填写必要信息。") }
     static var speechProviderUnavailable: String { tr("speech.providerUnavailable", "当前发音服务不可用。请稍后重试，或检查发音 provider 配置。") }
-    static var speechProviderNotConfigured: String { tr("speech.providerNotConfigured", "发音 provider 尚未配置。请到设置里填写 Base URL、API Key、TTS Model 和 TTS Voice。") }
-    static var speechNoAudioData: String { tr("speech.noAudioData", "发音服务没有返回可播放的音频数据。") }
     static func speechRequestFailed(statusCode: Int) -> String {
         format("speech.requestFailed", "发音服务请求失败（HTTP %d）。", statusCode)
     }

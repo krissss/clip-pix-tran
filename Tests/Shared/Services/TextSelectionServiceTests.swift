@@ -5,9 +5,9 @@ import Testing
 struct TextSelectionServiceTests {
     @Test func prefersClipboardSelectionToPreserveFormatting() async {
         let service = SystemTextSelectionService(
-            accessibilityGrabber: { "Providers: OpenAI Google Apple" },
+            accessibilityGrabber: { "Providers: System Google Apple" },
             clipboardGrabber: {
-                "\n  Providers\n\n- OpenAI\n- Google\n- Apple\n\n"
+                "\n  Providers\n\n- System\n- Google\n- Apple\n\n"
             }
         )
 
@@ -18,7 +18,7 @@ struct TextSelectionServiceTests {
                 """
                 Providers
 
-                - OpenAI
+                - System
                 - Google
                 - Apple
                 """

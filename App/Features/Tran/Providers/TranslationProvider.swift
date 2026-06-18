@@ -5,20 +5,17 @@ struct TranslationProviderDescriptor: Identifiable, Codable, Equatable, Sendable
     let name: String
     let systemImage: String
     let isLocal: Bool
-    let requiresConfiguration: Bool
 
     init(
         id: String,
         name: String,
         systemImage: String,
-        isLocal: Bool,
-        requiresConfiguration: Bool = false
+        isLocal: Bool
     ) {
         self.id = id
         self.name = name
         self.systemImage = systemImage
         self.isLocal = isLocal
-        self.requiresConfiguration = requiresConfiguration
     }
 }
 
@@ -37,18 +34,9 @@ extension TranslationProviderDescriptor {
         isLocal: false
     )
 
-    static let openAICompatible = TranslationProviderDescriptor(
-        id: "openai-compatible",
-        name: "OpenAI Compatible",
-        systemImage: "sparkles",
-        isLocal: false,
-        requiresConfiguration: true
-    )
-
     static let builtIn: [TranslationProviderDescriptor] = [
         .systemTranslation,
-        .google,
-        .openAICompatible
+        .google
     ]
 
     static func descriptor(for id: String) -> TranslationProviderDescriptor {
@@ -80,8 +68,7 @@ struct TranslationProvider: Identifiable {
 }
 
 extension TranslationProvider {
-    static func builtIn(preferences: TranslationPreferences? = nil) -> [TranslationProvider] {
-        let preferences = preferences ?? TranslationPreferences()
+    static func builtIn() -> [TranslationProvider] {
         return [
             TranslationProvider(
                 descriptor: .systemTranslation,
@@ -90,12 +77,6 @@ extension TranslationProvider {
             TranslationProvider(
                 descriptor: .google,
                 service: GoogleTranslationService()
-            ),
-            TranslationProvider(
-                descriptor: .openAICompatible,
-                service: OpenAICompatibleTranslationService(
-                    configurationProvider: { preferences.openAICompatibleConfiguration }
-                )
             )
         ]
     }

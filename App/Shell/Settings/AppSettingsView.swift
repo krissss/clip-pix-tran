@@ -402,38 +402,6 @@ private struct TranSettingsSection: View {
                 .settingsRowGroup()
             }
 
-            SettingsGroup(title: "OpenAI Compatible") {
-                VStack(spacing: 0) {
-                    SettingsFormRow(title: "Base URL") {
-                        TextField("https://api.openai.com/v1", text: openAIBaseURL)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    SettingsFormRow(title: "API Key") {
-                        SecureField("sk-...", text: openAIAPIKey)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    SettingsFormRow(title: "Translation Model") {
-                        TextField("gpt-4o-mini", text: openAIModel)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    SettingsFormRow(title: "TTS Model") {
-                        TextField(OpenAITextToSpeechConfiguration.defaultModel, text: openAITTSModel)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    SettingsFormRow(title: "TTS Voice") {
-                        TextField(OpenAITextToSpeechConfiguration.defaultVoice, text: openAITTSVoice)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
-                .settingsRowGroup()
-
-                SettingsFootnote(L10n.settingsMimoFootnote)
-            }
-
             SettingsGroup(title: L10n.settingsHistory) {
                 VStack(spacing: 0) {
                     toggleRow(L10n.settingsPersistTranslationHistory, isOn: persistsHistory)
@@ -484,12 +452,6 @@ private struct TranSettingsSection: View {
                 Label(provider.name, systemImage: provider.systemImage)
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.primary)
-
-                if provider.requiresConfiguration {
-                    Text(L10n.settingsRequiresConfiguration)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
             }
         } control: {
             Toggle("", isOn: providerEnabledBinding(provider.id))
@@ -520,77 +482,6 @@ private struct TranSettingsSection: View {
         } set: { newValue in
             controller.history.updatePersistsHistory(newValue)
         }
-    }
-
-    private var openAIBaseURL: Binding<String> {
-        Binding {
-            controller.preferences.openAICompatibleConfiguration.baseURL
-        } set: { newValue in
-            updateOpenAICompatibleConfiguration(baseURL: newValue)
-        }
-    }
-
-    private var openAIAPIKey: Binding<String> {
-        Binding {
-            controller.preferences.openAICompatibleConfiguration.apiKey
-        } set: { newValue in
-            updateOpenAICompatibleConfiguration(apiKey: newValue)
-        }
-    }
-
-    private var openAIModel: Binding<String> {
-        Binding {
-            controller.preferences.openAICompatibleConfiguration.model
-        } set: { newValue in
-            updateOpenAICompatibleConfiguration(model: newValue)
-        }
-    }
-
-    private var openAITTSModel: Binding<String> {
-        Binding {
-            controller.preferences.openAITextToSpeechConfiguration.model
-        } set: { newValue in
-            updateOpenAITextToSpeechConfiguration(model: newValue)
-        }
-    }
-
-    private var openAITTSVoice: Binding<String> {
-        Binding {
-            controller.preferences.openAITextToSpeechConfiguration.voice
-        } set: { newValue in
-            updateOpenAITextToSpeechConfiguration(voice: newValue)
-        }
-    }
-
-    private func updateOpenAICompatibleConfiguration(
-        baseURL: String? = nil,
-        apiKey: String? = nil,
-        model: String? = nil
-    ) {
-        let configuration = controller.preferences.openAICompatibleConfiguration
-        controller.preferences.updateOpenAICompatibleConfiguration(
-            OpenAICompatibleTranslationConfiguration(
-                baseURL: baseURL ?? configuration.baseURL,
-                apiKey: apiKey ?? configuration.apiKey,
-                model: model ?? configuration.model
-            )
-        )
-    }
-
-    private func updateOpenAITextToSpeechConfiguration(
-        model: String? = nil,
-        voice: String? = nil
-    ) {
-        let configuration = controller.preferences.openAITextToSpeechConfiguration
-        let openAIConfiguration = controller.preferences.openAICompatibleConfiguration
-        controller.preferences.updateOpenAITextToSpeechConfiguration(
-            OpenAITextToSpeechConfiguration(
-                baseURL: openAIConfiguration.baseURL,
-                apiKey: openAIConfiguration.apiKey,
-                model: model ?? configuration.model,
-                voice: voice ?? configuration.voice
-            )
-        )
     }
 }
 
