@@ -17,6 +17,7 @@ final class RegionSelectionOverlay {
     private var resignObserver: NSObjectProtocol?
     private var didFinish = false
     private var activeBaseCaptureID: UUID?
+    private var pendingBaseImageTask: Task<Void, Never>?
     private var scrollingCaptureSession: ScrollingScreenshotCaptureSession?
     private let captureProvider: CaptureProvider
     private let initialMode: ScreenshotRegionCaptureMode
@@ -430,39 +431,38 @@ final class RegionSelectionOverlay {
 
         let captureID = UUID()
         activeBaseCaptureID = captureID
+        pendingBaseImageTask?.cancel()
 
-        Task { @MainActor [weak self, weak view] in
+        pendingBaseImageTask = Task { [weak self, weak view] in
             guard let self else {
                 return
             }
 
-            defer {
-                if self.activeBaseCaptureID == captureID {
+            do {
+                let excludedWindowIDs = await MainActor.run { self.excludedWindowIDs }
+                let baseData = try await self.captureProvider(screenRect, excludedWindowIDs)
+                await MainActor.run {
+                    guard self.activeBaseCaptureID == captureID,
+                          !self.didFinish else {
+                        return
+                    }
+
+                    view?.setBaseImageData(baseData, for: screenRect)
+                    self.activeBaseCaptureID = nil
+                    self.setNeedsDisplayOnAllScreens()
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.activeBaseCaptureID == captureID else {
+                        return
+                    }
+
+                    view?.clearBaseImage()
                     self.activeBaseCaptureID = nil
                     if !self.didFinish {
                         self.setNeedsDisplayOnAllScreens()
                     }
                 }
-            }
-
-            do {
-                let baseData = try await self.captureProvider(
-                    screenRect,
-                    self.excludedWindowIDs
-                )
-                guard self.activeBaseCaptureID == captureID,
-                      !self.didFinish else {
-                    return
-                }
-
-                view?.setBaseImageData(baseData, for: screenRect)
-                self.setNeedsDisplayOnAllScreens()
-            } catch {
-                guard self.activeBaseCaptureID == captureID else {
-                    return
-                }
-
-                view?.clearBaseImage()
             }
         }
     }
@@ -505,6 +505,8 @@ final class RegionSelectionOverlay {
         }
 
         didFinish = true
+        pendingBaseImageTask?.cancel()
+        pendingBaseImageTask = nil
         removeMonitors()
         let session = scrollingCaptureSession
         scrollingCaptureSession = nil
@@ -808,6 +810,8 @@ private final class RegionSelectionView: NSView {
     private var statusWindow: NSWindow?
     private var textEditor: NSTextField?
     private var hiddenForCapture = false
+    private var pendingSnapshotBaseImageTask: Task<Data?, Never>?
+    private var pendingSnapshotBaseImageScreenRect: CGRect?
     private var statusOverlay: RegionSelectionStatusOverlay? {
         didSet {
             guard statusOverlay != oldValue else {
@@ -1226,11 +1230,13 @@ private final class RegionSelectionView: NSView {
             cgImage: cgImage,
             nsImage: NSImage(cgImage: cgImage, size: selectionRect.size)
         )
+        clearPendingSnapshotBaseImageCapture()
         needsDisplay = true
     }
 
     func clearBaseImage() {
         baseImage = nil
+        clearPendingSnapshotBaseImageCapture()
     }
 
     func closeTransientUI() {
@@ -1442,13 +1448,51 @@ private final class RegionSelectionView: NSView {
             return
         }
 
-        if let initialSnapshot,
-           let snapshotData = try? initialSnapshot.pngData(in: screenRect) {
-            setBaseImageData(snapshotData, for: screenRect)
+        if pendingSnapshotBaseImageScreenRect?.isApproximatelyEqual(to: screenRect) == true {
             return
         }
 
-        actions.requestBaseImageCapture(self, screenRect)
+        clearPendingSnapshotBaseImageCapture()
+
+        guard let initialSnapshot else {
+            actions.requestBaseImageCapture(self, screenRect)
+            return
+        }
+
+        let snapshotTask = Task.detached(priority: .utility) { [initialSnapshot, screenRect] in
+            try? initialSnapshot.pngData(in: screenRect)
+        }
+        pendingSnapshotBaseImageTask = snapshotTask
+        pendingSnapshotBaseImageScreenRect = screenRect
+
+        Task { [weak self, snapshotTask, screenRect] in
+            let snapshotData = await snapshotTask.value
+            await MainActor.run { [weak self] in
+                guard let self,
+                      self.pendingSnapshotBaseImageScreenRect?.isApproximatelyEqual(to: screenRect) == true else {
+                    return
+                }
+
+                defer {
+                    self.clearPendingSnapshotBaseImageCapture()
+                }
+
+                guard let snapshotData else {
+                    self.clearPendingSnapshotBaseImageCapture()
+                    self.actions.requestBaseImageCapture(self, screenRect)
+                    return
+                }
+
+                self.setBaseImageData(snapshotData, for: screenRect)
+                self.actions.setNeedsDisplayOnAllScreens()
+            }
+        }
+    }
+
+    private func clearPendingSnapshotBaseImageCapture() {
+        pendingSnapshotBaseImageTask?.cancel()
+        pendingSnapshotBaseImageTask = nil
+        pendingSnapshotBaseImageScreenRect = nil
     }
 
     private func drawBaseImage(in selectionRect: CGRect) {
