@@ -15,6 +15,8 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     @ObservationIgnored private var updaterStarted = false
+    @ObservationIgnored private var updateCheckWakeUpTimer: Timer?
+    @ObservationIgnored private static let updateCheckWakeUpGraceInterval: TimeInterval = 60
     @ObservationIgnored private static let isRunningTests =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
         ProcessInfo.processInfo.processName == "xctest"
@@ -71,10 +73,8 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
         _ = updater
         configureCancellables()
         startUpdaterIfNeeded()
-        if updater.automaticallyChecksForUpdates {
-            updater.checkForUpdatesInBackground()
-        }
         syncFromSparkle()
+        scheduleUpdateCheckWakeUp()
     }
 
     func checkForUpdates() {
@@ -102,6 +102,7 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
         automaticallyChecksForUpdates = newValue
         startUpdaterIfNeeded()
         updater.automaticallyChecksForUpdates = newValue
+        scheduleUpdateCheckWakeUp()
     }
 
     func setAutomaticallyDownloadsUpdates(_ newValue: Bool) {
@@ -122,12 +123,30 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
         updateCheckInterval = interval.seconds
         startUpdaterIfNeeded()
         updater.updateCheckInterval = interval.seconds
+        scheduleUpdateCheckWakeUp()
     }
 
     nonisolated static func isDebugBuildChannel(_ buildChannel: String?) -> Bool {
         buildChannel?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .caseInsensitiveCompare("Debug") == .orderedSame
+    }
+
+    nonisolated static func delayUntilUpdateCheckIsDue(
+        lastUpdateCheckDate: Date?,
+        updateCheckInterval: TimeInterval,
+        now: Date = Date()
+    ) -> TimeInterval {
+        guard updateCheckInterval > 0 else {
+            return .infinity
+        }
+
+        guard let lastUpdateCheckDate else {
+            return 0
+        }
+
+        let elapsed = max(0, now.timeIntervalSince(lastUpdateCheckDate))
+        return max(0, updateCheckInterval - elapsed)
     }
 
     private func configureCancellables() {
@@ -138,12 +157,18 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
         updater.publisher(for: \.lastUpdateCheckDate)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in self?.lastUpdateCheckDate = value }
+            .sink { [weak self] value in
+                self?.lastUpdateCheckDate = value
+                self?.scheduleUpdateCheckWakeUp()
+            }
             .store(in: &cancellables)
 
         updater.publisher(for: \.automaticallyChecksForUpdates)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in self?.automaticallyChecksForUpdates = value }
+            .sink { [weak self] value in
+                self?.automaticallyChecksForUpdates = value
+                self?.scheduleUpdateCheckWakeUp()
+            }
             .store(in: &cancellables)
 
         updater.publisher(for: \.automaticallyDownloadsUpdates)
@@ -153,7 +178,10 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
 
         updater.publisher(for: \.updateCheckInterval)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in self?.updateCheckInterval = value }
+            .sink { [weak self] value in
+                self?.updateCheckInterval = value
+                self?.scheduleUpdateCheckWakeUp()
+            }
             .store(in: &cancellables)
     }
 
@@ -176,6 +204,64 @@ final class AppUpdateManager: NSObject, SPUUpdaterDelegate {
         automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
         automaticallyDownloadsUpdates = updater.automaticallyDownloadsUpdates
         updateCheckInterval = updater.updateCheckInterval
+    }
+
+    private func scheduleUpdateCheckWakeUp() {
+        updateCheckWakeUpTimer?.invalidate()
+        updateCheckWakeUpTimer = nil
+
+        guard updaterStarted,
+              updater.automaticallyChecksForUpdates else {
+            return
+        }
+
+        let delayUntilDue = Self.delayUntilUpdateCheckIsDue(
+            lastUpdateCheckDate: updater.lastUpdateCheckDate,
+            updateCheckInterval: updater.updateCheckInterval
+        )
+        guard delayUntilDue.isFinite else {
+            return
+        }
+
+        let wakeUpDelay = max(
+            Self.updateCheckWakeUpGraceInterval,
+            delayUntilDue + Self.updateCheckWakeUpGraceInterval
+        )
+        let timer = Timer(timeInterval: wakeUpDelay, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.wakeUpOverdueUpdateCheck()
+            }
+        }
+
+        updateCheckWakeUpTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func wakeUpOverdueUpdateCheck() {
+        updateCheckWakeUpTimer?.invalidate()
+        updateCheckWakeUpTimer = nil
+        syncFromSparkle()
+
+        guard updaterStarted,
+              updater.automaticallyChecksForUpdates else {
+            return
+        }
+
+        guard !updater.sessionInProgress else {
+            scheduleUpdateCheckWakeUp()
+            return
+        }
+
+        let delayUntilDue = Self.delayUntilUpdateCheckIsDue(
+            lastUpdateCheckDate: updater.lastUpdateCheckDate,
+            updateCheckInterval: updater.updateCheckInterval
+        )
+
+        if delayUntilDue > 0 {
+            scheduleUpdateCheckWakeUp()
+        } else {
+            updater.resetUpdateCycle()
+        }
     }
 
     nonisolated func updaterShouldPromptForPermissionToCheck(forUpdates _: SPUUpdater) -> Bool {
