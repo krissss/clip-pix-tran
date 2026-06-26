@@ -113,8 +113,14 @@ enum ScreenshotAnnotationRenderer {
         baseImage: CGImage?,
         scale: CGSize
     ) {
+        var stepNumber = 0
         for annotation in annotations {
-            draw(annotation, in: context, baseImage: baseImage, scale: scale)
+            if annotation.kind == .step {
+                stepNumber += 1
+                draw(annotation, stepNumber: stepNumber, in: context)
+            } else {
+                draw(annotation, in: context, baseImage: baseImage, scale: scale)
+            }
         }
     }
 
@@ -144,8 +150,25 @@ enum ScreenshotAnnotationRenderer {
             drawText(annotation, in: context)
         case .mosaic:
             drawMosaic(annotation, in: context, baseImage: baseImage, scale: scale)
+        case .step:
+            break
         }
 
+        context.restoreGState()
+    }
+
+    nonisolated private static func draw(
+        _ annotation: ScreenshotAnnotation,
+        stepNumber: Int,
+        in context: CGContext
+    ) {
+        guard annotation.points.first != nil else {
+            return
+        }
+
+        context.saveGState()
+        drawStepBubble(annotation, stepNumber: stepNumber, in: context)
+        drawStepDescription(annotation, in: context)
         context.restoreGState()
     }
 
@@ -232,11 +255,7 @@ enum ScreenshotAnnotationRenderer {
         }
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: CTFontCreateWithName(
-                "HelveticaNeue-Medium" as CFString,
-                annotation.style.fontSize,
-                nil
-            ),
+            .font: annotation.style.ctFont,
             .foregroundColor: annotation.style.colorComponents.cgColor
         ]
         let attributedText = NSAttributedString(string: text, attributes: attributes)
@@ -245,6 +264,79 @@ enum ScreenshotAnnotationRenderer {
         context.textMatrix = .identity
         context.textPosition = origin
         CTLineDraw(line, context)
+    }
+
+    nonisolated private static func drawStepBubble(
+        _ annotation: ScreenshotAnnotation,
+        stepNumber: Int,
+        in context: CGContext
+    ) {
+        guard let center = annotation.points.first else {
+            return
+        }
+
+        let diameter = stepBubbleDiameter(for: annotation.style)
+        let bubbleRect = CGRect(
+            x: center.x - diameter / 2,
+            y: center.y - diameter / 2,
+            width: diameter,
+            height: diameter
+        )
+
+        context.setFillColor(annotation.style.colorComponents.cgColor)
+        context.fillEllipse(in: bubbleRect)
+        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.92))
+        context.setLineWidth(max(2, diameter * 0.08))
+        context.strokeEllipse(in: bubbleRect.insetBy(dx: 1, dy: 1))
+
+        let text = "\(stepNumber)"
+        let fontSize = min(max(annotation.style.fontSize * 0.78, 12), diameter * 0.52)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil),
+            .foregroundColor: CGColor(red: 1, green: 1, blue: 1, alpha: 1)
+        ]
+        let attributedText = NSAttributedString(string: text, attributes: attributes)
+        let line = CTLineCreateWithAttributedString(attributedText)
+        let bounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+        let textOrigin = CGPoint(
+            x: center.x - bounds.width / 2 - bounds.minX,
+            y: center.y - bounds.height / 2 - bounds.minY
+        )
+
+        context.textMatrix = .identity
+        context.textPosition = textOrigin
+        CTLineDraw(line, context)
+    }
+
+    nonisolated private static func drawStepDescription(
+        _ annotation: ScreenshotAnnotation,
+        in context: CGContext
+    ) {
+        guard let center = annotation.points.first,
+              let text = annotation.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else {
+            return
+        }
+
+        let diameter = stepBubbleDiameter(for: annotation.style)
+        let origin = CGPoint(
+            x: center.x + diameter / 2 + 8,
+            y: center.y - annotation.style.fontSize * 0.38
+        )
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: annotation.style.ctFont,
+            .foregroundColor: annotation.style.colorComponents.cgColor
+        ]
+        let attributedText = NSAttributedString(string: text, attributes: attributes)
+        let line = CTLineCreateWithAttributedString(attributedText)
+
+        context.textMatrix = .identity
+        context.textPosition = origin
+        CTLineDraw(line, context)
+    }
+
+    nonisolated static func stepBubbleDiameter(for style: ScreenshotAnnotationStyle) -> CGFloat {
+        max(style.fontSize + 14, 30)
     }
 
     nonisolated private static func drawMosaic(
@@ -397,5 +489,24 @@ private extension ScreenshotColorComponents {
             blue: blue,
             alpha: alpha
         )
+    }
+}
+
+private extension ScreenshotAnnotationStyle {
+    nonisolated var ctFont: CTFont {
+        CTFontCreateWithName(fontWeight.postScriptName as CFString, fontSize, nil)
+    }
+}
+
+private extension ScreenshotTextWeight {
+    nonisolated var postScriptName: String {
+        switch self {
+        case .regular:
+            "HelveticaNeue"
+        case .medium:
+            "HelveticaNeue-Medium"
+        case .bold:
+            "HelveticaNeue-Bold"
+        }
     }
 }

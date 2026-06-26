@@ -7,6 +7,7 @@ enum ScreenshotAnnotationKind: String, Codable, Equatable, Sendable {
     case pen
     case text
     case mosaic
+    case step
 }
 
 enum ScreenshotMosaicMode: String, Codable, Equatable, Sendable {
@@ -14,10 +15,17 @@ enum ScreenshotMosaicMode: String, Codable, Equatable, Sendable {
     case brush
 }
 
+enum ScreenshotTextWeight: String, Codable, Equatable, Sendable {
+    case regular
+    case medium
+    case bold
+}
+
 struct ScreenshotAnnotationStyle: Codable, Equatable, Sendable {
     var colorComponents: ScreenshotColorComponents
     var lineWidth: CGFloat
     var fontSize: CGFloat
+    var fontWeight: ScreenshotTextWeight
     var mosaicMode: ScreenshotMosaicMode
     var mosaicBlockSize: CGFloat
     var mosaicBrushSize: CGFloat
@@ -26,6 +34,7 @@ struct ScreenshotAnnotationStyle: Codable, Equatable, Sendable {
         colorComponents: ScreenshotColorComponents = .red,
         lineWidth: CGFloat = 3,
         fontSize: CGFloat = 20,
+        fontWeight: ScreenshotTextWeight = .medium,
         mosaicMode: ScreenshotMosaicMode = .rectangle,
         mosaicBlockSize: CGFloat = 14,
         mosaicBrushSize: CGFloat = 28
@@ -33,9 +42,21 @@ struct ScreenshotAnnotationStyle: Codable, Equatable, Sendable {
         self.colorComponents = colorComponents
         self.lineWidth = lineWidth
         self.fontSize = fontSize
+        self.fontWeight = fontWeight
         self.mosaicMode = mosaicMode
         self.mosaicBlockSize = mosaicBlockSize
         self.mosaicBrushSize = mosaicBrushSize
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        colorComponents = try container.decode(ScreenshotColorComponents.self, forKey: .colorComponents)
+        lineWidth = try container.decode(CGFloat.self, forKey: .lineWidth)
+        fontSize = try container.decode(CGFloat.self, forKey: .fontSize)
+        fontWeight = try container.decodeIfPresent(ScreenshotTextWeight.self, forKey: .fontWeight) ?? .medium
+        mosaicMode = try container.decode(ScreenshotMosaicMode.self, forKey: .mosaicMode)
+        mosaicBlockSize = try container.decode(CGFloat.self, forKey: .mosaicBlockSize)
+        mosaicBrushSize = try container.decode(CGFloat.self, forKey: .mosaicBrushSize)
     }
 
     @MainActor
@@ -166,6 +187,28 @@ final class ScreenshotAnnotationStore {
 
         annotations[index] = annotation
         refreshAvailability()
+    }
+
+    func remove(id: UUID) {
+        guard let index = annotations.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        pushUndoSnapshot()
+        annotations.remove(at: index)
+        redoStack.removeAll()
+        refreshAvailability()
+    }
+
+    func stepNumber(for id: UUID) -> Int? {
+        var stepNumber = 0
+        for annotation in annotations where annotation.kind == .step {
+            stepNumber += 1
+            if annotation.id == id {
+                return stepNumber
+            }
+        }
+        return nil
     }
 
     func removeLastIfEmpty() {

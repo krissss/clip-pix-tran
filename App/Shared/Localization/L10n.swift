@@ -293,7 +293,9 @@ enum L10n {
             "capture.tool.arrow": "Arrow",
             "capture.tool.pen": "Pen",
             "capture.tool.text": "Text",
+            "capture.tool.step": "Step",
             "capture.tool.mosaic": "Mosaic",
+            "capture.stepDescription": "Description",
             "capture.undo": "Undo",
             "capture.redo": "Redo",
             "capture.startRecording": "Start Recording",
@@ -303,6 +305,7 @@ enum L10n {
             "capture.color": "Color",
             "capture.lineWidth": "Line Width",
             "capture.fontSize": "Font Size",
+            "capture.fontWeight": "Font Weight",
             "language.autoDetect": "Auto Detect",
             "language.zhHans": "Simplified Chinese",
             "language.zhHant": "Traditional Chinese",
@@ -639,7 +642,9 @@ enum L10n {
             "capture.tool.arrow": "箭头",
             "capture.tool.pen": "画笔",
             "capture.tool.text": "文字",
+            "capture.tool.step": "步骤",
             "capture.tool.mosaic": "马赛克",
+            "capture.stepDescription": "描述",
             "capture.undo": "撤销",
             "capture.redo": "重做",
             "capture.startRecording": "开始录制",
@@ -649,6 +654,7 @@ enum L10n {
             "capture.color": "颜色",
             "capture.lineWidth": "线条粗细",
             "capture.fontSize": "字号大小",
+            "capture.fontWeight": "文字粗细",
             "language.autoDetect": "自动识别",
             "language.zhHans": "简体中文",
             "language.zhHant": "繁体中文",
@@ -999,7 +1005,9 @@ extension L10n {
     static var captureToolArrow: String { tr("capture.tool.arrow", "箭头") }
     static var captureToolPen: String { tr("capture.tool.pen", "画笔") }
     static var captureToolText: String { tr("capture.tool.text", "文字") }
+    static var captureToolStep: String { tr("capture.tool.step", "步骤") }
     static var captureToolMosaic: String { tr("capture.tool.mosaic", "马赛克") }
+    static var captureStepDescription: String { tr("capture.stepDescription", "描述") }
     static var captureUndo: String { tr("capture.undo", "撤销") }
     static var captureRedo: String { tr("capture.redo", "重做") }
     static var captureStartRecording: String { tr("capture.startRecording", "开始录制") }
@@ -1009,6 +1017,7 @@ extension L10n {
     static var captureColor: String { tr("capture.color", "颜色") }
     static var captureLineWidth: String { tr("capture.lineWidth", "线条粗细") }
     static var captureFontSize: String { tr("capture.fontSize", "字号大小") }
+    static var captureFontWeight: String { tr("capture.fontWeight", "文字粗细") }
     static var languageAutoDetect: String { tr("language.autoDetect", "自动识别") }
     static var languageZhHans: String { tr("language.zhHans", "简体中文") }
     static var languageZhHant: String { tr("language.zhHant", "繁体中文") }

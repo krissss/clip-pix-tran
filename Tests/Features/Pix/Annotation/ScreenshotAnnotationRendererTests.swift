@@ -40,6 +40,16 @@ struct ScreenshotAnnotationRendererTests {
                 text: "Pix"
             ),
             ScreenshotAnnotation(
+                kind: .step,
+                points: [CGPoint(x: 32, y: 104)],
+                style: ScreenshotAnnotationStyle(
+                    colorComponents: .blue,
+                    fontSize: 18,
+                    fontWeight: .bold
+                ),
+                text: "Click"
+            ),
+            ScreenshotAnnotation(
                 kind: .mosaic,
                 points: [CGPoint(x: 60, y: 92), CGPoint(x: 110, y: 116)],
                 style: style

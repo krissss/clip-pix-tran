@@ -190,16 +190,9 @@ final class RegionSelectionOverlay {
             }
         }
 
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .rightMouseDown]) { [weak self] event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else {
                 return event
-            }
-
-            if event.type == .rightMouseDown {
-                Task { @MainActor [weak self] in
-                    self?.cancel()
-                }
-                return nil
             }
 
             if event.keyCode == 53 {
@@ -583,8 +576,7 @@ private final class RegionSelectionCancelEventTap {
             return
         }
 
-        let mask = (1 << CGEventType.keyDown.rawValue)
-            | (1 << CGEventType.rightMouseDown.rawValue)
+        let mask = 1 << CGEventType.keyDown.rawValue
         let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         guard let eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -629,7 +621,7 @@ private final class RegionSelectionCancelEventTap {
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        if type == .rightMouseDown || type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
+        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
             Task { @MainActor [action] in
                 action()
             }
@@ -654,8 +646,6 @@ private final class RegionSelectionWindow: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
         case .keyDown where event.keyCode == 53:
-            cancelHandler?()
-        case .rightMouseDown:
             cancelHandler?()
         default:
             super.sendEvent(event)
@@ -699,6 +689,7 @@ private enum RegionAnnotationTool: CaseIterable {
     case arrow
     case pen
     case text
+    case step
     case mosaic
 
     var annotationKind: ScreenshotAnnotationKind {
@@ -713,6 +704,8 @@ private enum RegionAnnotationTool: CaseIterable {
             .pen
         case .text:
             .text
+        case .step:
+            .step
         case .mosaic:
             .mosaic
         }
@@ -722,7 +715,16 @@ private enum RegionAnnotationTool: CaseIterable {
         switch self {
         case .rectangle, .ellipse, .arrow, .pen:
             true
-        case .text, .mosaic:
+        case .text, .step, .mosaic:
+            false
+        }
+    }
+
+    var usesTextEditor: Bool {
+        switch self {
+        case .text, .step:
+            true
+        case .rectangle, .ellipse, .arrow, .pen, .mosaic:
             false
         }
     }
@@ -739,6 +741,8 @@ private enum RegionAnnotationTool: CaseIterable {
             L10n.captureToolPen
         case .text:
             L10n.captureToolText
+        case .step:
+            L10n.captureToolStep
         case .mosaic:
             L10n.captureToolMosaic
         }
@@ -756,6 +760,8 @@ private enum RegionAnnotationTool: CaseIterable {
             "pencil.tip"
         case .text:
             "t.circle"
+        case .step:
+            "1.circle"
         case .mosaic:
             "checkerboard.rectangle"
         }
@@ -776,6 +782,7 @@ private struct RegionToolbarActions {
     let setColor: (ScreenshotColorComponents) -> Void
     let setLineWidth: (CGFloat) -> Void
     let setFontSize: (CGFloat) -> Void
+    let setFontWeight: (ScreenshotTextWeight) -> Void
     let setMosaicMode: (ScreenshotMosaicMode) -> Void
     let setMosaicBlockSize: (CGFloat) -> Void
     let setMosaicBrushSize: (CGFloat) -> Void
@@ -899,6 +906,8 @@ private final class RegionSelectionView: NSView {
 
         if event.keyCode == 53 {
             actions.cancel()
+        } else if event.keyCode == 51 || event.keyCode == 117 {
+            removeHoveredAnnotationIfPossible()
         } else if event.keyCode == 36 {
             switch behavior {
             case .capture:
@@ -913,6 +922,15 @@ private final class RegionSelectionView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         guard statusOverlay == nil else {
+            return
+        }
+
+        let point = convert(event.locationInWindow, from: nil)
+        if let selectionRect,
+           behavior == .capture,
+           toolbarCaptureMode == .screenshot,
+           let annotation = annotation(at: point, in: selectionRect) {
+            showAnnotationContextMenu(for: annotation, with: event)
             return
         }
 
@@ -1299,7 +1317,7 @@ private final class RegionSelectionView: NSView {
             kind: activeTool.annotationKind,
             points: initialPoints(for: activeTool, at: screenPoint(fromLocalPoint: point)),
             style: activeStyle,
-            text: activeTool == .text ? "" : nil
+            text: activeTool.usesTextEditor ? "" : nil
         )
         annotationStore.append(annotation)
         interaction = .annotating(start: point, annotationID: annotation.id)
@@ -1315,6 +1333,8 @@ private final class RegionSelectionView: NSView {
         at point: CGPoint
     ) -> [CGPoint] {
         switch tool {
+        case .step:
+            [point]
         case .pen:
             [point]
         case .mosaic where activeStyle.mosaicMode == .brush:
@@ -1338,7 +1358,9 @@ private final class RegionSelectionView: NSView {
         let screenPoint = screenPoint(fromLocalPoint: clampedPoint)
         var annotation = last
 
-        if annotation.kind == .pen || annotation.kind == .mosaic && annotation.style.mosaicMode == .brush {
+        if annotation.kind == .step {
+            annotation.points = [screenPoint]
+        } else if annotation.kind == .pen || annotation.kind == .mosaic && annotation.style.mosaicMode == .brush {
             annotation.points.append(screenPoint)
         } else if annotation.points.count >= 2 {
             annotation.points[annotation.points.count - 1] = screenPoint
@@ -1367,24 +1389,25 @@ private final class RegionSelectionView: NSView {
     private func finishTextAnnotationIfNeeded(id: UUID) {
         guard let annotation = annotationStore.annotations.last,
               annotation.id == id,
-              annotation.kind == .text,
+              annotation.kind.usesTextEditor,
               let firstPoint = annotation.points.first else {
             return
         }
 
         let localPoint = localPoint(fromScreenPoint: firstPoint)
-        let height = max(activeStyle.fontSize + 10, 28)
+        let height = max(annotation.style.fontSize + 10, 28)
+        let textOrigin = textEditorOrigin(for: annotation, at: localPoint)
         let field = NSTextField(
             frame: CGRect(
-                x: localPoint.x,
-                y: localPoint.y,
+                x: textOrigin.x,
+                y: textOrigin.y,
                 width: 180,
                 height: height
             )
         )
-        field.placeholderString = L10n.captureToolText
-        field.font = .systemFont(ofSize: activeStyle.fontSize, weight: .medium)
-        field.textColor = activeStyle.nsColor
+        field.placeholderString = annotation.kind == .step ? L10n.captureStepDescription : L10n.captureToolText
+        field.font = .systemFont(ofSize: annotation.style.fontSize, weight: annotation.style.fontWeight.nsFontWeight)
+        field.textColor = annotation.style.nsColor
         field.backgroundColor = .clear
         field.isBordered = false
         field.focusRingType = .none
@@ -1398,24 +1421,27 @@ private final class RegionSelectionView: NSView {
     private func commitTextEditor() {
         guard let textEditor,
               var annotation = annotationStore.annotations.last,
-              annotation.kind == .text else {
+              annotation.kind.usesTextEditor else {
             return
         }
 
-        annotation.text = textEditor.stringValue
-        let baselineOffset = textBaselineOffset(
-            fontSize: annotation.style.fontSize,
-            fieldHeight: textEditor.frame.height
-        )
-        annotation.points = [
-            screenPoint(
-                fromLocalPoint: CGPoint(
-                    x: textEditor.frame.minX,
-                    y: textEditor.frame.minY + baselineOffset
-                )
+        let trimmedText = textEditor.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        annotation.text = trimmedText
+        if annotation.kind == .text {
+            let baselineOffset = textBaselineOffset(
+                fontSize: annotation.style.fontSize,
+                fieldHeight: textEditor.frame.height
             )
-        ]
-        if textEditor.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            annotation.points = [
+                screenPoint(
+                    fromLocalPoint: CGPoint(
+                        x: textEditor.frame.minX,
+                        y: textEditor.frame.minY + baselineOffset
+                    )
+                )
+            ]
+        }
+        if annotation.kind == .text && trimmedText.isEmpty {
             annotationStore.discardLatestChange()
         } else {
             annotationStore.replaceLast(with: annotation)
@@ -1423,6 +1449,19 @@ private final class RegionSelectionView: NSView {
         textEditor.removeFromSuperview()
         self.textEditor = nil
         needsDisplay = true
+    }
+
+    private func textEditorOrigin(for annotation: ScreenshotAnnotation, at localPoint: CGPoint) -> CGPoint {
+        switch annotation.kind {
+        case .step:
+            let diameter = ScreenshotAnnotationRenderer.stepBubbleDiameter(for: annotation.style)
+            return CGPoint(
+                x: localPoint.x + diameter / 2 + 8,
+                y: localPoint.y - max(annotation.style.fontSize + 10, 28) / 2
+            )
+        default:
+            return localPoint
+        }
     }
 
     private func textBaselineOffset(fontSize: CGFloat, fieldHeight: CGFloat) -> CGFloat {
@@ -1677,6 +1716,8 @@ private final class RegionSelectionView: NSView {
             annotation.rect.insetBy(dx: -annotationHitSlop, dy: -annotationHitSlop).contains(screenPoint)
         case .text:
             textHitRect(for: annotation).contains(screenPoint)
+        case .step:
+            stepHitRect(for: annotation).contains(screenPoint)
         case .arrow:
             pointsHitPath(annotation.points, point: screenPoint, tolerance: max(annotation.style.lineWidth + annotationHitSlop, 12))
         case .pen:
@@ -1684,6 +1725,54 @@ private final class RegionSelectionView: NSView {
         case .mosaic:
             pointsHitPath(annotation.points, point: screenPoint, tolerance: max(annotation.style.mosaicBrushSize / 2, 14))
         }
+    }
+
+    private func removeHoveredAnnotationIfPossible() {
+        guard behavior == .capture,
+              toolbarCaptureMode == .screenshot,
+              let window,
+              let selectionRect else {
+            return
+        }
+
+        commitTextEditor()
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        guard let annotation = annotation(at: point, in: selectionRect) else {
+            return
+        }
+
+        annotationStore.remove(id: annotation.id)
+        refreshToolbar()
+        needsDisplay = true
+        actions.setNeedsDisplayOnAllScreens()
+    }
+
+    private func showAnnotationContextMenu(
+        for annotation: ScreenshotAnnotation,
+        with event: NSEvent
+    ) {
+        commitTextEditor()
+        let menu = NSMenu()
+        let deleteItem = NSMenuItem(
+            title: L10n.commonDelete,
+            action: #selector(deleteAnnotationFromContextMenu(_:)),
+            keyEquivalent: ""
+        )
+        deleteItem.target = self
+        deleteItem.representedObject = annotation.id
+        menu.addItem(deleteItem)
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func deleteAnnotationFromContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else {
+            return
+        }
+
+        annotationStore.remove(id: id)
+        refreshToolbar()
+        needsDisplay = true
+        actions.setNeedsDisplayOnAllScreens()
     }
 
     private func textHitRect(for annotation: ScreenshotAnnotation) -> CGRect {
@@ -1704,6 +1793,38 @@ private final class RegionSelectionView: NSView {
             height: max(size.height, annotation.style.fontSize + 6)
         )
         .insetBy(dx: -annotationHitSlop, dy: -annotationHitSlop)
+    }
+
+    private func stepHitRect(for annotation: ScreenshotAnnotation) -> CGRect {
+        guard let center = annotation.points.first else {
+            return annotation.rect.insetBy(dx: -annotationHitSlop, dy: -annotationHitSlop)
+        }
+
+        let diameter = ScreenshotAnnotationRenderer.stepBubbleDiameter(for: annotation.style)
+        var hitRect = CGRect(
+            x: center.x - diameter / 2,
+            y: center.y - diameter / 2,
+            width: diameter,
+            height: diameter
+        )
+        .insetBy(dx: -annotationHitSlop, dy: -annotationHitSlop)
+
+        if let text = annotation.text,
+           !text.isEmpty {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: annotation.style.fontSize, weight: annotation.style.fontWeight.nsFontWeight)
+            ]
+            let size = text.size(withAttributes: attributes)
+            let descriptionRect = CGRect(
+                x: center.x + diameter / 2 + 8,
+                y: center.y - max(size.height, annotation.style.fontSize + 6) / 2,
+                width: max(size.width, 18),
+                height: max(size.height, annotation.style.fontSize + 6)
+            )
+            hitRect = hitRect.union(descriptionRect.insetBy(dx: -annotationHitSlop, dy: -annotationHitSlop))
+        }
+
+        return hitRect
     }
 
     private func pointsHitPath(
@@ -1977,6 +2098,10 @@ private final class RegionSelectionView: NSView {
             },
             setFontSize: { [weak self] fontSize in
                 self?.activeStyle.fontSize = fontSize
+                self?.refreshToolbar()
+            },
+            setFontWeight: { [weak self] fontWeight in
+                self?.activeStyle.fontWeight = fontWeight
                 self?.refreshToolbar()
             },
             setMosaicMode: { [weak self] mode in
@@ -2343,7 +2468,7 @@ private struct RegionSelectionToolbarView: View {
             switch state.activeTool {
             case .rectangle, .ellipse, .arrow, .pen:
                 strokeOptions
-            case .text:
+            case .text, .step:
                 textOptions
             case .mosaic:
                 mosaicOptions
@@ -2376,7 +2501,35 @@ private struct RegionSelectionToolbarView: View {
                 action: actions.setFontSize,
                 help: L10n.captureFontSize
             )
+            Divider().frame(height: 22)
+            fontWeightOptions
         }
+    }
+
+    private var fontWeightOptions: some View {
+        HStack(spacing: 6) {
+            fontWeightButton(.regular, title: "R")
+            fontWeightButton(.medium, title: "M")
+            fontWeightButton(.bold, title: "B")
+        }
+    }
+
+    private func fontWeightButton(
+        _ weight: ScreenshotTextWeight,
+        title: String
+    ) -> some View {
+        Button {
+            actions.setFontWeight(weight)
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: weight.swiftUIFontWeight))
+                .frame(width: 22, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(weight == state.activeStyle.fontWeight ? Color.accentColor.opacity(0.16) : .clear)
+                )
+        }
+        .hoverTooltip(L10n.captureFontWeight)
     }
 
     private var mosaicOptions: some View {
@@ -2568,6 +2721,41 @@ private extension View {
     /// 不会显示,因此这里用 SwiftUI overlay 在同一窗口内绘制提示气泡。
     func hoverTooltip(_ text: String) -> some View {
         modifier(RegionSelectionHoverTooltip(text: text))
+    }
+}
+
+private extension ScreenshotAnnotationKind {
+    var usesTextEditor: Bool {
+        switch self {
+        case .text, .step:
+            true
+        case .rectangle, .ellipse, .arrow, .pen, .mosaic:
+            false
+        }
+    }
+}
+
+private extension ScreenshotTextWeight {
+    var nsFontWeight: NSFont.Weight {
+        switch self {
+        case .regular:
+            .regular
+        case .medium:
+            .medium
+        case .bold:
+            .bold
+        }
+    }
+
+    var swiftUIFontWeight: Font.Weight {
+        switch self {
+        case .regular:
+            .regular
+        case .medium:
+            .medium
+        case .bold:
+            .bold
+        }
     }
 }
 
