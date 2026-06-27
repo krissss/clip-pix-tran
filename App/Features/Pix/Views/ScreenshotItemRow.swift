@@ -30,7 +30,7 @@ struct ScreenshotItemRow: View {
     private var historyThumbnail: some View {
         if item.isImage {
             ImageThumbnailView(
-                data: item.data,
+                source: item.imageDataSource,
                 size: CGSize(width: 48, height: ControlPanelDesign.Layout.historyRowThumbnailSize)
             )
         } else {

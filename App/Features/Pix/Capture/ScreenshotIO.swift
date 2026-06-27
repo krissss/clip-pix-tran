@@ -107,12 +107,15 @@ struct SystemScreenshotService: ScreenshotService {
             in: rect,
             excludingWindowIDs: excludingWindowIDs
         )
-        let bitmap = NSBitmapImageRep(cgImage: cgImage)
-        guard let data = bitmap.representation(using: .png, properties: [:]) else {
-            throw ScreenshotCaptureError.pngEncodingFailed
-        }
 
-        return data
+        return try autoreleasepool {
+            let bitmap = NSBitmapImageRep(cgImage: cgImage)
+            guard let data = bitmap.representation(using: .png, properties: [:]) else {
+                throw ScreenshotCaptureError.pngEncodingFailed
+            }
+
+            return data
+        }
     }
 
     nonisolated private func captureDisplayImage(
@@ -412,26 +415,28 @@ struct ScreenCaptureSnapshot: @unchecked Sendable {
     }
 
     nonisolated func pngData(in rect: CGRect) throws -> Data {
-        guard let croppedImage = croppedImage(in: rect) else {
-            throw ScreenshotCaptureError.unavailable
-        }
+        try autoreleasepool {
+            guard let croppedImage = croppedImage(in: rect) else {
+                throw ScreenshotCaptureError.unavailable
+            }
 
-        let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            data,
-            UTType.png.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw ScreenshotCaptureError.pngEncodingFailed
-        }
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(
+                data,
+                UTType.png.identifier as CFString,
+                1,
+                nil
+            ) else {
+                throw ScreenshotCaptureError.pngEncodingFailed
+            }
 
-        CGImageDestinationAddImage(destination, croppedImage, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw ScreenshotCaptureError.pngEncodingFailed
-        }
+            CGImageDestinationAddImage(destination, croppedImage, nil)
+            guard CGImageDestinationFinalize(destination) else {
+                throw ScreenshotCaptureError.pngEncodingFailed
+            }
 
-        return data as Data
+            return data as Data
+        }
     }
 
     nonisolated func cropPixelRect(in rect: CGRect) -> CGRect? {
@@ -531,13 +536,18 @@ struct SystemScreenshotPasteboardService: ScreenshotPasteboardService {
     }
 
     func writePNGData(_ data: Data) throws {
-        guard let image = NSImage(data: data) else {
+        pasteboard.clearContents()
+
+        let didWriteData = pasteboard.setData(data, forType: .png)
+        if didWriteData {
+            return
+        }
+
+        guard let image = autoreleasepool(invoking: { NSImage(data: data) }) else {
             throw ScreenshotPasteboardError.invalidImageData
         }
 
-        pasteboard.clearContents()
-        let didWrite = pasteboard.writeObjects([image])
-        if !didWrite {
+        guard pasteboard.writeObjects([image]) else {
             throw ScreenshotPasteboardError.rejected
         }
     }

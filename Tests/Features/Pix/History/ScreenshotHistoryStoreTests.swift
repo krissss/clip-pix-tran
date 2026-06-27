@@ -170,6 +170,16 @@ struct ScreenshotHistoryStoreTests {
         #expect(reloadedStore.items.map(\.data) == [secondData, firstData])
         #expect(reloadedStore.limit == 5)
         #expect(reloadedStore.persistsHistory == true)
+
+        let persistedData = try Data(contentsOf: fileURL)
+        let persistedSnapshot = try JSONDecoder().decode(ScreenshotHistorySnapshot.self, from: persistedData)
+        let persistedImageItem = try #require(persistedSnapshot.items.first)
+        let imageFileName = try #require(persistedImageItem.dataFileName)
+        let imageFileURL = fileURL.deletingLastPathComponent()
+            .appending(path: "ScreenshotImages", directoryHint: .isDirectory)
+            .appending(path: imageFileName)
+        #expect(try Data(contentsOf: imageFileURL) == secondData)
+        #expect(!String(decoding: persistedData, as: UTF8.self).contains(secondData.base64EncodedString()))
     }
 
     @Test func decodesLegacyImageItemsWithoutKind() throws {
@@ -200,6 +210,42 @@ struct ScreenshotHistoryStoreTests {
         #expect(item.kind == .image)
         #expect(item.data == data)
         #expect(item.createdAt == createdAt)
+    }
+
+    @Test func loadingLegacyImageSnapshotMigratesImageDataToFile() async throws {
+        let fileURL = temporaryFileURL()
+        let imageData = try #require("legacy-image".data(using: .utf8))
+        let legacySnapshot = ScreenshotHistorySnapshot(
+            items: [ScreenshotItem(data: imageData)],
+            maximumItems: 20,
+            persistsHistory: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let legacyData = try encoder.encode(legacySnapshot)
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try legacyData.write(to: fileURL)
+        #expect(String(decoding: legacyData, as: UTF8.self).contains(imageData.base64EncodedString()))
+
+        let reloadedStore = ScreenshotHistoryStore(
+            persistence: FileScreenshotHistoryPersistence(fileURL: fileURL)
+        )
+        let item = try #require(reloadedStore.items.first)
+        #expect(item.data == imageData)
+
+        let migratedData = try Data(contentsOf: fileURL)
+        let migratedText = String(decoding: migratedData, as: UTF8.self)
+        let migratedSnapshot = try JSONDecoder().decode(ScreenshotHistorySnapshot.self, from: migratedData)
+        let migratedItem = try #require(migratedSnapshot.items.first)
+        let imageFileName = try #require(migratedItem.dataFileName)
+        let imageFileURL = fileURL.deletingLastPathComponent()
+            .appending(path: "ScreenshotImages", directoryHint: .isDirectory)
+            .appending(path: imageFileName)
+        #expect(try Data(contentsOf: imageFileURL) == imageData)
+        #expect(!migratedText.contains(imageData.base64EncodedString()))
     }
 
     @Test func explicitPersistencePreferenceOverridesSnapshot() async throws {

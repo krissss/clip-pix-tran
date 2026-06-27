@@ -125,7 +125,10 @@ struct ClipboardItemDetailPane: View {
                 }
 
                 if item.kind != .text {
-                    ClipboardMetadataRow(title: L10n.clipItemCount, value: "\(max(item.filePaths.count, item.imageData == nil ? 0 : 1))")
+                    ClipboardMetadataRow(
+                        title: L10n.clipItemCount,
+                        value: "\(max(item.filePaths.count, item.imageDataSource.isAvailable ? 1 : 0))"
+                    )
                 }
             }
         }
@@ -173,8 +176,8 @@ private struct ClipboardImagePreview: View {
         VStack(alignment: .leading, spacing: 10) {
             ControlPanelSectionLabel(title: L10n.pixImagePreview, systemImage: "photo")
 
-            if let imageData = item.imageData {
-                ClipboardFittedPreviewImage(data: imageData)
+            if item.imageDataSource.isAvailable {
+                ClipboardFittedPreviewImage(source: item.imageDataSource)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(ControlPanelDesign.Layout.detailContentPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -197,19 +200,15 @@ private struct ClipboardImagePreview: View {
 }
 
 private struct ClipboardFittedPreviewImage: View {
-    let data: Data
+    let source: ImageDataSource
 
-    @State private var thumbnailData: Data?
+    @State private var thumbnailImage: NSImage?
     @State private var didLoadThumbnail = false
 
     private let cornerRadius: CGFloat = ControlPanelDesign.compactRadius
 
     private var nsImage: NSImage? {
-        guard let thumbnailData else {
-            return nil
-        }
-
-        return NSImage(data: thumbnailData)
+        thumbnailImage
     }
 
     var body: some View {
@@ -239,12 +238,16 @@ private struct ClipboardFittedPreviewImage: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: data) {
-            thumbnailData = nil
+        .task(id: source.id) {
+            thumbnailImage = nil
             didLoadThumbnail = false
-            let sourceData = data
-            thumbnailData = await Task.detached(priority: .utility) {
-                ImageThumbnailRenderer.pngData(
+            let imageSource = source
+            thumbnailImage = await Task.detached(priority: .utility) {
+                guard let sourceData = imageSource.loadData() else {
+                    return nil
+                }
+
+                return ImageThumbnailRenderer.image(
                     from: sourceData,
                     maxPixelSize: 1400
                 )

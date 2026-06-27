@@ -8,7 +8,7 @@ struct ScreenRecordingThumbnailView<Overlay: View>: View {
     var maxPixelSize: CGFloat = 480
     @ViewBuilder var overlay: () -> Overlay
 
-    @State private var thumbnailData: Data?
+    @State private var thumbnailImage: NSImage?
     @State private var didLoadThumbnail = false
 
     init(
@@ -26,12 +26,11 @@ struct ScreenRecordingThumbnailView<Overlay: View>: View {
     }
 
     private var image: Image? {
-        guard let thumbnailData,
-              let nsImage = NSImage(data: thumbnailData) else {
+        guard let thumbnailImage else {
             return nil
         }
 
-        return Image(nsImage: nsImage)
+        return Image(nsImage: thumbnailImage)
     }
 
     var body: some View {
@@ -56,14 +55,14 @@ struct ScreenRecordingThumbnailView<Overlay: View>: View {
                 .stroke(.quaternary)
         }
         .task(id: item.recordingFileName) {
-            thumbnailData = nil
+            thumbnailImage = nil
             didLoadThumbnail = false
             guard let url = item.recordingURL else {
                 didLoadThumbnail = true
                 return
             }
 
-            thumbnailData = await ScreenRecordingThumbnailRenderer.pngData(
+            thumbnailImage = await ScreenRecordingThumbnailRenderer.image(
                 from: url,
                 maxPixelSize: maxPixelSize
             )

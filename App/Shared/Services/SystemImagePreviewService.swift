@@ -46,6 +46,11 @@ enum SystemImagePreviewService {
             return nil
         }
 
+        if let imageDataURL = item.imageDataURL,
+           FileManager.default.fileExists(atPath: imageDataURL.path) {
+            return imageDataURL
+        }
+
         return writeTemporaryImageFile(data: item.data, id: item.id, prefix: "screenshot")
     }
 
@@ -72,7 +77,7 @@ enum SystemImagePreviewService {
             return true
         }
 
-        return item.imageData != nil
+        return item.imageDataSource.isAvailable
     }
 
     static func imageFileExtension(from data: Data) -> String {

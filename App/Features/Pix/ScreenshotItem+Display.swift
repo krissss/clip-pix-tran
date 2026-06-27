@@ -58,8 +58,22 @@ extension ScreenshotItem {
     }
 
     private var imagePixelSize: CGSize? {
-        guard isImage,
-              let source = CGImageSourceCreateWithData(data as CFData, nil),
+        guard isImage else {
+            return nil
+        }
+
+        let source: CGImageSource?
+        if let imageDataURL {
+            source = CGImageSourceCreateWithURL(imageDataURL as CFURL, [
+                kCGImageSourceShouldCache: false
+            ] as CFDictionary)
+        } else {
+            source = CGImageSourceCreateWithData(data as CFData, [
+                kCGImageSourceShouldCache: false
+            ] as CFDictionary)
+        }
+
+        guard let source,
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
               let height = properties[kCGImagePropertyPixelHeight] as? CGFloat else {

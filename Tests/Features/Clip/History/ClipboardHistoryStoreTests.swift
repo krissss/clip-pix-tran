@@ -322,6 +322,52 @@ struct ClipboardHistoryStoreTests {
         #expect(reloadedStore.items.map(\.kind) == [.file, .image])
         #expect(reloadedStore.items.first?.filePaths == ["/tmp/report.pdf"])
         #expect(reloadedStore.items.last?.imageData == imageData)
+
+        let persistedData = try Data(contentsOf: fileURL)
+        let persistedSnapshot = try JSONDecoder().decode(ClipboardHistorySnapshot.self, from: persistedData)
+        let persistedImageItem = try #require(persistedSnapshot.items.last)
+        let imageFileName = try #require(persistedImageItem.imageDataFileName)
+        let imageFileURL = fileURL.deletingLastPathComponent()
+            .appending(path: "ClipboardImages", directoryHint: .isDirectory)
+            .appending(path: imageFileName)
+        #expect(try Data(contentsOf: imageFileURL) == imageData)
+        #expect(!String(decoding: persistedData, as: UTF8.self).contains(imageData.base64EncodedString()))
+    }
+
+    @Test func loadingLegacyImageSnapshotMigratesImageDataToFile() async throws {
+        let fileURL = temporaryFileURL()
+        let imageData = Data([0x89, 0x50, 0x4E, 0x47, 0x0D])
+        let legacySnapshot = ClipboardHistorySnapshot(
+            items: [ClipboardItem(imageData: imageData)],
+            maximumNormalItems: 20,
+            persistsHistory: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let legacyData = try encoder.encode(legacySnapshot)
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try legacyData.write(to: fileURL)
+        #expect(String(decoding: legacyData, as: UTF8.self).contains(imageData.base64EncodedString()))
+
+        let reloadedStore = ClipboardHistoryStore(
+            persistence: FileClipboardHistoryPersistence(fileURL: fileURL)
+        )
+        let item = try #require(reloadedStore.items.first)
+        #expect(item.imageData == imageData)
+
+        let migratedData = try Data(contentsOf: fileURL)
+        let migratedText = String(decoding: migratedData, as: UTF8.self)
+        let migratedSnapshot = try JSONDecoder().decode(ClipboardHistorySnapshot.self, from: migratedData)
+        let migratedItem = try #require(migratedSnapshot.items.first)
+        let imageFileName = try #require(migratedItem.imageDataFileName)
+        let imageFileURL = fileURL.deletingLastPathComponent()
+            .appending(path: "ClipboardImages", directoryHint: .isDirectory)
+            .appending(path: imageFileName)
+        #expect(try Data(contentsOf: imageFileURL) == imageData)
+        #expect(!migratedText.contains(imageData.base64EncodedString()))
     }
 
     @Test func persistsRichTextPayloads() async throws {

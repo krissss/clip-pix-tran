@@ -70,9 +70,9 @@ struct ClipboardItemRow: View {
 
     @ViewBuilder
     private var itemPreview: some View {
-        if item.kind == .image, let imageData = item.imageData {
+        if item.kind == .image, item.imageDataSource.isAvailable {
             ImageThumbnailView(
-                data: imageData,
+                source: item.imageDataSource,
                 size: CGSize(
                     width: ControlPanelDesign.Layout.historyRowThumbnailSize,
                     height: ControlPanelDesign.Layout.historyRowThumbnailSize

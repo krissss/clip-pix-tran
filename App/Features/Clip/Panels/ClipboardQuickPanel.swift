@@ -472,9 +472,9 @@ private struct ClipboardQuickPanelRow: View {
 
     @ViewBuilder
     private var preview: some View {
-        if item.kind == .image, let imageData = item.imageData {
+        if item.kind == .image, item.imageDataSource.isAvailable {
             ImageThumbnailView(
-                data: imageData,
+                source: item.imageDataSource,
                 size: CGSize(
                     width: ControlPanelDesign.Layout.compactPreviewSize,
                     height: ControlPanelDesign.Layout.compactPreviewSize

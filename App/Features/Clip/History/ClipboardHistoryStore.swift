@@ -54,6 +54,10 @@ final class ClipboardHistoryStore {
     }
 
     func updatePersistsHistory(_ shouldPersist: Bool) {
+        if !shouldPersist {
+            hydrateImageDataForCurrentSession()
+        }
+
         persistsHistory = shouldPersist
         persistencePreference.save(shouldPersist)
 
@@ -113,6 +117,7 @@ final class ClipboardHistoryStore {
 
     func delete(_ item: ClipboardItem) {
         items.removeAll { $0.id == item.id }
+        deleteImageFiles(for: [item])
         persistIfNeeded()
     }
 
@@ -127,12 +132,15 @@ final class ClipboardHistoryStore {
     }
 
     func clear() {
+        deleteImageFiles(for: items)
         items.removeAll()
         persistIfNeeded()
     }
 
     func clearUnpinned() {
+        let removedItems = items.filter { !$0.isPinned }
         items.removeAll { !$0.isPinned }
+        deleteImageFiles(for: removedItems)
         persistIfNeeded()
     }
 
@@ -145,8 +153,31 @@ final class ClipboardHistoryStore {
 
         while normalItemCount > limit,
               let oldestNormalIndex = items.lastIndex(where: { !$0.isPinned }) {
-            items.remove(at: oldestNormalIndex)
+            let removedItem = items.remove(at: oldestNormalIndex)
+            deleteImageFiles(for: [removedItem])
             normalItemCount -= 1
+        }
+    }
+
+    private func deleteImageFiles(for items: [ClipboardItem]) {
+        items.compactMap(\.imageDataURL).forEach { url in
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private func hydrateImageDataForCurrentSession() {
+        items = items.map { item in
+            guard item.kind == .image,
+                  item.imageDataFileName != nil,
+                  let imageData = item.imageData else {
+                return item
+            }
+
+            return item.replacingImageStorage(
+                inlineImageData: imageData,
+                imageDataFileName: nil,
+                imageDataFilePath: nil
+            )
         }
     }
 
@@ -165,7 +196,7 @@ final class ClipboardHistoryStore {
         case .text:
             return !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .image:
-            return item.imageData != nil || !item.filePaths.isEmpty
+            return item.hasImageData || !item.filePaths.isEmpty
         case .file:
             return !item.filePaths.isEmpty
         }

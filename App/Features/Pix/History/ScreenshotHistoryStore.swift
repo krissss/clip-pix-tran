@@ -57,6 +57,10 @@ final class ScreenshotHistoryStore {
     }
 
     func updatePersistsHistory(_ shouldPersist: Bool) {
+        if !shouldPersist {
+            hydrateImageDataForCurrentSession()
+        }
+
         persistsHistory = shouldPersist
         persistencePreference.save(shouldPersist)
 
@@ -111,6 +115,7 @@ final class ScreenshotHistoryStore {
     func delete(_ item: ScreenshotItem) {
         items.removeAll { $0.id == item.id }
         deleteRecordingFiles(for: [item])
+        deleteImageFiles(for: [item])
         persistIfNeeded()
     }
 
@@ -132,6 +137,7 @@ final class ScreenshotHistoryStore {
 
     func clear() {
         deleteRecordingFiles(for: items)
+        deleteImageFiles(for: items)
         items.removeAll()
         persistIfNeeded()
     }
@@ -142,7 +148,9 @@ final class ScreenshotHistoryStore {
 
     private func trimToLimit() {
         if items.count > maximumItems {
-            deleteRecordingFiles(for: Array(items[maximumItems...]))
+            let removedItems = Array(items[maximumItems...])
+            deleteRecordingFiles(for: removedItems)
+            deleteImageFiles(for: removedItems)
             items.removeSubrange(maximumItems...)
         }
     }
@@ -150,6 +158,33 @@ final class ScreenshotHistoryStore {
     private func deleteRecordingFiles(for items: [ScreenshotItem]) {
         items.compactMap(\.recordingFileName).forEach { fileName in
             recordingFileStore.deleteRecording(named: fileName)
+        }
+    }
+
+    private func deleteImageFiles(for items: [ScreenshotItem]) {
+        items.compactMap(\.imageDataURL).forEach { url in
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private func hydrateImageDataForCurrentSession() {
+        items = items.map { item in
+            guard item.isImage,
+                  item.dataFileName != nil else {
+                return item
+            }
+
+            let data = item.data
+            guard !data.isEmpty else {
+                return item
+            }
+
+            return item.replacingImageStorage(
+                inlineData: data,
+                dataFileName: nil,
+                dataFilePath: nil,
+                fileSize: Int64(data.count)
+            )
         }
     }
 

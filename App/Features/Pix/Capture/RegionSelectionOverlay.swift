@@ -21,7 +21,7 @@ final class RegionSelectionOverlay {
     private var scrollingCaptureSession: ScrollingScreenshotCaptureSession?
     private let captureProvider: CaptureProvider
     private let initialMode: ScreenshotRegionCaptureMode
-    private let initialSnapshots: [ScreenCaptureSnapshot]
+    private var initialSnapshots: [ScreenCaptureSnapshot]
     private let autoSelectionDetector: ScreenshotAutoSelectionDetecting
     private let behavior: RegionSelectionBehavior
     private let annotationStore = ScreenshotAnnotationStore()
@@ -179,6 +179,7 @@ final class RegionSelectionOverlay {
             window.makeFirstResponder(view)
             return window
         }
+        initialSnapshots.removeAll(keepingCapacity: false)
 
         NSCursor.crosshair.set()
     }
@@ -507,7 +508,11 @@ final class RegionSelectionOverlay {
             await session?.cancel()
         }
         NSCursor.arrow.set()
-        selectionViews.forEach { $0.closeTransientUI() }
+        initialSnapshots.removeAll(keepingCapacity: false)
+        selectionViews.forEach { view in
+            view.clearBaseImage()
+            view.closeTransientUI()
+        }
         selectionViews.removeAll()
         windows.forEach { window in
             window.orderOut(nil)
@@ -680,7 +685,6 @@ private struct RegionSelectionBaseImage {
     let screenRect: CGRect
     let pngData: Data
     let cgImage: CGImage
-    let nsImage: NSImage
 }
 
 private enum RegionAnnotationTool: CaseIterable {
@@ -1235,18 +1239,25 @@ private final class RegionSelectionView: NSView {
     }
 
     func setBaseImageData(_ data: Data, for capturedScreenRect: CGRect) {
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+        let imageOptions = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: true
+        ] as CFDictionary
+
         guard let selectionRect,
               screenRect(fromLocalRect: selectionRect).isApproximatelyEqual(to: capturedScreenRect),
-              let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+              let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, imageOptions) else {
             return
         }
 
         baseImage = RegionSelectionBaseImage(
             screenRect: capturedScreenRect,
             pngData: data,
-            cgImage: cgImage,
-            nsImage: NSImage(cgImage: cgImage, size: selectionRect.size)
+            cgImage: cgImage
         )
         clearPendingSnapshotBaseImageCapture()
         needsDisplay = true
@@ -1545,9 +1556,9 @@ private final class RegionSelectionView: NSView {
         }
 
         NSGraphicsContext.current?.imageInterpolation = .none
-        baseImage.nsImage.draw(
+        NSImage(cgImage: baseImage.cgImage, size: selectionRect.size).draw(
             in: selectionRect,
-            from: CGRect(origin: .zero, size: baseImage.nsImage.size),
+            from: CGRect(origin: .zero, size: selectionRect.size),
             operation: .sourceOver,
             fraction: 1
         )

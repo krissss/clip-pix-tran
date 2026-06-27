@@ -602,7 +602,26 @@ nonisolated enum ScreenRecordingGIFExporter {
 }
 
 nonisolated enum ScreenRecordingThumbnailRenderer {
+    static func image(from sourceURL: URL, maxPixelSize: CGFloat = 480) async -> NSImage? {
+        guard let cgImage = await cgImage(from: sourceURL, maxPixelSize: maxPixelSize) else {
+            return nil
+        }
+
+        return NSImage(cgImage: cgImage, size: CGSize(width: cgImage.width, height: cgImage.height))
+    }
+
     static func pngData(from sourceURL: URL, maxPixelSize: CGFloat = 480) async -> Data? {
+        guard let image = await cgImage(from: sourceURL, maxPixelSize: maxPixelSize) else {
+            return nil
+        }
+
+        return autoreleasepool {
+            let bitmap = NSBitmapImageRep(cgImage: image)
+            return bitmap.representation(using: .png, properties: [:])
+        }
+    }
+
+    private static func cgImage(from sourceURL: URL, maxPixelSize: CGFloat) async -> CGImage? {
         await Task.detached(priority: .utility) {
             guard FileManager.default.fileExists(atPath: sourceURL.path) else {
                 return nil
@@ -618,19 +637,16 @@ nonisolated enum ScreenRecordingThumbnailRenderer {
                 sampleSeconds = 0
             }
 
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+            return autoreleasepool {
+                let generator = AVAssetImageGenerator(asset: asset)
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
 
-            guard let image = try? generator.copyCGImage(
-                at: CMTime(seconds: sampleSeconds, preferredTimescale: 600),
-                actualTime: nil
-            ) else {
-                return nil
+                return try? generator.copyCGImage(
+                    at: CMTime(seconds: sampleSeconds, preferredTimescale: 600),
+                    actualTime: nil
+                )
             }
-
-            let bitmap = NSBitmapImageRep(cgImage: image)
-            return bitmap.representation(using: .png, properties: [:])
         }.value
     }
 }

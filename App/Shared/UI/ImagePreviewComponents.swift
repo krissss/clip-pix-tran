@@ -3,21 +3,46 @@ import ImageIO
 import SwiftUI
 
 struct ImageThumbnailView: View {
-    let data: Data
+    let source: ImageDataSource
     let size: CGSize
     var cornerRadius: CGFloat = 6
     var maxPixelSize: Int = 240
 
-    @State private var thumbnailData: Data?
+    @State private var thumbnailImage: NSImage?
     @State private var didLoadThumbnail = false
 
+    init(
+        data: Data,
+        size: CGSize,
+        cornerRadius: CGFloat = 6,
+        maxPixelSize: Int = 240
+    ) {
+        self.init(
+            source: ImageDataSource(id: data.stableImageDataID, inlineData: data),
+            size: size,
+            cornerRadius: cornerRadius,
+            maxPixelSize: maxPixelSize
+        )
+    }
+
+    init(
+        source: ImageDataSource,
+        size: CGSize,
+        cornerRadius: CGFloat = 6,
+        maxPixelSize: Int = 240
+    ) {
+        self.source = source
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.maxPixelSize = maxPixelSize
+    }
+
     private var image: Image? {
-        guard let thumbnailData,
-              let nsImage = NSImage(data: thumbnailData) else {
+        guard let thumbnailImage else {
             return nil
         }
 
-        return Image(nsImage: nsImage)
+        return Image(nsImage: thumbnailImage)
     }
 
     var body: some View {
@@ -37,12 +62,17 @@ struct ImageThumbnailView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .task(id: data) {
-            thumbnailData = nil
+        .task(id: source.id) {
+            thumbnailImage = nil
             didLoadThumbnail = false
-            let sourceData = data
-            thumbnailData = await Task.detached(priority: .utility) {
-                ImageThumbnailRenderer.pngData(
+            let imageSource = source
+            let maxPixelSize = maxPixelSize
+            thumbnailImage = await Task.detached(priority: .utility) {
+                guard let sourceData = imageSource.loadData() else {
+                    return nil
+                }
+
+                return ImageThumbnailRenderer.image(
                     from: sourceData,
                     maxPixelSize: maxPixelSize
                 )
@@ -67,24 +97,62 @@ struct ImageThumbnailView: View {
     }
 }
 
+private extension Data {
+    var stableImageDataID: String {
+        "\(count)-\(prefix(32).reduce(UInt64(1469598103934665603)) { hash, byte in (hash ^ UInt64(byte)) &* 1099511628211 })"
+    }
+}
+
 enum ImageThumbnailRenderer {
+    nonisolated static func image(from data: Data, maxPixelSize: Int = 240) -> NSImage? {
+        autoreleasepool {
+            guard let cgImage = downsampledCGImage(
+                from: data,
+                maxPixelSize: maxPixelSize
+            ) else {
+                return nil
+            }
+
+            return NSImage(cgImage: cgImage, size: imageSize(for: cgImage))
+        }
+    }
+
     nonisolated static func pngData(from data: Data, maxPixelSize: Int = 240) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+        autoreleasepool {
+            guard let image = downsampledCGImage(
+                from: data,
+                maxPixelSize: maxPixelSize
+            ) else {
+                return nil
+            }
+
+            let bitmap = NSBitmapImageRep(cgImage: image)
+            return bitmap.representation(using: .png, properties: [:])
+        }
+    }
+
+    private nonisolated static func downsampledCGImage(from data: Data, maxPixelSize: Int) -> CGImage? {
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
             return nil
         }
 
         let options = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
         ] as CFDictionary
 
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else {
-            return nil
-        }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options)
+    }
 
-        let bitmap = NSBitmapImageRep(cgImage: image)
-        return bitmap.representation(using: .png, properties: [:])
+    private nonisolated static func imageSize(for image: CGImage) -> CGSize {
+        CGSize(width: image.width, height: image.height)
     }
 }
 
@@ -300,7 +368,10 @@ private struct ImagePreviewDetailView: View {
             didLoadImage = false
             let sourceData = data
             nsImage = await Task.detached(priority: .utility) {
-                NSImage(data: sourceData)
+                ImageThumbnailRenderer.image(
+                    from: sourceData,
+                    maxPixelSize: 2400
+                )
             }.value
             didLoadImage = true
         }
