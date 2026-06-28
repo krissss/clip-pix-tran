@@ -165,7 +165,7 @@ final class RegionSelectionOverlay {
             window.backgroundColor = .clear
             window.isOpaque = false
             window.level = .screenSaver
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.collectionBehavior = [.fullScreenAuxiliary]
             window.hidesOnDeactivate = false
             window.ignoresMouseEvents = false
             window.acceptsMouseMovedEvents = true
@@ -1910,7 +1910,7 @@ private final class RegionSelectionView: NSView {
         toolbarWindow.backgroundColor = .clear
         toolbarWindow.isOpaque = false
         toolbarWindow.level = .screenSaver
-        toolbarWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        toolbarWindow.collectionBehavior = [.fullScreenAuxiliary]
         toolbarWindow.ignoresMouseEvents = false
         toolbarWindow.isReleasedWhenClosed = false
         toolbarWindow.orderFront(nil)
@@ -1952,7 +1952,7 @@ private final class RegionSelectionView: NSView {
         toolbarWindow.backgroundColor = .clear
         toolbarWindow.isOpaque = false
         toolbarWindow.level = .screenSaver
-        toolbarWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        toolbarWindow.collectionBehavior = [.fullScreenAuxiliary]
         toolbarWindow.ignoresMouseEvents = false
         toolbarWindow.isReleasedWhenClosed = false
         toolbarWindow.orderFront(nil)
@@ -2000,7 +2000,7 @@ private final class RegionSelectionView: NSView {
         statusWindow.backgroundColor = .clear
         statusWindow.isOpaque = false
         statusWindow.level = .screenSaver
-        statusWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        statusWindow.collectionBehavior = [.fullScreenAuxiliary]
         statusWindow.ignoresMouseEvents = false
         statusWindow.isReleasedWhenClosed = false
         statusWindow.orderFront(nil)

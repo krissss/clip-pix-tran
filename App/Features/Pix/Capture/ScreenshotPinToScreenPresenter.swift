@@ -122,7 +122,7 @@ private final class PinnedScreenshotWindowController: NSWindowController, NSWind
         window.isOpaque = false
         window.hasShadow = true
         window.level = .statusBar
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.collectionBehavior = [.fullScreenAuxiliary]
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false

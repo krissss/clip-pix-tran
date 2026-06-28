@@ -163,7 +163,7 @@ final class TranslationQuickPanelPresenter {
         panel.titlebarAppearsTransparent = true
         panel.isFloatingPanel = true
         panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.collectionBehavior = [.fullScreenAuxiliary, .transient, .moveToActiveSpace]
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false

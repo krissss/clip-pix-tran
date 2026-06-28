@@ -53,7 +53,7 @@ final class ScreenRecordingControlWindow {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.level = .screenSaver
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.fullScreenAuxiliary]
         panel.ignoresMouseEvents = false
         panel.isReleasedWhenClosed = false
         panel.isExcludedFromWindowsMenu = true

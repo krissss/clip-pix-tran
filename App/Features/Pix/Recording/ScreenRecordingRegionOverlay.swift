@@ -48,7 +48,7 @@ final class ScreenRecordingRegionOverlay: ScreenRecordingRegionOverlayPresenting
             window.backgroundColor = .clear
             window.isOpaque = false
             window.level = .screenSaver
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.collectionBehavior = [.fullScreenAuxiliary]
             window.ignoresMouseEvents = true
             window.isReleasedWhenClosed = false
             window.isExcludedFromWindowsMenu = true
