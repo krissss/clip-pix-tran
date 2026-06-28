@@ -979,6 +979,8 @@ extension L10n {
     static var pixOCRCopyText: String { tr("pix.ocr.copyText", "复制文字") }
     static var pixOCRTool: String { tr("pix.ocr.tool", "识别文字") }
     static var pixOCRToolHelp: String { tr("pix.ocr.tool.help", "识别所选区域的文字并复制") }
+    static var pixQRCodeTool: String { tr("pix.qrcode.tool", "识别二维码") }
+    static var pixQRCodeToolHelp: String { tr("pix.qrcode.tool.help", "识别所选区域中的二维码并复制内容") }
     static var pixScrollingCaptureTool: String { tr("pix.scrollingCapture.tool", "截长图") }
     static var pixScrollingCaptureToolHelp: String { tr("pix.scrollingCapture.tool.help", "滚动所选区域并拼接成长图") }
     static var pixScrollingCaptureInProgress: String { tr("pix.scrollingCapture.inProgress", "截长图中") }
@@ -987,6 +989,8 @@ extension L10n {
     static var pixOCRInvalidImage: String { tr("pix.ocr.invalidImage", "无法读取这张图片。") }
     static var pixOCRNoTextRecognized: String { tr("pix.ocr.noTextRecognized", "未识别到文字。") }
     static var pixOCRRecognizedCopied: String { tr("pix.ocr.recognizedCopied", "已识别并复制文字。") }
+    static var pixQRCodeInvalidImage: String { tr("pix.qrcode.invalidImage", "无法读取这张图片。") }
+    static var pixQRCodeNoCodeRecognized: String { tr("pix.qrcode.noCodeRecognized", "未识别到二维码。") }
     static var gifExportTitle: String { tr("gif.exportTitle", "导出 GIF") }
     static func gifFrameCount(_ count: Int) -> String { format("gif.frameCount", "%d 帧", count) }
     static func gifPreviewFrameCount(_ count: Int) -> String { format("gif.previewFrameCount", "%d 帧预览", count) }

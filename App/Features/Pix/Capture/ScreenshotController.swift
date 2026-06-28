@@ -38,6 +38,7 @@ final class ScreenshotController {
     private let recordingRegionOverlayFactory: (CGRect) -> ScreenRecordingRegionOverlayPresenting
     private let captureTimeoutNanoseconds: UInt64
     private let ocrService: OCRService?
+    private let qrCodeProvider: VisionQRCodeProvider
 
     var captureMode: PixCaptureMode = .screenshot
     var isCapturing = false
@@ -87,6 +88,7 @@ final class ScreenshotController {
         self.recordingRegionOverlayFactory = recordingRegionOverlayFactory
         self.captureTimeoutNanoseconds = captureTimeoutNanoseconds
         self.ocrService = ocrService
+        self.qrCodeProvider = VisionQRCodeProvider()
     }
 
     @discardableResult
@@ -206,6 +208,10 @@ final class ScreenshotController {
                 history.record(output.data, captureSource: captureSource)
                 ocrCaptureDidRecord?()
                 await recognizeAndCopyImageData(output.data)
+            case .recognizeQRCode:
+                captureMode = .screenshot
+                history.record(output.data, captureSource: captureSource)
+                await recognizeAndCopyQRCodeData(output.data)
             case .startRecording:
                 guard let sourceRect = output.sourceRect else {
                     throw ScreenshotCaptureError.unavailable
@@ -627,6 +633,24 @@ final class ScreenshotController {
             }
             clearLastError()
         } catch let error as OCRError {
+            setOperationError(error)
+        } catch {
+            setOperationError(error)
+        }
+    }
+
+    /// 对刚捕获的图片数据做二维码识别，识别到后复制首个结果到剪贴板。
+    private func recognizeAndCopyQRCodeData(_ data: Data) async {
+        do {
+            let result = try await qrCodeProvider.recognize(in: data)
+            guard let payload = result.primaryValue else {
+                clearLastError()
+                return
+            }
+
+            pasteboard.writeString(payload)
+            clearLastError()
+        } catch let error as QRCodeError {
             setOperationError(error)
         } catch {
             setOperationError(error)

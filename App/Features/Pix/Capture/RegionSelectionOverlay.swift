@@ -796,6 +796,7 @@ private struct RegionToolbarActions {
     let copy: () -> Void
     let save: () -> Void
     let recognizeText: () -> Void
+    let recognizeQRCode: () -> Void
     let scrollingCapture: () -> Void
     let cancel: () -> Void
     let finish: () -> Void
@@ -2153,6 +2154,10 @@ private final class RegionSelectionView: NSView {
                 self?.commitTextEditor()
                 self?.actions.finish(.recognizeText)
             },
+            recognizeQRCode: { [weak self] in
+                self?.commitTextEditor()
+                self?.actions.finish(.recognizeQRCode)
+            },
             scrollingCapture: { [weak self] in
                 self?.commitTextEditor()
                 self?.actions.finish(.scrollingCapture)
@@ -2429,6 +2434,12 @@ private struct RegionSelectionToolbarView: View {
                     .frame(width: 22, height: 22)
             }
             .hoverTooltip(L10n.pixOCRTool)
+
+            Button(action: actions.recognizeQRCode) {
+                Image(systemName: "qrcode.viewfinder")
+                    .frame(width: 22, height: 22)
+            }
+            .hoverTooltip(L10n.pixQRCodeToolHelp)
 
             Button(action: actions.scrollingCapture) {
                 Image(systemName: "arrow.down.doc")
