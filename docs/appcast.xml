@@ -6,34 +6,34 @@
         <description>ClipPixTran 版本更新</description>
         <language>zh-CN</language>
         <item>
-            <title>ClipPixTran 0.5.0</title>
-            <sparkle:version>62</sparkle:version>
-            <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+            <title>ClipPixTran 0.6.0</title>
+            <sparkle:version>71</sparkle:version>
+            <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
-            <pubDate>Thu, 18 Jun 2026 09:35:47 +0000</pubDate>
+            <pubDate>Thu, 02 Jul 2026 15:12:18 +0000</pubDate>
             <description><![CDATA[<b>What&#x27;s Changed</b>
 <b>Added</b>
 <ul>
-<li>添加 Pix 截图 OCR 功能</li>
-<li>支持手动截长图</li>
-<li>支持双击预览图片</li>
+<li>支持截图步骤标注</li>
+<li>pix: 在截图框选中添加二维码识别</li>
 </ul>
 <b>Changed</b>
 <ul>
-<li>移除 OpenAI 翻译与发音支持</li>
-<li>移除翻译硬编码 fallback</li>
+<li>优化区域截图工具条显示卡顿</li>
+<li>优化图片历史内存占用</li>
+<li>移除 gitnexus</li>
 </ul>
 <b>Fixed</b>
 <ul>
-<li>修复历史列表选中样式与点击区域</li>
-<li>修复系统翻译首次不可用误判</li>
+<li>强化自动更新兜底唤醒</li>
+<li>收紧窗口的桌面可见范围</li>
 </ul>
-**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...v0.5.0]]></description>
+**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.5.0...v0.6.0]]></description>
             <enclosure
-                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.5.0/ClipPixTran-v0.5.0.zip"
-                sparkle:edSignature="x5ZwP9YIL9GbZcoBmb6E2yXsuCSGX+5Dyq2fyTBm4BhPAHLBCUCEHQmnSEzHVH2w6LmP73RCPPb1OnHMyUlhBw=="
-                length="3287697"
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.6.0/ClipPixTran-v0.6.0.zip"
+                sparkle:edSignature="SDFtwWLjyLAcYE/04NnYvZQovqLURsoV61LkRQ0JNU2DRPnlDrQOt2FwdhW0TSjPKGOexd4siyggTceNdgfnAQ=="
+                length="3365649"
                 type="application/octet-stream"
             />
         </item>
