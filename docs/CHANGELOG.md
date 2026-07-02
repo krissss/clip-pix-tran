@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-02
+
+### Added
+
+- 支持截图步骤标注
+- pix: 在截图框选中添加二维码识别
+
+### Changed
+
+- 优化区域截图工具条显示卡顿
+- 优化图片历史内存占用
+- 移除 gitnexus
+
+### Fixed
+
+- 强化自动更新兜底唤醒
+- 收紧窗口的桌面可见范围
+
 ## [0.5.0] - 2026-06-18
 
 ### Added
@@ -93,7 +111,8 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/krissss/clip-pix-tran/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/krissss/clip-pix-tran/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/krissss/clip-pix-tran/compare/v0.2.0...v0.3.0
