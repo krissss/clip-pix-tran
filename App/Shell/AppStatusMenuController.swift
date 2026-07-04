@@ -49,9 +49,10 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
             return
         }
 
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = statusBarImage
         item.button?.imagePosition = .imageOnly
+        item.button?.imageScaling = .scaleProportionallyDown
         item.button?.toolTip = statusItemToolTip
         item.menu = menu
         statusItem = item
@@ -66,7 +67,11 @@ final class AppStatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private var statusBarImage: NSImage? {
-        let image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: L10n.appName)
+        let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        let baseImage = NSImage(systemSymbolName: "text.viewfinder", accessibilityDescription: statusItemToolTip)
+            ?? NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: statusItemToolTip)
+        let configuredImage = baseImage?.withSymbolConfiguration(symbolConfiguration) ?? baseImage
+        let image = configuredImage?.copy() as? NSImage
         image?.isTemplate = true
         return image
     }
