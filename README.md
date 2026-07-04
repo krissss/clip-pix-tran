@@ -1,9 +1,15 @@
-# ClipPixTran
+<p align="center">
+  <img src="docs/brand/clip-pix-tran-logo-lockup-2400x760.png" alt="ClipPixTran logo" width="720">
+</p>
 
-[English](README_EN.md)
+<p align="center">
+  <a href="README.md">简体中文</a> · <a href="README_EN.md">English</a>
+</p>
 
-[![CI](https://github.com/krissss/clip-pix-tran/actions/workflows/ci.yml/badge.svg)](https://github.com/krissss/clip-pix-tran/actions/workflows/ci.yml)
-[![Release](https://github.com/krissss/clip-pix-tran/actions/workflows/release.yml/badge.svg)](https://github.com/krissss/clip-pix-tran/actions/workflows/release.yml)
+<p align="center">
+  <a href="https://github.com/krissss/clip-pix-tran/actions/workflows/ci.yml"><img src="https://github.com/krissss/clip-pix-tran/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/krissss/clip-pix-tran/actions/workflows/release.yml"><img src="https://github.com/krissss/clip-pix-tran/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+</p>
 
 ClipPixTran 是一个 macOS 桌面效率工具，围绕 Clip、Pix、Tran 三个常用工作流，把剪贴板、截图和翻译放进同一个轻量控制面板。
 

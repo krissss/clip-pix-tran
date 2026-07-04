@@ -74,15 +74,12 @@ struct AppShellView: View {
 
     private var sidebarHeader: some View {
         VStack(spacing: 7) {
-            Image(systemName: "sparkles.rectangle.stack")
-                .font(.system(size: 19, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 38, height: 38)
-                .controlPanelRoundedSurface(
-                    background: Color.accentColor.opacity(0.13),
-                    cornerRadius: ControlPanelDesign.cardRadius
-                )
+            Image("BrandMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 42, height: 42)
+                .accessibilityLabel(L10n.appName)
+                .help(L10n.appName)
 
             #if DEBUG
             DebugBuildBadge()
