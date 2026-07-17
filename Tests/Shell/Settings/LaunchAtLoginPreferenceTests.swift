@@ -1,9 +1,16 @@
 import Foundation
+import ServiceManagement
 import Testing
 @testable import ClipPixTran
 
 @MainActor
 struct LaunchAtLoginPreferenceTests {
+    @Test func treatsMissingRegistrationAsDisabled() {
+        #expect(
+            SystemLaunchAtLoginService.registrationStatus(for: .notFound) == .disabled
+        )
+    }
+
     @Test func reflectsEnabledStatus() {
         let preference = LaunchAtLoginPreference(
             service: FakeLaunchAtLoginService(status: .enabled)

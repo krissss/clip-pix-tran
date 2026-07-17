@@ -17,7 +17,13 @@ protocol LaunchAtLoginServicing {
 
 struct SystemLaunchAtLoginService: LaunchAtLoginServicing {
     var status: LaunchAtLoginRegistrationStatus {
-        switch SMAppService.mainApp.status {
+        Self.registrationStatus(for: SMAppService.mainApp.status)
+    }
+
+    static func registrationStatus(
+        for status: SMAppService.Status
+    ) -> LaunchAtLoginRegistrationStatus {
+        switch status {
         case .notRegistered:
             .disabled
         case .enabled:
@@ -25,7 +31,8 @@ struct SystemLaunchAtLoginService: LaunchAtLoginServicing {
         case .requiresApproval:
             .requiresApproval
         case .notFound:
-            .unavailable
+            // macOS can report this before the first main-app registration.
+            .disabled
         @unknown default:
             .unavailable
         }
