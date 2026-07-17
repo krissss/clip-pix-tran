@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-17
+
+### Fixed
+
+- 修复首次设置开机自启失败
+
 ## [0.6.1] - 2026-07-05
 
 ### Added
@@ -118,7 +124,8 @@
 
 - 修复 Pix 区域截图菜单栏面板保留问题
 
-[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/krissss/clip-pix-tran/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/krissss/clip-pix-tran/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/krissss/clip-pix-tran/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/krissss/clip-pix-tran/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/krissss/clip-pix-tran/compare/v0.4.0...v0.5.0
