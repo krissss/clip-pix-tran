@@ -6,23 +6,22 @@
         <description>ClipPixTran 版本更新</description>
         <language>zh-CN</language>
         <item>
-            <title>ClipPixTran 0.6.1</title>
-            <sparkle:version>76</sparkle:version>
-            <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
+            <title>ClipPixTran 0.6.2</title>
+            <sparkle:version>79</sparkle:version>
+            <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:fullReleaseNotesLink>https://krissss.github.io/clip-pix-tran/CHANGELOG.md</sparkle:fullReleaseNotesLink>
-            <pubDate>Sat, 04 Jul 2026 16:08:20 +0000</pubDate>
+            <pubDate>Fri, 17 Jul 2026 03:45:45 +0000</pubDate>
             <description><![CDATA[<b>What&#x27;s Changed</b>
-<b>Added</b>
+<b>Fixed</b>
 <ul>
-<li>添加应用品牌标识</li>
-<li>更换新的菜单栏图标</li>
+<li>修复首次设置开机自启失败</li>
 </ul>
-**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.6.0...v0.6.1]]></description>
+**Full Changelog**: https://github.com/krissss/clip-pix-tran/compare/v0.6.1...v0.6.2]]></description>
             <enclosure
-                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.6.1/ClipPixTran-v0.6.1.zip"
-                sparkle:edSignature="vMNMA46ZOR0Vg/CdHf2WQo5zDK8+XAIPHKfcaS9dPME7yLUCsW24tAXICUM3kAxvtCkrZY0p60+OEWbk+t94Dw=="
-                length="4019937"
+                url="https://github.com/krissss/clip-pix-tran/releases/download/v0.6.2/ClipPixTran-v0.6.2.zip"
+                sparkle:edSignature="IGN/5+eBHEFociLH2HfKY9AzJ6bQ7I3vyUnD9q2phyIRR/qYslOb5kyxpVp94qqf90uEJQBOEbuH7IsirfmwAA=="
+                length="4020063"
                 type="application/octet-stream"
             />
         </item>
